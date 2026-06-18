@@ -1,0 +1,140 @@
+"use client";
+
+import React from "react";
+import { FormCard, ActionButtons } from "@/components/shared";
+import type { Action } from "@/components/shared";
+import type { Category } from "../types";
+import { colors } from "@/components/ui/colors";
+import { typography } from "@/components/ui/typography";
+
+// ----------------------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------------------
+export interface CategoryDetailProps {
+  category: Category;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onBack?: () => void;
+}
+
+// ----------------------------------------------------------------------------
+// Styles
+// ----------------------------------------------------------------------------
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, 1fr)",
+  gap: "16px",
+};
+
+const fieldStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "2px",
+};
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: typography.fontFamily,
+  fontSize: typography.sizes.caption.fontSize,
+  fontWeight: typography.weights.medium,
+  color: colors.text.secondary,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const valueStyle: React.CSSProperties = {
+  fontFamily: typography.fontFamily,
+  fontSize: typography.sizes.body.fontSize,
+  color: colors.text.primary,
+  lineHeight: "24px",
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: typography.fontFamily,
+  fontSize: typography.sizes.small.fontSize,
+  fontWeight: typography.weights.semibold,
+  color: colors.text.primary,
+  margin: 0,
+  marginBottom: "12px",
+  paddingBottom: "6px",
+  borderBottom: `1px solid ${colors.border}`,
+};
+
+const badgeActiveStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "2px 10px",
+  borderRadius: "12px",
+  fontFamily: typography.fontFamily,
+  fontSize: typography.sizes.caption.fontSize,
+  fontWeight: typography.weights.medium,
+  backgroundColor: colors.success[50],
+  color: colors.success[700],
+  border: `1px solid ${colors.success[200]}`,
+};
+
+const badgeInactiveStyle: React.CSSProperties = {
+  ...badgeActiveStyle,
+  backgroundColor: colors.secondary[50],
+  color: colors.secondary[600],
+  border: `1px solid ${colors.secondary[200]}`,
+};
+
+// ----------------------------------------------------------------------------
+// Component
+// ----------------------------------------------------------------------------
+export default function CategoryDetail({
+  category,
+  onEdit,
+  onDelete,
+  onBack,
+}: CategoryDetailProps) {
+  const actions: Action[] = [
+    ...(onEdit
+      ? [{ label: "Edit", variant: "primary" as const, onClick: onEdit }]
+      : []),
+    ...(onDelete
+      ? [{ label: "Delete", variant: "danger" as const, onClick: onDelete }]
+      : []),
+    ...(onBack
+      ? [{ label: "Back", variant: "secondary" as const, onClick: onBack }]
+      : []),
+  ];
+
+  const statusBadge = category.isActive ? (
+    <span style={badgeActiveStyle}>Active</span>
+  ) : (
+    <span style={badgeInactiveStyle}>Inactive</span>
+  );
+
+  const renderField = (label: string, value: React.ReactNode) => (
+    <div style={fieldStyle}>
+      <span style={labelStyle}>{label}</span>
+      <span style={valueStyle}>{value ?? "\u2014"}</span>
+    </div>
+  );
+
+  return (
+    <FormCard
+      title="Category Information"
+      variant="teal-header"
+      footer={{ actions: <ActionButtons actions={actions} /> }}
+    >
+      <div>
+        <h4 style={sectionTitleStyle}>Category Details</h4>
+        <div style={gridStyle}>
+          {renderField("Category Name", category.name)}
+          {renderField("Status", statusBadge)}
+          {renderField(
+            "Parent Category",
+            category.parentCategoryName ||
+              category.parentCategoryId ||
+              "\u2014",
+          )}
+        </div>
+        <div style={{ marginTop: "16px" }}>
+          {renderField("Description", category.description || "\u2014")}
+        </div>
+      </div>
+    </FormCard>
+  );
+}

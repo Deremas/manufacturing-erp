@@ -1,0 +1,18 @@
+"use client";
+
+import PageHeader from "@/components/shared/PageHeader";
+import EmptyState from "@/components/shared/EmptyState";
+
+export default function BankAccountsPage() {
+  return (
+    <div
+      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
+    >
+      <PageHeader
+        title="Bank Accounts"
+        subtitle="Manage finance bank accounts"
+      />
+      <EmptyState title="Bank Accounts" message="Module coming soon." />
+    </div>
+  );
+}

@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id                String    @id @default(cuid())
+  companyName       String
+  logo              String?
+  address           String?
+  phone             String?
+  email             String?
+  tinNumber         String?
+  vatNumber         String?
+  defaultCurrency   String    @default("KES")
+  fiscalYearStart   DateTime?
+  invoiceFooter     String?
+  reportHeaderInfo  String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model User {
+  id                  String           @id @default(cuid())
+  name                String
+  email               String           @unique
+  password            String?
+  role                String           @default("user")
+  phone               String?
+  avatar              String?
+  isActive            Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  roleId              String?
+  roleRel             Role?            @relation(fields: [roleId], references: [id])
+  locations           UserLocation[]
+  auditLogs           AuditLog[]
+  managedDepartments  Department[]
+  stockMovementsCreated StockMovement[]
+  requestedApprovals  Approval[]       @relation("RequestedBy")
+  approvedApprovals   Approval[]       @relation("ApprovedBy")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  isActive    Boolean          @default(true)
+  permissions RolePermission[]
+  users       User[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  module          String
+  action          String
+  label           String?
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id             String     @id @default(cuid())
+  roleId         String
+  role           Role       @relation(fields: [roleId], references: [id])
+  permission     String
+  module         String
+  action         String
+  permissionRel  Permission? @relation(fields: [permission], references: [id])
+}
+
+model Location {
+  id              String           @id @default(cuid())
+  locationCode    String           @unique
+  locationName    String
+  locationType    String
+  address         String?
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  userLocations   UserLocation[]
+  stockBalances   StockBalance[]
+  stockMovements  StockMovement[]
+}
+
+model UserLocation {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  isDefault  Boolean  @default(false)
+}
+
+model SystemSetting {
+  id       String @id @default(cuid())
+  key      String @unique
+  value    String
+  category String @default("general")
+}
+
+// Master Data Models
+model Item {
+  id                String          @id @default(cuid())
+  itemCode          String          @unique
+  itemName          String
+  sku               String?
+  categoryId        String?
+  category          Category?       @relation(fields: [categoryId], references: [id])
+  itemType          String
+  uomId             String?
+  uom               Unit?           @relation("ItemUOM", fields: [uomId], references: [id])
+  purchaseUomId     String?
+  purchaseUom       Unit?           @relation("PurchaseUOM", fields: [purchaseUomId], references: [id])
+  salesUomId        String?
+  salesUom          Unit?           @relation("SalesUOM", fields: [salesUomId], references: [id])
+  conversionFactor  Float?          @default(1)
+  reorderPoint      Float?          @default(0)
+  standardCost      Float?          @default(0)
+  sellingPrice      Float?          @default(0)
+  vatApplicable     Boolean         @default(true)
+  exciseApplicable  Boolean         @default(false)
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  stockBalances     StockBalance[]
+  stockMovements    StockMovement[]
+  priceListItems    PriceList[]
+}
+
+model Category {
+  id                String     @id @default(cuid())
+  name              String
+  parentCategoryId  String?
+  parent            Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  children          Category[] @relation("CategoryHierarchy")
+  description       String?
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  items             Item[]
+}
+
+model Unit {
+  id             String  @id @default(cuid())
+  name           String
+  abbreviation   String
+  type           String
+  isActive       Boolean @default(true)
+  items          Item[]  @relation("ItemUOM")
+  purchaseItems  Item[]  @relation("PurchaseUOM")
+  salesItems     Item[]  @relation("SalesUOM")
+}
+
+model Customer {
+  id            String   @id @default(cuid())
+  customerCode  String   @unique
+  name          String
+  phone         String?
+  email         String?
+  address       String?
+  creditLimit   Float?   @default(0)
+  paymentTerms  String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  supplierCode  String   @unique
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  paymentTerms  String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  managerId String?
+  manager   User?    @relation(fields: [managerId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bank {
+  id        String        @id @default(cuid())
+  name      String
+  shortName String?
+  isActive  Boolean       @default(true)
+  accounts  BankAccount[]
+}
+
+model BankAccount {
+  id              String  @id @default(cuid())
+  accountCode     String  @unique
+  accountName     String
+  accountType     String
+  bankId          String
+  bank            Bank    @relation(fields: [bankId], references: [id])
+  accountNumber   String
+  branch          String?
+  swiftCode       String?
+  currency        String  @default("KES")
+  openingBalance  Float   @default(0)
+  currentBalance  Float   @default(0)
+  isActive        Boolean @default(true)
+}
+
+model PriceList {
+  id            String    @id @default(cuid())
+  itemId        String
+  item          Item      @relation(fields: [itemId], references: [id])
+  customerGroup String?
+  price         Float
+  effectiveDate DateTime?
+  isActive      Boolean   @default(true)
+}
+
+model TaxCode {
+  id       String   @id @default(cuid())
+  taxName  String
+  taxType  String
+  rate     Float
+  isActive Boolean  @default(true)
+}
+
+// Document Numbering
+model DocumentNumbering {
+  id              String  @id @default(cuid())
+  prefix          String  @unique
+  description     String?
+  prefixFormat    String  @default("PREFIX")
+  separator       String  @default("")
+  yearFormat      String  @default("YYYY")
+  monthFormat     String  @default("MM")
+  dayFormat       String  @default("DD")
+  sequenceLength  Int     @default(4)
+  currentSequence Int     @default(0)
+  isActive        Boolean @default(true)
+}
+
+// Audit Log
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  module    String
+  recordId  String?
+  oldValue  String?
+  newValue  String?
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime @default(now())
+}
+
+// Inventory Models
+model StockBalance {
+  id                String    @id @default(cuid())
+  itemId            String
+  item              Item      @relation(fields: [itemId], references: [id])
+  locationId        String
+  location          Location  @relation(fields: [locationId], references: [id])
+  quantity          Float     @default(0)
+  reservedQuantity  Float     @default(0)
+  availableQuantity Float     @default(0)
+  averageCost       Float     @default(0)
+  lastMovementDate  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([itemId, locationId])
+}
+
+model StockMovement {
+  id             String   @id @default(cuid())
+  movementNumber String   @unique
+  date           DateTime @default(now())
+  itemId         String
+  item           Item     @relation(fields: [itemId], references: [id])
+  locationId     String
+  location       Location @relation(fields: [locationId], references: [id])
+  movementType   String
+  quantityIn     Float    @default(0)
+  quantityOut    Float    @default(0)
+  unitCost       Float?
+  totalCost      Float?
+  referenceType  String?
+  referenceId    String?
+  remarks        String?
+  createdById    String
+  createdBy      User     @relation(fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+}
+
+// Approval Model
+model Approval {
+  id             String   @id @default(cuid())
+  referenceType  String
+  referenceId    String
+  status         String   @default("PENDING")
+  requestedById  String
+  requestedBy    User     @relation("RequestedBy", fields: [requestedById], references: [id])
+  approvedById   String?
+  approvedBy     User?    @relation("ApprovedBy", fields: [approvedById], references: [id])
+  comment        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Master Data — Extended Models
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Color {
+  id          String   @id @default(cuid())
+  name        String
+  value       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Size {
+  id          String   @id @default(cuid())
+  name        String
+  value       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Attribute {
+  id          String            @id @default(cuid())
+  name        String
+  type        String            @default("text") // text | select | boolean
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  options     AttributeOption[]
+}
+
+model AttributeOption {
+  id          String    @id @default(cuid())
+  attributeId String
+  attribute   Attribute @relation(fields: [attributeId], references: [id])
+  value       String
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@unique([attributeId, value])
+}
+
+model UnitConversion {
+  id         String   @id @default(cuid())
+  fromUnitId String
+  toUnitId   String
+  factor     Float
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUnitId, toUnitId])
+}
+
+model PrintSetting {
+  id       String @id @default(cuid())
+  module   String
+  template String
+  options  String @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([module, template])
+}
+
+model ModuleSetting {
+  id        String   @id @default(cuid())
+  module    String
+  key       String
+  value     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([module, key])
+}
