@@ -1,18 +1,7 @@
-"use client";
-
-import React from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { BankForm } from "@/features/master-data/components";
 
-export default function CreateBankPage() {
-  const router = useRouter();
-
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist bank
-    router.push("/master-data/banks");
-  };
-
+export default async function CreateBankPage() {
   return (
     <div
       style={{
@@ -30,7 +19,7 @@ export default function CreateBankPage() {
           { label: "Create" },
         ]}
       />
-      <BankForm onSubmit={handleSubmit} />
+      <BankForm />
     </div>
   );
 }

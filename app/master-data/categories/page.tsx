@@ -1,8 +1,7 @@
-"use client";
+import { CategoriesListPage } from "@/features/master-data/categories";
+import { getCategories } from "@/lib/master-data-db";
 
-import React from "react";
-import { CategoriesPage } from "@/features/master-data";
-
-export default function MasterDataCategoriesPage() {
-  return <CategoriesPage />;
+export default async function MasterDataCategoriesPage() {
+  const categories = await getCategories();
+  return <CategoriesListPage initialData={categories} />;
 }

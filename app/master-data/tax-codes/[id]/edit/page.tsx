@@ -1,40 +1,23 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { TaxCodeForm } from "@/features/master-data/components";
-import type { TaxCode } from "@/features/master-data/types";
+import { getTaxCodeById, getTaxTypes } from "@/lib/master-data-db";
 
-export default function EditTaxCodePage() {
-  const router = useRouter();
-  const params = useParams();
-  const [data, setData] = useState<TaxCode | null>(null);
-  const [loading, setLoading] = useState(true);
+interface EditTaxCodeRouteProps {
+  params: { id: string };
+}
 
-  useEffect(() => {
-    // TODO: API integration — fetch tax code by ID
-    setData({
-      id: params.id as string,
-      taxName: "VAT 16%",
-      taxType: "vat",
-      rate: 16,
-      isActive: true,
-    } as TaxCode);
-    setLoading(false);
-  }, [params.id]);
+export default async function EditTaxCodeRoute({
+  params,
+}: EditTaxCodeRouteProps) {
+  const { id } = params;
+  const [taxCode, taxTypes] = await Promise.all([
+    getTaxCodeById(id),
+    getTaxTypes(),
+  ]);
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — update tax code
-    router.push("/master-data/tax-codes");
-  };
-
-  if (loading) {
-    return <div style={{ padding: "24px" }}>Loading…</div>;
-  }
-
-  if (!data) {
-    return <div style={{ padding: "24px" }}>Tax Code not found</div>;
+  if (!taxCode) {
+    notFound();
   }
 
   return (
@@ -47,15 +30,15 @@ export default function EditTaxCodePage() {
       }}
     >
       <PageHeader
-        title={`Edit: ${data.taxName}`}
+        title={`Edit: ${taxCode.taxName}`}
         breadcrumbs={[
           { label: "Master Data", href: "/master-data" },
           { label: "Tax Codes", href: "/master-data/tax-codes" },
-          { label: data.taxName },
+          { label: taxCode.taxName },
           { label: "Edit" },
         ]}
       />
-      <TaxCodeForm initialData={data} onSubmit={handleSubmit} />
+      <TaxCodeForm initialData={taxCode} taxTypes={taxTypes} />
     </div>
   );
 }

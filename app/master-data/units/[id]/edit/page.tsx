@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { UnitForm } from "@/features/master-data/components";
 import type { Unit } from "@/features/master-data/types";
@@ -13,24 +13,41 @@ export default function EditUnitPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: API integration — fetch unit by ID
-    setData({
-      id: params.id as string,
-      name: "Kilogram",
-      abbreviation: "kg",
-      type: "weight",
-      isActive: true,
-    } as Unit);
-    setLoading(false);
+    const loadUnit = async () => {
+      try {
+        const response = await fetch(`/api/master-data/units/${params.id}`);
+        if (!response.ok) {
+          setData(null);
+          return;
+        }
+        const payload = await response.json();
+        setData(payload);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (params.id) {
+      loadUnit();
+    }
   }, [params.id]);
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — update unit
+  const handleSubmit = async (formData: unknown) => {
+    const response = await fetch(`/api/master-data/units/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to update unit");
+    }
+
     router.push("/master-data/units");
   };
 
   if (loading) {
-    return <div style={{ padding: "24px" }}>Loading…</div>;
+    return <div style={{ padding: "24px" }}>Loading...</div>;
   }
 
   if (!data) {

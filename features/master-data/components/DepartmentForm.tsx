@@ -15,7 +15,7 @@ import { typography } from "@/components/ui/typography";
 export interface DepartmentFormProps {
   initialData?: Department;
   departments?: Department[];
-  onSubmit: (data: DepartmentInput) => Promise<void>;
+  onSubmit?: (data: DepartmentInput) => Promise<void>;
   loading?: boolean;
 }
 
@@ -150,7 +150,9 @@ export default function DepartmentForm({
       return;
     }
 
-    await onSubmit(parsed.data);
+    if (onSubmit) {
+      await onSubmit(parsed.data);
+    }
   };
 
   const handleCancel = () => {

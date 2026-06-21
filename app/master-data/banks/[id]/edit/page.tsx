@@ -1,39 +1,18 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { BankForm } from "@/features/master-data/components";
-import type { Bank } from "@/features/master-data/types";
+import { getBankById } from "@/lib/master-data-db";
 
-export default function EditBankPage() {
-  const router = useRouter();
-  const params = useParams();
-  const [data, setData] = useState<Bank | null>(null);
-  const [loading, setLoading] = useState(true);
+interface EditBankRouteProps {
+  params: { id: string };
+}
 
-  useEffect(() => {
-    // TODO: API integration — fetch bank by ID
-    setData({
-      id: params.id as string,
-      name: "Kenya Commercial Bank",
-      shortName: "KCB",
-      isActive: true,
-    } as Bank);
-    setLoading(false);
-  }, [params.id]);
+export default async function EditBankRoute({ params }: EditBankRouteProps) {
+  const { id } = params;
+  const bank = await getBankById(id);
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — update bank
-    router.push("/master-data/banks");
-  };
-
-  if (loading) {
-    return <div style={{ padding: "24px" }}>Loading…</div>;
-  }
-
-  if (!data) {
-    return <div style={{ padding: "24px" }}>Bank not found</div>;
+  if (!bank) {
+    notFound();
   }
 
   return (
@@ -46,15 +25,15 @@ export default function EditBankPage() {
       }}
     >
       <PageHeader
-        title={`Edit: ${data.name}`}
+        title={`Edit: ${bank.name}`}
         breadcrumbs={[
           { label: "Master Data", href: "/master-data" },
           { label: "Banks", href: "/master-data/banks" },
-          { label: data.shortName },
+          { label: bank.shortName },
           { label: "Edit" },
         ]}
       />
-      <BankForm initialData={data} onSubmit={handleSubmit} />
+      <BankForm initialData={bank} />
     </div>
   );
 }

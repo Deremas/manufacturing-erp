@@ -1,17 +1,9 @@
-"use client";
-
-import React from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { BankAccountForm } from "@/features/master-data/components";
+import { getBanks } from "@/lib/master-data-db";
 
-export default function CreateBankAccountPage() {
-  const router = useRouter();
-
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist bank account
-    router.push("/master-data/bank-accounts");
-  };
+export default async function CreateBankAccountPage() {
+  const banks = await getBanks();
 
   return (
     <div
@@ -30,7 +22,9 @@ export default function CreateBankAccountPage() {
           { label: "Create" },
         ]}
       />
-      <BankAccountForm onSubmit={handleSubmit} />
+      <BankAccountForm
+        banks={banks}
+      />
     </div>
   );
 }

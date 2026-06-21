@@ -4,6 +4,8 @@
 // Reusable radius tokens mapped to common component types.
 
 export interface RadiusScale {
+  /** 4 px — Extra-small radius (badges, small tags) */
+  xs: string;
   /** 6 px — Small radius (checkboxes, tags, small elements) */
   sm: string;
   /** 8 px — Medium radius (buttons, inputs, cards) */
@@ -34,6 +36,7 @@ export interface RadiusConfig {
 
 export const radius: RadiusConfig = {
   scale: {
+    xs: "4px",
     sm: "6px",
     md: "8px",
     lg: "12px",

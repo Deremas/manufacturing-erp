@@ -1,8 +1,7 @@
-"use client";
+import { UnitsListPage } from "@/features/master-data/units";
+import { getUnits } from "@/lib/master-data-db";
 
-import React from "react";
-import { UnitsPage } from "@/features/master-data";
-
-export default function MasterDataUnitsPage() {
-  return <UnitsPage />;
+export default async function MasterDataUnitsPage() {
+  const units = await getUnits();
+  return <UnitsListPage initialData={units} />;
 }

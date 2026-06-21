@@ -1,47 +1,19 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { CustomerDetail } from "@/features/master-data/components";
-import type { Customer } from "@/features/master-data/types";
+import { getCustomerById } from "@/lib/master-data-db";
 
-export default function CustomerDetailPage() {
-  const router = useRouter();
-  const params = useParams();
-  const [data, setData] = useState<Customer | null>(null);
-  const [loading, setLoading] = useState(true);
+interface CustomerPageProps {
+  params: { id: string };
+}
 
-  useEffect(() => {
-    // TODO: API integration — fetch customer by ID
-    setData({
-      id: params.id as string,
-      customerCode: "CUST-001",
-      name: "ABC Corporation",
-      phone: "+254 712 345 678",
-      email: "info@abccorp.com",
-      address: "123 Industrial Area, Nairobi",
-      creditLimit: 500000,
-      paymentTerms: "net_30",
-      isActive: true,
-    } as Customer);
-    setLoading(false);
-  }, [params.id]);
+export default async function CustomerDetailPage({
+  params,
+}: CustomerPageProps) {
+  const customer = await getCustomerById(params.id);
 
-  const handleEdit = () => {
-    router.push(`/master-data/customers/${params.id}/edit`);
-  };
-
-  const handleBack = () => {
-    router.push("/master-data/customers");
-  };
-
-  if (loading) {
-    return <div style={{ padding: "24px" }}>Loading…</div>;
-  }
-
-  if (!data) {
-    return <div style={{ padding: "24px" }}>Customer not found</div>;
+  if (!customer) {
+    notFound();
   }
 
   return (
@@ -54,14 +26,14 @@ export default function CustomerDetailPage() {
       }}
     >
       <PageHeader
-        title={data.name}
+        title={customer.name}
         breadcrumbs={[
           { label: "Master Data", href: "/master-data" },
           { label: "Customers", href: "/master-data/customers" },
-          { label: data.customerCode },
+          { label: customer.customerCode },
         ]}
       />
-      <CustomerDetail customer={data} onEdit={handleEdit} onBack={handleBack} />
+      <CustomerDetail customer={customer} />
     </div>
   );
 }

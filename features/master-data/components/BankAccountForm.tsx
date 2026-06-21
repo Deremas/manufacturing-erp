@@ -15,7 +15,7 @@ import { typography } from "@/components/ui/typography";
 export interface BankAccountFormProps {
   initialData?: BankAccount;
   banks?: Bank[];
-  onSubmit: (data: BankAccountInput) => Promise<void>;
+  onSubmit?: (data: BankAccountInput) => Promise<void>;
   loading?: boolean;
 }
 
@@ -103,14 +103,6 @@ const sectionStyle: React.CSSProperties = {
   marginBottom: "20px",
 };
 
-const accountTypeOptions = [
-  "Checking",
-  "Savings",
-  "Credit",
-  "Loan",
-  "Investment",
-];
-
 // ----------------------------------------------------------------------------
 // Component
 // ----------------------------------------------------------------------------
@@ -125,12 +117,11 @@ export default function BankAccountForm({
   const [form, setForm] = useState<BankAccountInput>({
     accountCode: "",
     accountName: "",
-    accountType: "",
     bankId: "",
     accountNumber: "",
     branch: "",
     swiftCode: "",
-    currency: "KES",
+    currency: "ETB",
     openingBalance: 0,
     currentBalance: 0,
     isActive: true,
@@ -143,12 +134,11 @@ export default function BankAccountForm({
       setForm({
         accountCode: initialData.accountCode,
         accountName: initialData.accountName,
-        accountType: initialData.accountType ?? "",
         bankId: initialData.bankId,
         accountNumber: initialData.accountNumber,
         branch: initialData.branch ?? "",
         swiftCode: initialData.swiftCode ?? "",
-        currency: initialData.currency ?? "KES",
+        currency: initialData.currency ?? "ETB",
         openingBalance: initialData.openingBalance ?? 0,
         currentBalance: initialData.currentBalance ?? 0,
         isActive: initialData.isActive ?? true,
@@ -195,7 +185,9 @@ export default function BankAccountForm({
       return;
     }
 
-    await onSubmit(parsed.data);
+    if (onSubmit) {
+      await onSubmit(parsed.data);
+    }
   };
 
   const handleCancel = () => {
@@ -294,12 +286,6 @@ export default function BankAccountForm({
               undefined,
               "Enter account name",
             )}
-            {renderField(
-              "accountType",
-              "Account Type",
-              "select",
-              accountTypeOptions.map((t) => ({ label: t, value: t })),
-            )}
           </div>
         </div>
 
@@ -329,7 +315,7 @@ export default function BankAccountForm({
               undefined,
               "e.g. KCBLKENX",
             )}
-            {renderField("currency", "Currency", "text", undefined, "e.g. KES")}
+            {renderField("currency", "Currency", "text", undefined, "e.g. ETB")}
           </div>
         </div>
 

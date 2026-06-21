@@ -1,8 +1,7 @@
-"use client";
-
-import React from "react";
 import { PriceListsPage } from "@/features/master-data";
+import { getPriceLists } from "@/lib/master-data-db";
 
-export default function MasterDataPriceListsPage() {
-  return <PriceListsPage />;
+export default async function MasterDataPriceListsPage() {
+  const priceLists = await getPriceLists();
+  return <PriceListsPage initialData={priceLists} />;
 }

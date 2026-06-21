@@ -1,17 +1,9 @@
-"use client";
-
-import React from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { TaxCodeForm } from "@/features/master-data/components";
+import { getTaxTypes } from "@/lib/master-data-db";
 
-export default function CreateTaxCodePage() {
-  const router = useRouter();
-
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist tax code
-    router.push("/master-data/tax-codes");
-  };
+export default async function CreateTaxCodePage() {
+  const taxTypes = await getTaxTypes();
 
   return (
     <div
@@ -30,7 +22,7 @@ export default function CreateTaxCodePage() {
           { label: "Create" },
         ]}
       />
-      <TaxCodeForm onSubmit={handleSubmit} />
+      <TaxCodeForm taxTypes={taxTypes} />
     </div>
   );
 }

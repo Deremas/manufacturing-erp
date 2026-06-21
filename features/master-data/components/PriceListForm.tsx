@@ -15,7 +15,7 @@ import { typography } from "@/components/ui/typography";
 export interface PriceListFormProps {
   initialData?: PriceList;
   items?: Item[];
-  onSubmit: (data: PriceListInput) => Promise<void>;
+  onSubmit?: (data: PriceListInput) => Promise<void>;
   loading?: boolean;
 }
 
@@ -88,9 +88,6 @@ const checkboxStyle: React.CSSProperties = {
   accentColor: colors.primary[600],
 };
 
-// ----------------------------------------------------------------------------
-// Mock items (replace with real data)
-// ----------------------------------------------------------------------------
 const defaultItems: Item[] = [];
 
 // ----------------------------------------------------------------------------
@@ -117,9 +114,9 @@ export default function PriceListForm({
   useEffect(() => {
     if (initialData) {
       setForm({
-        itemId: initialData.itemId,
+        itemId: initialData.itemId ?? "",
         customerGroup: initialData.customerGroup ?? "",
-        price: initialData.price,
+        price: initialData.price ?? 0,
         effectiveDate: initialData.effectiveDate ?? "",
         isActive: initialData.isActive ?? true,
       });
@@ -165,7 +162,9 @@ export default function PriceListForm({
       return;
     }
 
-    await onSubmit(parsed.data);
+    if (onSubmit) {
+      await onSubmit(parsed.data);
+    }
   };
 
   const handleCancel = () => {

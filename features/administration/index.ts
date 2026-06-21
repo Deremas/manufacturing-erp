@@ -5,6 +5,7 @@ export { default as CompanySettingsPage } from "./company-settings";
 export { default as SystemSettingsPage } from "./system-settings";
 export { default as DocumentNumberingPage } from "./document-numbering";
 export { default as AuditLogsPage } from "./audit-logs";
+export { default as LocationsPage } from "./locations";
 
 export type {
   User,
@@ -14,4 +15,5 @@ export type {
   SystemSettings,
   DocumentNumberingConfig,
   AuditLog,
+  Location,
 } from "./types";

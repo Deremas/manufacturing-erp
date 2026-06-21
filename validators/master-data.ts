@@ -1,22 +1,24 @@
 // ----------------------------------------------------------------------------
-// KONEL ERP — Master Data Zod Validation Schemas
+// NEW ERP — Master Data Zod Validation Schemas
 // ----------------------------------------------------------------------------
 import { z } from "zod";
 
 // ─── Item ───────────────────────────────────────────────────────────────────
 export const itemSchema = z.object({
-  itemCode: z.string().min(1, "Item code is required"),
+  itemCode: z.string().optional().default(""),
   itemName: z.string().min(1, "Item name is required"),
   sku: z.string().optional().default(""),
+  description: z.string().optional().default(""),
   categoryId: z.string().optional().default(""),
   itemType: z.string().optional().default(""),
   uomId: z.string().optional().default(""),
-  purchaseUomId: z.string().optional().default(""),
-  salesUomId: z.string().optional().default(""),
-  conversionFactor: z.coerce.number().nonnegative().optional().default(1),
   reorderPoint: z.coerce.number().nonnegative().optional().default(0),
   standardCost: z.coerce.number().nonnegative().optional().default(0),
   sellingPrice: z.coerce.number().nonnegative().optional().default(0),
+  batchTracking: z.boolean().optional().default(false),
+  expiryTracking: z.boolean().optional().default(false),
+  serialTracking: z.boolean().optional().default(false),
+  purchaseTaxCodeId: z.string().optional().default(""),
   vatApplicable: z.boolean().optional().default(true),
   exciseApplicable: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true),
@@ -108,12 +110,11 @@ export type BankInput = z.infer<typeof bankSchema>;
 export const bankAccountSchema = z.object({
   accountCode: z.string().min(1, "Account code is required"),
   accountName: z.string().min(1, "Account name is required"),
-  accountType: z.string().optional().default(""),
   bankId: z.string().min(1, "Bank is required"),
   accountNumber: z.string().min(1, "Account number is required"),
   branch: z.string().optional().default(""),
   swiftCode: z.string().optional().default(""),
-  currency: z.string().optional().default("KES"),
+  currency: z.string().optional().default("ETB"),
   openingBalance: z.coerce.number().optional().default(0),
   currentBalance: z.coerce.number().optional().default(0),
   isActive: z.boolean().optional().default(true),
@@ -152,3 +153,13 @@ export const taxCodeSchema = z.object({
 });
 
 export type TaxCodeInput = z.infer<typeof taxCodeSchema>;
+
+// ─── Item Type ──────────────────────────────────────────────────────────────
+export const itemTypeSchema = z.object({
+  name: z.string().min(1, "Item type name is required"),
+  code: z.string().min(1, "Item type code is required"),
+  description: z.string().optional().default(""),
+  isActive: z.boolean().optional().default(true),
+});
+
+export type ItemTypeInput = z.infer<typeof itemTypeSchema>;

@@ -102,8 +102,10 @@ export default function PriceListDetail({
     </div>
   );
 
-  const formatCurrency = (val: number) =>
-    `$${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const formatCurrency = (val?: number) =>
+    val == null
+      ? "\u2014"
+      : `$${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
   return (
     <FormCard

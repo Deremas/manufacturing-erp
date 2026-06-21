@@ -5,9 +5,13 @@ import { FormCard, ActionButtons } from "@/components/shared";
 import type { Action } from "@/components/shared";
 import { itemSchema } from "@/validators/master-data";
 import type { ItemInput } from "@/validators/master-data";
-import type { Item } from "../types";
+import type { Item, Category, ItemType, Unit, TaxCode } from "../types";
 import { colors } from "@/components/ui/colors";
 import { typography } from "@/components/ui/typography";
+import * as categoryService from "@/services/master-data/categoryService";
+import * as itemTypeService from "@/services/master-data/itemTypeService";
+import * as unitService from "@/services/master-data/unitService";
+import * as taxCodeService from "@/services/master-data/taxCodeService";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -101,40 +105,26 @@ const sectionStyle: React.CSSProperties = {
   marginBottom: "20px",
 };
 
-// ----------------------------------------------------------------------------
-// Mock fetch helpers (replace with real API calls)
-// ----------------------------------------------------------------------------
-const mockCategories = [
-  { id: "cat-1", name: "Raw Materials" },
-  { id: "cat-2", name: "Electrical Components" },
-  { id: "cat-3", name: "Machinery Parts" },
-  { id: "cat-4", name: "Packaging Materials" },
-  { id: "cat-5", name: "Consumables" },
-];
-
-const mockUnits = [
-  { id: "uom-1", name: "Kilogram", abbreviation: "kg" },
-  { id: "uom-2", name: "Gram", abbreviation: "g" },
-  { id: "uom-3", name: "Roll", abbreviation: "rl" },
-  { id: "uom-4", name: "Meter", abbreviation: "m" },
-  { id: "uom-5", name: "Unit", abbreviation: "unit" },
-  { id: "uom-6", name: "Liter", abbreviation: "L" },
-];
-
-const itemTypeOptions = [
-  "Raw Material",
-  "Component",
-  "Finished Good",
-  "Service",
-  "Supply",
-];
-
 const checkboxStyle: React.CSSProperties = {
   width: "18px",
   height: "18px",
   cursor: "pointer",
   accentColor: colors.primary[600],
 };
+
+// ----------------------------------------------------------------------------
+// Item types that use standardCost
+// ----------------------------------------------------------------------------
+const COST_ITEM_TYPES = ["RAW", "PACK", "CONS", "SPARE"];
+const SELLING_PRICE_ITEM_TYPE = "FG";
+
+function normalizeItemTypeCode(value: string, itemTypes: ItemType[]): string {
+  const trimmed = value.trim();
+  const match = itemTypes.find(
+    (itemType) => itemType.code === trimmed || itemType.name === trimmed,
+  );
+  return match?.code ?? trimmed;
+}
 
 // ----------------------------------------------------------------------------
 // Component
@@ -150,44 +140,103 @@ export default function ItemForm({
     itemCode: "",
     itemName: "",
     sku: "",
+    description: "",
     categoryId: "",
     itemType: "",
     uomId: "",
-    purchaseUomId: "",
-    salesUomId: "",
-    conversionFactor: 1,
     reorderPoint: 0,
     standardCost: 0,
     sellingPrice: 0,
+    batchTracking: false,
+    expiryTracking: false,
+    serialTracking: false,
+    purchaseTaxCodeId: "",
     vatApplicable: true,
     exciseApplicable: false,
     isActive: true,
   });
 
+  // Extra tracking fields (not in ItemInput schema but managed locally)
+  const [batchTracking, setBatchTracking] = useState(false);
+  const [expiryTracking, setExpiryTracking] = useState(false);
+  const [serialTracking, setSerialTracking] = useState(false);
+  const [taxCodeId, setTaxCodeId] = useState("");
+
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
+  // Dropdown data from DB services
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
+  const [dropdownsLoading, setDropdownsLoading] = useState(true);
+
+  // Determine if pricing fields should be shown
+  const normalizedItemType = normalizeItemTypeCode(form.itemType, itemTypes);
+  const showStandardCost = COST_ITEM_TYPES.includes(normalizedItemType);
+  const showSellingPrice = normalizedItemType === SELLING_PRICE_ITEM_TYPE;
+
+  // ── Fetch dropdown data from DB services on mount ─────────────────────────
+  useEffect(() => {
+    async function fetchDropdowns() {
+      try {
+        const [catResult, itResult, unitResult, taxResult] = await Promise.all([
+          categoryService.getAll({ isActive: true }),
+          itemTypeService.getAll({ isActive: true }),
+          unitService.getAll({ isActive: true }),
+          taxCodeService.getAll({ isActive: true }),
+        ]);
+        setCategories(catResult.items);
+        setItemTypes(itResult.items);
+        setUnits(unitResult.items);
+        setTaxCodes(taxResult.items);
+      } catch (err) {
+        console.error("Failed to load dropdown data:", err);
+      } finally {
+        setDropdownsLoading(false);
+      }
+    }
+    fetchDropdowns();
+  }, []);
+
+  useEffect(() => {
+    if (!itemTypes.length || !form.itemType) return;
+    const normalized = normalizeItemTypeCode(form.itemType, itemTypes);
+    if (normalized !== form.itemType) {
+      setForm((prev) => ({ ...prev, itemType: normalized }));
+    }
+  }, [itemTypes, form.itemType]);
+
+  // ── Populate form from initialData on edit ────────────────────────────────
   useEffect(() => {
     if (initialData) {
       setForm({
         itemCode: initialData.itemCode,
         itemName: initialData.itemName,
         sku: initialData.sku ?? "",
+        description: initialData.description ?? "",
         categoryId: initialData.categoryId ?? "",
         itemType: initialData.itemType ?? "",
         uomId: initialData.uomId ?? "",
-        purchaseUomId: initialData.purchaseUomId ?? "",
-        salesUomId: initialData.salesUomId ?? "",
-        conversionFactor: initialData.conversionFactor ?? 1,
         reorderPoint: initialData.reorderPoint ?? 0,
         standardCost: initialData.standardCost ?? 0,
         sellingPrice: initialData.sellingPrice ?? 0,
+        batchTracking: initialData.batchTracking ?? false,
+        expiryTracking: initialData.expiryTracking ?? false,
+        serialTracking: initialData.serialTracking ?? false,
+        purchaseTaxCodeId: initialData.purchaseTaxCodeId ?? "",
         vatApplicable: initialData.vatApplicable ?? true,
         exciseApplicable: initialData.exciseApplicable ?? false,
         isActive: initialData.isActive ?? true,
       });
+      setBatchTracking(initialData.batchTracking ?? false);
+      setExpiryTracking(initialData.expiryTracking ?? false);
+      setSerialTracking(initialData.serialTracking ?? false);
+      setTaxCodeId(initialData.purchaseTaxCodeId ?? "");
     }
   }, [initialData]);
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -228,7 +277,20 @@ export default function ItemForm({
       return;
     }
 
-    await onSubmit(parsed.data);
+    // Merge tracking and tax fields into payload
+    const payload: ItemInput & {
+      batchTracking?: boolean;
+      expiryTracking?: boolean;
+      serialTracking?: boolean;
+    } = {
+      ...parsed.data,
+      batchTracking,
+      expiryTracking,
+      serialTracking,
+      purchaseTaxCodeId: taxCodeId || "",
+    };
+
+    await onSubmit(payload as unknown as ItemInput);
   };
 
   const handleCancel = () => {
@@ -250,6 +312,7 @@ export default function ItemForm({
     },
   ];
 
+  // ── Render field helper ───────────────────────────────────────────────────
   const renderField = (
     name: string,
     label: string,
@@ -300,6 +363,16 @@ export default function ItemForm({
     );
   };
 
+  if (dropdownsLoading) {
+    return (
+      <FormCard title="Item Information" variant="teal-header">
+        <p style={{ padding: "24px", color: colors.text.secondary }}>
+          Loading form data…
+        </p>
+      </FormCard>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit}>
       <FormCard
@@ -307,7 +380,7 @@ export default function ItemForm({
         variant="teal-header"
         footer={{ actions: <ActionButtons actions={footerActions} /> }}
       >
-        {/* Basic Info */}
+        {/* ── Basic Information ────────────────────────────────────────────── */}
         <div style={sectionStyle}>
           <h4 style={sectionTitleStyle}>Basic Information</h4>
           <div style={gridStyle}>
@@ -325,92 +398,131 @@ export default function ItemForm({
               undefined,
               "Enter item name",
             )}
-            {renderField("sku", "SKU", "text", undefined, "Stock keeping unit")}
+            {renderField(
+              "sku",
+              "SKU / Barcode",
+              "text",
+              undefined,
+              "Stock keeping unit or barcode",
+            )}
             {renderField(
               "categoryId",
               "Category",
               "select",
-              mockCategories.map((c) => ({ label: c.name, value: c.id })),
+              categories
+                .filter((c) => c.isActive)
+                .map((c) => ({ label: c.name, value: c.id })),
             )}
             {renderField(
               "itemType",
               "Item Type",
               "select",
-              itemTypeOptions.map((t) => ({ label: t, value: t })),
+              itemTypes
+                .filter((t) => t.isActive)
+                .map((t) => ({ label: t.name, value: t.code })),
             )}
-          </div>
-        </div>
-
-        {/* UOM */}
-        <div style={sectionStyle}>
-          <h4 style={sectionTitleStyle}>Units of Measure</h4>
-          <div style={gridStyle}>
             {renderField(
               "uomId",
               "UOM",
               "select",
-              mockUnits.map((u) => ({
-                label: `${u.name} (${u.abbreviation})`,
-                value: u.id,
-              })),
+              units
+                .filter((u) => u.isActive)
+                .map((u) => ({
+                  label: `${u.name} (${u.abbreviation})`,
+                  value: u.id,
+                })),
             )}
-            {renderField(
-              "purchaseUomId",
-              "Purchase UOM",
-              "select",
-              mockUnits.map((u) => ({
-                label: `${u.name} (${u.abbreviation})`,
-                value: u.id,
-              })),
-              "Select purchase UOM",
-            )}
-            {renderField(
-              "salesUomId",
-              "Sales UOM",
-              "select",
-              mockUnits.map((u) => ({
-                label: `${u.name} (${u.abbreviation})`,
-                value: u.id,
-              })),
-              "Select sales UOM",
-            )}
-            {renderField("conversionFactor", "Conversion Factor", "number")}
           </div>
         </div>
 
-        {/* Pricing */}
+        {/* ── Pricing & Stock Level ────────────────────────────────────────── */}
         <div style={sectionStyle}>
-          <h4 style={sectionTitleStyle}>Pricing & Inventory</h4>
+          <h4 style={sectionTitleStyle}>Pricing & Stock Level</h4>
           <div style={gridStyle}>
-            {renderField("reorderPoint", "Reorder Point", "number")}
-            {renderField("standardCost", "Standard Cost", "number")}
-            {renderField("sellingPrice", "Selling Price", "number")}
+            {renderField("reorderPoint", "Low Stock Alert Level", "number")}
+            {showStandardCost &&
+              renderField("standardCost", "Standard Cost", "number")}
+            {showSellingPrice &&
+              renderField("sellingPrice", "Selling Price", "number")}
           </div>
         </div>
 
-        {/* Settings */}
+        {/* ── Tracking ─────────────────────────────────────────────────────── */}
         <div style={sectionStyle}>
-          <h4 style={sectionTitleStyle}>Status & Settings</h4>
+          <h4 style={sectionTitleStyle}>Tracking</h4>
           <div style={gridStyle}>
             <div style={toggleRowStyle}>
               <input
-                name="vatApplicable"
                 type="checkbox"
                 style={checkboxStyle}
-                checked={form.vatApplicable}
-                onChange={handleChange}
+                checked={batchTracking}
+                onChange={(e) => setBatchTracking(e.target.checked)}
               />
-              <span style={toggleLabelStyle}>VAT Applicable</span>
+              <span style={toggleLabelStyle}>Batch Tracking</span>
             </div>
             <div style={toggleRowStyle}>
               <input
-                name="exciseApplicable"
                 type="checkbox"
                 style={checkboxStyle}
-                checked={form.exciseApplicable}
-                onChange={handleChange}
+                checked={expiryTracking}
+                onChange={(e) => setExpiryTracking(e.target.checked)}
               />
-              <span style={toggleLabelStyle}>Excise Applicable</span>
+              <span style={toggleLabelStyle}>Expiry Tracking</span>
+            </div>
+            <div style={toggleRowStyle}>
+              <input
+                type="checkbox"
+                style={checkboxStyle}
+                checked={serialTracking}
+                onChange={(e) => setSerialTracking(e.target.checked)}
+              />
+              <span style={toggleLabelStyle}>Serial Tracking</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Tax & Status ─────────────────────────────────────────────────── */}
+        <div style={sectionStyle}>
+          <h4 style={sectionTitleStyle}>Tax & Status</h4>
+          <div style={gridStyle}>
+            <div>
+              <div style={toggleRowStyle}>
+                <input
+                  name="vatApplicable"
+                  type="checkbox"
+                  style={checkboxStyle}
+                  checked={form.vatApplicable}
+                  onChange={handleChange}
+                />
+                <span style={toggleLabelStyle}>VAT Applicable</span>
+              </div>
+              <div style={toggleRowStyle}>
+                <input
+                  name="exciseApplicable"
+                  type="checkbox"
+                  style={checkboxStyle}
+                  checked={form.exciseApplicable}
+                  onChange={handleChange}
+                />
+                <span style={toggleLabelStyle}>Excise Applicable</span>
+              </div>
+            </div>
+            <div style={fieldGroupStyle}>
+              <label style={labelStyle}>Tax Code</label>
+              <select
+                style={selectStyle}
+                value={taxCodeId}
+                onChange={(e) => setTaxCodeId(e.target.value)}
+              >
+                <option value="">Select tax code...</option>
+                {taxCodes
+                  .filter((t) => t.isActive)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.taxName} ({t.rate}%)
+                    </option>
+                  ))}
+              </select>
             </div>
             <div style={toggleRowStyle}>
               <input

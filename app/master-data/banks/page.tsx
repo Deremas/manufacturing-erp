@@ -1,8 +1,7 @@
-"use client";
+import { BanksListPage } from "@/features/master-data/banks";
+import { getBanks } from "@/lib/master-data-db";
 
-import React from "react";
-import { BanksPage } from "@/features/master-data";
-
-export default function MasterDataBanksPage() {
-  return <BanksPage />;
+export default async function MasterDataBanksPage() {
+  const banks = await getBanks();
+  return <BanksListPage initialData={banks} />;
 }

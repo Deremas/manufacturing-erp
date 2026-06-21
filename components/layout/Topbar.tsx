@@ -1,47 +1,18 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { spacing } from "@/components/ui/spacing";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import type { CurrentUser } from "@/lib/auth/current-user";
 
 // ---------------------------------------------------------------------------
 // Inline SVG icons
 // ---------------------------------------------------------------------------
-
-const HamburgerIcon = (
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-);
-
-const SearchIcon = (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
 
 const BellIcon = (
   <svg
@@ -59,20 +30,41 @@ const BellIcon = (
   </svg>
 );
 
-const ChevronDownIcon = (
+const HamburgerIcon = (
   <svg
-    width="16"
-    height="16"
+    width="22"
+    height="22"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="2"
+    strokeWidth="2.2"
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    <polyline points="6 9 12 15 18 9" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
   </svg>
 );
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function derivePageTitle(pathname: string): string {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return "Dashboard";
+  const last = segments[segments.length - 1];
+  return last.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part.charAt(0).toUpperCase())
+    .slice(0, 2)
+    .join("");
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -80,17 +72,23 @@ const ChevronDownIcon = (
 
 interface TopbarProps {
   onToggleSidebar: () => void;
+  leftOffset: number;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar, leftOffset }) => {
+  const pathname = usePathname();
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Close dropdown on outside click
+  useEffect(() => {
+    getCurrentUser().then((u) => setUser(u));
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -104,12 +102,22 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const pageTitle = derivePageTitle(pathname);
+  const initials = user ? getInitials(user.name) : "SA";
+  const displayName = user?.name ?? "System Administrator";
+  const displayEmail = user?.email ?? "admin";
+
+  const handleLogout = async () => {
+    setDropdownOpen(false);
+    await signOut({ callbackUrl: "/auth/login" });
+  };
+
   return (
     <header
       style={{
         position: "fixed",
         top: 0,
-        left: 0,
+        left: leftOffset,
         right: 0,
         height: spacing.layout.topbarHeight,
         backgroundColor: colors.surface,
@@ -117,98 +125,77 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: `0 ${spacing.page.padding}px`,
-        zIndex: 999,
+        padding: "0 24px 0 16px",
+        zIndex: 40,
+        transition: "left 0.25s ease",
       }}
     >
-      {/* ---- Left: Hamburger ---- */}
-      <button
-        onClick={onToggleSidebar}
-        aria-label="Toggle sidebar"
-        style={{
-          background: "none",
-          border: "none",
-          color: colors.text.secondary,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 8,
-          borderRadius: radius.scale.sm,
-          transition: "background 0.15s ease",
-        }}
-        onMouseOver={(e) =>
-          (e.currentTarget.style.backgroundColor = colors.secondary[50])
-        }
-        onMouseOut={(e) =>
-          (e.currentTarget.style.backgroundColor = "transparent")
-        }
-      >
-        {HamburgerIcon}
-      </button>
-
-      {/* ---- Center: Search bar ---- */}
       <div
         style={{
-          flex: 1,
-          maxWidth: 400,
-          marginLeft: spacing.page.gap,
-          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          minWidth: 0,
+          flexShrink: 0,
         }}
       >
-        <div
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label="Toggle sidebar"
           style={{
-            position: "absolute",
-            left: 12,
-            top: "50%",
-            transform: "translateY(-50%)",
-            color: colors.text.muted,
+            width: 38,
+            height: 38,
+            background: "transparent",
+            border: "1px solid transparent",
+            color: colors.text.secondary,
+            cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            pointerEvents: "none",
+            justifyContent: "center",
+            padding: 0,
+            borderRadius: radius.scale.md,
+            transition: "background 0.15s ease",
+            flexShrink: 0,
           }}
+          onMouseOver={(e) =>
+            (e.currentTarget.style.backgroundColor = colors.secondary[50])
+          }
+          onMouseOut={(e) =>
+            (e.currentTarget.style.backgroundColor = "transparent")
+          }
         >
-          {SearchIcon}
-        </div>
-        <input
-          type="text"
-          placeholder="Search modules, records..."
-          style={{
-            width: "100%",
-            height: 38,
-            paddingLeft: 40,
-            paddingRight: 12,
-            border: `1px solid ${colors.border}`,
-            borderRadius: radius.components.input,
-            backgroundColor: colors.secondary[50],
-            fontFamily: typography.fontFamily,
-            fontSize: typography.sizes.small.fontSize,
-            color: colors.text.primary,
-            outline: "none",
-            transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-            boxSizing: "border-box",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = colors.primary[400];
-            e.currentTarget.style.boxShadow = `0 0 0 3px ${colors.primary[50]}`;
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = colors.border;
-            e.currentTarget.style.boxShadow = "none";
-          }}
-        />
+          {HamburgerIcon}
+        </button>
       </div>
 
-      {/* ---- Right: Notifications + User ---- */}
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          transform: "translateX(-50%)",
+          textAlign: "center",
+          fontFamily: typography.fontFamily,
+          fontSize: typography.sizes.h5.fontSize,
+          fontWeight: typography.weights.semibold,
+          color: colors.text.primary,
+          pointerEvents: "none",
+          maxWidth: "50%",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {pageTitle}
+      </div>
+
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: 16,
-          marginLeft: "auto",
+          paddingRight: 20,
         }}
       >
-        {/* Notification bell */}
         <button
           aria-label="Notifications"
           style={{
@@ -245,7 +232,6 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
           />
         </button>
 
-        {/* User avatar + dropdown */}
         <div ref={dropdownRef} style={{ position: "relative" }}>
           <button
             onClick={() => setDropdownOpen((prev) => !prev)}
@@ -269,7 +255,6 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
               (e.currentTarget.style.backgroundColor = "transparent")
             }
           >
-            {/* Avatar */}
             <div
               style={{
                 width: 32,
@@ -286,7 +271,7 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
                 flexShrink: 0,
               }}
             >
-              JK
+              {initials}
             </div>
             <div style={{ textAlign: "left" }}>
               <div
@@ -299,7 +284,7 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
                   whiteSpace: "nowrap",
                 }}
               >
-                John Kamau
+                {displayName}
               </div>
               <div
                 style={{
@@ -310,23 +295,11 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
                   whiteSpace: "nowrap",
                 }}
               >
-                Administrator
+                {displayEmail}
               </div>
             </div>
-            <span
-              style={{
-                color: colors.text.muted,
-                display: "flex",
-                alignItems: "center",
-                transition: "transform 0.2s ease",
-                transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
-              }}
-            >
-              {ChevronDownIcon}
-            </span>
           </button>
 
-          {/* Dropdown menu */}
           {dropdownOpen && (
             <div
               style={{
@@ -343,27 +316,33 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
                 zIndex: 1001,
               }}
             >
-              {["Profile", "Settings", "Logout"].map((item, index) => (
-                <a
+              {["Profile", "Settings", "Logout"].map((item, index) => {
+                const isLogout = item === "Logout";
+                return (
+                <button
                   key={item}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setDropdownOpen(false);
-                  }}
+                  type="button"
+                  onClick={isLogout ? handleLogout : () => setDropdownOpen(false)}
                   style={{
+                    width: "100%",
                     display: "block",
                     padding: "8px 16px",
                     fontFamily: typography.fontFamily,
                     fontSize: typography.sizes.small.fontSize,
                     color:
-                      item === "Logout"
+                      isLogout
                         ? colors.danger[600]
                         : colors.text.primary,
                     textDecoration: "none",
                     transition: "background 0.15s ease",
                     borderBottom:
                       index < 2 ? `1px solid ${colors.border}` : "none",
+                    background: "transparent",
+                    borderLeft: "none",
+                    borderRight: "none",
+                    borderTop: "none",
+                    textAlign: "left",
+                    cursor: "pointer",
                   }}
                   onMouseOver={(e) =>
                     (e.currentTarget.style.backgroundColor =
@@ -374,8 +353,9 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
                   }
                 >
                   {item}
-                </a>
-              ))}
+                </button>
+                );
+              })}
             </div>
           )}
         </div>

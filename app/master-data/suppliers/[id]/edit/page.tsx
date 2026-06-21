@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { SupplierForm } from "@/features/master-data/components";
 import type { Supplier } from "@/features/master-data/types";
@@ -13,28 +13,41 @@ export default function EditSupplierPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: API integration — fetch supplier by ID
-    setData({
-      id: params.id as string,
-      supplierCode: "SUPP-001",
-      name: "XYZ Suppliers Ltd",
-      contactPerson: "John Doe",
-      phone: "+254 722 111 222",
-      email: "orders@xyzsuppliers.com",
-      address: "456 Industrial Park, Mombasa",
-      paymentTerms: "net_45",
-      isActive: true,
-    } as Supplier);
-    setLoading(false);
+    const loadSupplier = async () => {
+      try {
+        const response = await fetch(`/api/master-data/suppliers/${params.id}`);
+        if (!response.ok) {
+          setData(null);
+          return;
+        }
+        const payload = await response.json();
+        setData(payload);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (params.id) {
+      loadSupplier();
+    }
   }, [params.id]);
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — update supplier
+  const handleSubmit = async (formData: unknown) => {
+    const response = await fetch(`/api/master-data/suppliers/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to update supplier");
+    }
+
     router.push("/master-data/suppliers");
   };
 
   if (loading) {
-    return <div style={{ padding: "24px" }}>Loading…</div>;
+    return <div style={{ padding: "24px" }}>Loading...</div>;
   }
 
   if (!data) {

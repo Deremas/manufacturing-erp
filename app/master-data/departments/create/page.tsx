@@ -1,18 +1,7 @@
-"use client";
-
-import React from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { DepartmentForm } from "@/features/master-data/components";
 
-export default function CreateDepartmentPage() {
-  const router = useRouter();
-
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist department
-    router.push("/master-data/departments");
-  };
-
+export default async function CreateDepartmentPage() {
   return (
     <div
       style={{
@@ -30,7 +19,7 @@ export default function CreateDepartmentPage() {
           { label: "Create" },
         ]}
       />
-      <DepartmentForm onSubmit={handleSubmit} />
+      <DepartmentForm />
     </div>
   );
 }

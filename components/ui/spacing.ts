@@ -60,7 +60,7 @@ export const spacing: SpacingConfig = {
   },
   layout: {
     sidebarWidth: 260,
-    topbarHeight: 64,
+    topbarHeight: 72,
   },
 };
 

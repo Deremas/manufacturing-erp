@@ -12,7 +12,7 @@ import { typography } from "@/components/ui/typography";
 export interface Column<T = any> {
   key: string;
   label: string;
-  render?: (value: unknown, record: T, index: number) => React.ReactNode;
+  render?: (value: unknown, record: T, index: number) => any;
   sortable?: boolean;
 }
 
@@ -23,9 +23,9 @@ export interface TableAction {
   color?: string;
 }
 
-export interface DataTableProps {
-  columns: Column[];
-  data: Record<string, unknown>[];
+export interface DataTableProps<T = Record<string, unknown>> {
+  columns: Column<any>[];
+  data: T[];
   actions?: TableAction[];
   loading?: boolean;
   emptyState?: React.ReactNode;
@@ -154,7 +154,7 @@ const paginationButtonStyle = (disabled: boolean): React.CSSProperties => ({
 // ----------------------------------------------------------------------------
 // Component
 // ----------------------------------------------------------------------------
-export default function DataTable<T extends Record<string, unknown>>({
+export default function DataTable<T = Record<string, unknown>>({
   columns,
   data,
   actions,

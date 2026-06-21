@@ -53,3 +53,6 @@ export type {
 
 export { default as RecordBadge } from "./RecordBadge";
 export type { RecordBadgeProps } from "./RecordBadge";
+
+export { default as ModuleLandingPage } from "./ModuleLandingPage";
+export type { ModuleLandingPageProps, ModuleLink } from "./ModuleLandingPage";

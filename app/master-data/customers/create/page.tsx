@@ -8,8 +8,17 @@ import { CustomerForm } from "@/features/master-data/components";
 export default function CreateCustomerPage() {
   const router = useRouter();
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist customer
+  const handleSubmit = async (data: unknown) => {
+    const response = await fetch("/api/master-data/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to create customer");
+    }
+
     router.push("/master-data/customers");
   };
 

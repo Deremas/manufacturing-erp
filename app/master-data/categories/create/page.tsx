@@ -8,8 +8,17 @@ import { CategoryForm } from "@/features/master-data/components";
 export default function CreateCategoryPage() {
   const router = useRouter();
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist category
+  const handleSubmit = async (data: unknown) => {
+    const response = await fetch("/api/master-data/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to create category");
+    }
+
     router.push("/master-data/categories");
   };
 

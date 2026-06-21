@@ -14,7 +14,8 @@ import { typography } from "@/components/ui/typography";
 // ----------------------------------------------------------------------------
 export interface TaxCodeFormProps {
   initialData?: TaxCode;
-  onSubmit: (data: TaxCodeInput) => Promise<void>;
+  taxTypes?: string[];
+  onSubmit?: (data: TaxCodeInput) => Promise<void>;
   loading?: boolean;
 }
 
@@ -87,19 +88,12 @@ const checkboxStyle: React.CSSProperties = {
   accentColor: colors.primary[600],
 };
 
-const taxTypeOptions = [
-  "Sales Tax",
-  "Purchase Tax",
-  "Excise Duty",
-  "VAT",
-  "Withholding Tax",
-];
-
 // ----------------------------------------------------------------------------
 // Component
 // ----------------------------------------------------------------------------
 export default function TaxCodeForm({
   initialData,
+  taxTypes = [],
   onSubmit,
   loading,
 }: TaxCodeFormProps) {
@@ -164,7 +158,9 @@ export default function TaxCodeForm({
       return;
     }
 
-    await onSubmit(parsed.data);
+    if (onSubmit) {
+      await onSubmit(parsed.data);
+    }
   };
 
   const handleCancel = () => {
@@ -255,7 +251,7 @@ export default function TaxCodeForm({
             "taxType",
             "Tax Type",
             "select",
-            taxTypeOptions.map((t) => ({ label: t, value: t })),
+            taxTypes.map((t) => ({ label: t, value: t })),
           )}
           {renderField("rate", "Rate (%)", "number")}
         </div>

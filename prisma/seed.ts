@@ -1,857 +1,1065 @@
-import { PrismaClient } from "@prisma/client";
-import * as bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
+import { sql } from "@/lib/db";
 
-const prisma = new PrismaClient();
+const permissionModules = [
+  "administration",
+  "master-data",
+  "procurement",
+  "inventory",
+  "production",
+  "sales",
+  "finance",
+  "accounting",
+  "hr",
+  "fleet",
+  "reports",
+  "qc",
+  "maintenance",
+  "shifts",
+];
 
-async function main() {
-  console.log("🌱 Seeding database...");
+const permissionActions = [
+  "view",
+  "create",
+  "edit",
+  "delete",
+  "approve",
+  "print",
+  "export",
+];
 
-  // ── 1. Admin User ──
-  const hashedPassword = await bcrypt.hash("admin123", 12);
+const locations = [
+  {
+    locationCode: "FACTORY-001",
+    locationName: "Main Factory",
+    locationType: "Factory",
+    address: "Industrial Area, Nairobi",
+    isStockLocation: true,
+    isProcurementLocation: true,
+    isProductionLocation: true,
+    isSalesLocation: false,
+    isTransitLocation: false,
+    isScrapLocation: false,
+  },
+  {
+    locationCode: "RM-STORE",
+    locationName: "Raw Material Store",
+    locationType: "Raw Material Store",
+    address: "Factory Store",
+    isStockLocation: true,
+    isProcurementLocation: true,
+    isProductionLocation: false,
+    isSalesLocation: false,
+    isTransitLocation: false,
+    isScrapLocation: false,
+  },
+  {
+    locationCode: "FG-STORE",
+    locationName: "Finished Goods Store",
+    locationType: "Finished Goods Store",
+    address: "Dispatch Area",
+    isStockLocation: true,
+    isProcurementLocation: false,
+    isProductionLocation: false,
+    isSalesLocation: true,
+    isTransitLocation: false,
+    isScrapLocation: false,
+  },
+  {
+    locationCode: "SCRAP-001",
+    locationName: "Scrap Area",
+    locationType: "Scrap",
+    address: "Yard Corner",
+    isStockLocation: false,
+    isProcurementLocation: false,
+    isProductionLocation: false,
+    isSalesLocation: false,
+    isTransitLocation: false,
+    isScrapLocation: true,
+  },
+  {
+    locationCode: "BRANCH-001",
+    locationName: "Nairobi Branch",
+    locationType: "Branch",
+    address: "Westlands, Nairobi",
+    isStockLocation: true,
+    isProcurementLocation: false,
+    isProductionLocation: false,
+    isSalesLocation: true,
+    isTransitLocation: false,
+    isScrapLocation: false,
+  },
+];
 
-  const adminUser = await prisma.user.upsert({
-    where: { email: "admin@gmail.com" },
-    update: {},
-    create: {
-      name: "Admin",
-      email: "admin@gmail.com",
-      password: hashedPassword,
-      role: "admin",
-      phone: "+251912345678",
-      isActive: true,
-    },
-  });
-  console.log(`  ✓ Admin user created: ${adminUser.email}`);
+const categories = [
+  {
+    code: "RAW",
+    name: "Raw Materials",
+    description: "Input materials used in production",
+  },
+  {
+    code: "PACK",
+    name: "Packaging Materials",
+    description: "Packaging and wrapping materials",
+  },
+  { code: "FG", name: "Finished Goods", description: "Items ready for sale" },
+  {
+    code: "CONS",
+    name: "Consumables",
+    description: "Low-value consumable stock",
+  },
+  {
+    code: "SPARE",
+    name: "Spare Parts",
+    description: "Maintenance and spare parts",
+  },
+];
 
-  // ── 2. Roles ──
-  const rolesData = [
-    { name: "Admin", description: "Full system access" },
-    { name: "Manager", description: "Departmental management access" },
-    { name: "User", description: "Standard user access" },
-    { name: "Viewer", description: "Read-only access" },
-  ];
+const units = [
+  { code: "PCS", name: "Piece", abbreviation: "pcs", type: "QUANTITY" },
+  { code: "KG", name: "Kilogram", abbreviation: "kg", type: "WEIGHT" },
+  { code: "LTR", name: "Liter", abbreviation: "ltr", type: "VOLUME" },
+  { code: "BOX", name: "Box", abbreviation: "box", type: "QUANTITY" },
+  { code: "MTR", name: "Meter", abbreviation: "m", type: "LENGTH" },
+  { code: "ROLL", name: "Roll", abbreviation: "roll", type: "QUANTITY" },
+];
 
-  const roles = [];
-  for (const r of rolesData) {
-    const role = await prisma.role.upsert({
-      where: { name: r.name },
-      update: {},
-      create: { name: r.name, description: r.description, isActive: true },
-    });
-    roles.push(role);
-  }
-  console.log(`  ✓ ${roles.length} roles created`);
+const itemTypes = [
+  {
+    code: "RAW",
+    name: "Raw Material",
+    description: "Purchasable stock used in production",
+  },
+  {
+    code: "PACK",
+    name: "Packaging Material",
+    description: "Packaging stock used in production",
+  },
+  {
+    code: "FG",
+    name: "Finished Good",
+    description: "Sellable finished item",
+  },
+  {
+    code: "CONS",
+    name: "Consumable",
+    description: "Consumable item",
+  },
+  {
+    code: "SPARE",
+    name: "Spare Part",
+    description: "Equipment spare part",
+  },
+  {
+    code: "SERVICE",
+    name: "Service",
+    description: "Non-stock service",
+  },
+];
 
-  // ── 3. Permissions & RolePermissions ──
-  const modules = [
-    "users",
-    "roles",
-    "items",
-    "categories",
-    "units",
-    "customers",
-    "suppliers",
-    "locations",
-    "departments",
-    "banks",
-    "bank-accounts",
-    "price-lists",
-    "tax-codes",
-    "stocks",
-    "stock-movements",
-    "purchasing",
-    "sales",
-    "production",
-    "qc",
-    "fleet",
-    "hr",
-    "accounting",
-    "finance",
-    "reports",
-    "audit-logs",
-    "company-settings",
-    "system-settings",
-    "document-numbering",
-  ];
+const taxCodes = [
+  {
+    code: "VAT15",
+    taxName: "VAT 15%",
+    taxType: "VAT",
+    rate: 15,
+    appliesTo: "BOTH",
+    isDefault: true,
+  },
+  {
+    code: "VAT0",
+    taxName: "VAT 0%",
+    taxType: "VAT",
+    rate: 0,
+    appliesTo: "BOTH",
+  },
+  {
+    code: "EXC10",
+    taxName: "Excise 10%",
+    taxType: "EXCISE",
+    rate: 10,
+    appliesTo: "SALES",
+  },
+  {
+    code: "WHT5",
+    taxName: "Withholding 3%",
+    taxType: "WITHHOLDING",
+    rate: 3,
+    appliesTo: "PURCHASE",
+  },
+];
 
-  const actions = ["create", "read", "update", "delete"];
+const departments = [
+  { code: "PROD", name: "Production" },
+  { code: "PROC", name: "Procurement" },
+  { code: "SALES", name: "Sales" },
+  { code: "FIN", name: "Finance" },
+  { code: "WH", name: "Warehouse" },
+];
 
-  // Create permissions and assign to Admin role
-  for (const module of modules) {
-    for (const action of actions) {
-      const permLabel = `${module.charAt(0).toUpperCase() + module.slice(1).replace(/-/g, " ")} - ${action.charAt(0).toUpperCase() + action.slice(1)}`;
+const banks = [
+  { id: "ECB", name: "Ethiopia Commercial Bank", shortName: "KCB" },
+  { id: "EQUITY", name: "Equity Bank", shortName: "Equity" },
+  { id: "COOP", name: "Co-operative Bank", shortName: "Co-op" },
+];
 
-      const permission = await prisma.permission.upsert({
-        where: { id: `${module}-${action}` },
-        update: { label: permLabel },
-        create: {
-          id: `${module}-${action}`,
-          module,
-          action,
-          label: permLabel,
-        },
-      });
+const customers = [
+  {
+    customerCode: "CUST-001",
+    name: "ABC Enterprises Ltd",
+    phone: "+254711000001",
+    email: "info@abcenterprises.co.ke",
+    address: "Nairobi, Kenya",
+    creditLimit: 500000,
+    paymentTerms: "NET30",
+  },
+  {
+    customerCode: "CUST-002",
+    name: "Nairobi Wholesalers",
+    phone: "+254711000002",
+    email: "orders@nairobwholesale.co.ke",
+    address: "Nairobi Industrial Area",
+    creditLimit: 1000000,
+    paymentTerms: "NET60",
+  },
+];
 
-      // Assign all permissions to Admin role
-      await prisma.rolePermission.upsert({
-        where: { id: `${roles[0].id}-${permission.id}` },
-        update: {},
-        create: {
-          id: `${roles[0].id}-${permission.id}`,
-          roleId: roles[0].id,
-          permission: permission.id,
-          module,
-          action,
-        },
-      });
+const suppliers = [
+  {
+    supplierCode: "SUP-001",
+    name: "Industrial Raw Materials Ltd",
+    contactPerson: "John Doe",
+    phone: "+254722000001",
+    email: "john@irm.co.ke",
+    address: "Nairobi Industrial Area",
+    paymentTerms: "NET30",
+  },
+  {
+    supplierCode: "SUP-002",
+    name: "Packaging Solutions Ltd",
+    contactPerson: "Mary Wanjiku",
+    phone: "+254722000002",
+    email: "mary@packsol.co.ke",
+    address: "Thika Road",
+    paymentTerms: "NET30",
+  },
+];
+
+const items = [
+  {
+    itemCode: "RM-001",
+    itemName: "Corn Flour - Grade A",
+    sku: "CF-GA-001",
+    categoryCode: "RAW",
+    itemTypeCode: "RAW",
+    uomCode: "KG",
+    reorderPoint: 25,
+    standardCost: 45,
+    vatApplicable: true,
+    exciseApplicable: false,
+  },
+  {
+    itemCode: "FG-001",
+    itemName: "Maize Flour - 2kg Pack",
+    sku: "MF-2KG-001",
+    categoryCode: "FG",
+    itemTypeCode: "FG",
+    uomCode: "PCS",
+    reorderPoint: 50,
+    sellingPrice: 145,
+    vatApplicable: true,
+    exciseApplicable: false,
+  },
+  {
+    itemCode: "PACK-001",
+    itemName: "Plastic Bag - 2kg",
+    sku: "PB-2KG-001",
+    categoryCode: "PACK",
+    itemTypeCode: "PACK",
+    uomCode: "PCS",
+    reorderPoint: 100,
+    standardCost: 5,
+    vatApplicable: true,
+    exciseApplicable: false,
+  },
+];
+
+const priceLists = [
+  {
+    code: "RETAIL-2026",
+    name: "Retail Price List",
+    currency: "ETB",
+    customerGroup: "Retail",
+    price: 145,
+    effectiveFrom: "2026-01-01T00:00:00Z",
+  },
+  {
+    code: "WHOLESALE-2026",
+    name: "Wholesale Price List",
+    currency: "ETB",
+    customerGroup: "Wholesale",
+    price: 135,
+    effectiveFrom: "2026-01-01T00:00:00Z",
+  },
+];
+
+function titleCase(value: string): string {
+  return value
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function makeSeedId(prefix: string, value: string): string {
+  return `${prefix}-${value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")}`;
+}
+
+async function seedPermissions() {
+  const permissions: Array<{ id: string; module: string; action: string }> = [];
+
+  for (const module of permissionModules) {
+    for (const action of permissionActions) {
+      const id = `${module}.${action}`;
+      await sql`
+        INSERT INTO "Permission" ("id", "module", "action", "label", "isArchived")
+        VALUES (${id}, ${module}, ${action}, ${`${titleCase(module)} ${titleCase(action)}`}, false)
+        ON CONFLICT ("id") DO UPDATE SET
+          "module" = EXCLUDED."module",
+          "action" = EXCLUDED."action",
+          "label" = EXCLUDED."label",
+          "isArchived" = false
+      `;
+      permissions.push({ id, module, action });
     }
   }
 
-  // Assign limited permissions to Manager role (all read + create/update on some modules)
-  const managerWriteModules = [
-    "items",
-    "customers",
-    "suppliers",
-    "stocks",
-    "purchasing",
-    "sales",
-  ];
-  for (const module of modules) {
-    for (const action of ["read"]) {
-      const perm = await prisma.permission.findFirst({
-        where: { module, action },
-      });
-      if (perm) {
-        await prisma.rolePermission.upsert({
-          where: { id: `${roles[1].id}-${perm.id}` },
-          update: {},
-          create: {
-            id: `${roles[1].id}-${perm.id}`,
-            roleId: roles[1].id,
-            permission: perm.id,
-            module,
-            action,
-          },
-        });
-      }
-    }
-  }
-  for (const module of managerWriteModules) {
-    for (const action of ["create", "update"]) {
-      const perm = await prisma.permission.findFirst({
-        where: { module, action },
-      });
-      if (perm) {
-        await prisma.rolePermission.upsert({
-          where: { id: `${roles[1].id}-${perm.id}` },
-          update: {},
-          create: {
-            id: `${roles[1].id}-${perm.id}`,
-            roleId: roles[1].id,
-            permission: perm.id,
-            module,
-            action,
-          },
-        });
-      }
-    }
-  }
+  return permissions;
+}
 
-  // User role: read-only on most modules
-  for (const module of modules) {
-    const perm = await prisma.permission.findFirst({
-      where: { module, action: "read" },
-    });
-    if (perm) {
-      await prisma.rolePermission.upsert({
-        where: { id: `${roles[2].id}-${perm.id}` },
-        update: {},
-        create: {
-          id: `${roles[2].id}-${perm.id}`,
-          roleId: roles[2].id,
-          permission: perm.id,
-          module,
-          action: "read",
-        },
-      });
-    }
-  }
+async function seedRoles(
+  permissions: Array<{ id: string; module: string; action: string }>,
+) {
+  const roleRows = await sql<Array<{ id: string; name: string }>>`
+    INSERT INTO "Role" ("id", "name", "description", "isSystem", "isActive", "isArchived", "createdAt", "updatedAt")
+    VALUES
+      (${makeSeedId("role", "super-admin")}, 'Super Admin', 'Reserved system role with full access.', true, true, false, NOW(), NOW()),
+      (${makeSeedId("role", "admin")}, 'Admin', 'Administrative access for daily operations.', false, true, false, NOW(), NOW()),
+      (${makeSeedId("role", "user")}, 'User', 'Standard read access for day-to-day use.', false, true, false, NOW(), NOW())
+    ON CONFLICT ("name") DO UPDATE SET
+      "description" = EXCLUDED."description",
+      "isSystem" = EXCLUDED."isSystem",
+      "isActive" = true,
+      "isArchived" = false,
+      "updatedAt" = NOW()
+    RETURNING "id", "name"
+  `;
 
-  // Viewer role: read-only on core modules only
-  const viewerModules = [
-    "items",
-    "categories",
-    "units",
-    "customers",
-    "suppliers",
-    "locations",
-    "reports",
-  ];
-  for (const module of viewerModules) {
-    const perm = await prisma.permission.findFirst({
-      where: { module, action: "read" },
-    });
-    if (perm) {
-      await prisma.rolePermission.upsert({
-        where: { id: `${roles[3].id}-${perm.id}` },
-        update: {},
-        create: {
-          id: `${roles[3].id}-${perm.id}`,
-          roleId: roles[3].id,
-          permission: perm.id,
-          module,
-          action: "read",
-        },
-      });
-    }
-  }
+  const roleByName = new Map(roleRows.map((row) => [row.name, row.id]));
+  const superAdminId = roleByName.get("Super Admin")!;
+  const adminId = roleByName.get("Admin")!;
+  const userId = roleByName.get("User")!;
 
-  console.log("  ✓ Permissions and role assignments created");
-
-  // ── 4. System Settings ──
-  const systemSettings = [
-    { key: "company_name", value: "NEW ERP", category: "general" },
-    { key: "company_address", value: "Nairobi, Kenya", category: "general" },
-    { key: "company_phone", value: "+254700000000", category: "general" },
-    { key: "company_email", value: "info@konel.com", category: "general" },
-    { key: "default_currency", value: "KES", category: "general" },
-    { key: "tax_rate", value: "16", category: "tax" },
-    { key: "enable_approval_workflow", value: "true", category: "approval" },
-    { key: "low_stock_threshold", value: "10", category: "inventory" },
-    { key: "session_timeout_minutes", value: "60", category: "security" },
-    { key: "max_login_attempts", value: "5", category: "security" },
-    { key: "enable_audit_log", value: "true", category: "audit" },
-    { key: "date_format", value: "DD/MM/YYYY", category: "localization" },
-    { key: "time_format", value: "HH:mm", category: "localization" },
-    { key: "timezone", value: "Africa/Nairobi", category: "localization" },
+  const rolePermissionRows = [
+    ...permissions.map((permission) => ({
+      roleId: superAdminId,
+      permissionId: permission.id,
+      module: permission.module,
+      action: permission.action,
+    })),
+    ...permissions
+      .filter(
+        (permission) =>
+          permission.module === "administration" ||
+          permission.module === "master-data" ||
+          permission.action === "view",
+      )
+      .map((permission) => ({
+        roleId: adminId,
+        permissionId: permission.id,
+        module: permission.module,
+        action: permission.action,
+      })),
+    ...permissions
+      .filter((permission) => permission.action === "view")
+      .map((permission) => ({
+        roleId: userId,
+        permissionId: permission.id,
+        module: permission.module,
+        action: permission.action,
+      })),
   ];
 
-  for (const setting of systemSettings) {
-    await prisma.systemSetting.upsert({
-      where: { key: setting.key },
-      update: { value: setting.value },
-      create: setting,
-    });
+  for (const row of rolePermissionRows) {
+    await sql`
+      INSERT INTO "RolePermission" ("id", "roleId", "permission", "module", "action", "isArchived")
+      VALUES (${`${row.roleId}:${row.permissionId}`}, ${row.roleId}, ${row.permissionId}, ${row.module}, ${row.action}, false)
+      ON CONFLICT ("id") DO UPDATE SET
+        "roleId" = EXCLUDED."roleId",
+        "permission" = EXCLUDED."permission",
+        "module" = EXCLUDED."module",
+        "action" = EXCLUDED."action",
+        "isArchived" = false
+    `;
   }
-  console.log(`  ✓ ${systemSettings.length} system settings created`);
 
-  // ── 5. Document Numbering ──
-  const documentNumberings = [
-    {
-      prefix: "PO",
-      description: "Purchase Order",
-      prefixFormat: "PO",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "SO",
-      description: "Sales Order",
-      prefixFormat: "SO",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "GRN",
-      description: "Goods Received Note",
-      prefixFormat: "GRN",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "DN",
-      description: "Delivery Note",
-      prefixFormat: "DN",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "INV",
-      description: "Invoice",
-      prefixFormat: "INV",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "CN",
-      description: "Credit Note",
-      prefixFormat: "CN",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "SM",
-      description: "Stock Movement",
-      prefixFormat: "SM",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "PR",
-      description: "Purchase Requisition",
-      prefixFormat: "PR",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "QT",
-      description: "Quotation",
-      prefixFormat: "QT",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-    {
-      prefix: "JRN",
-      description: "Journal Entry",
-      prefixFormat: "JRN",
-      yearFormat: "YYYY",
-      currentSequence: 0,
-    },
-  ];
+  return { superAdminId, adminId, userId };
+}
 
-  for (const dn of documentNumberings) {
-    await prisma.documentNumbering.upsert({
-      where: { prefix: dn.prefix },
-      update: {},
-      create: dn,
-    });
+async function seedLocations(adminUserId: string) {
+  const rows: Array<{ id: string; locationCode: string }> = [];
+
+  for (const location of locations) {
+    const result = await sql<Array<{ id: string; locationCode: string }>>`
+      INSERT INTO "Location" (
+        "id",
+        "locationCode",
+        "locationName",
+        "locationType",
+        address,
+        "isStockLocation",
+        "isProcurementLocation",
+        "isProductionLocation",
+        "isSalesLocation",
+        "isTransitLocation",
+        "isScrapLocation",
+        "createdById",
+        "updatedById",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("location", location.locationCode)},
+        ${location.locationCode},
+        ${location.locationName},
+        ${location.locationType},
+        ${location.address},
+        ${location.isStockLocation},
+        ${location.isProcurementLocation},
+        ${location.isProductionLocation},
+        ${location.isSalesLocation},
+        ${location.isTransitLocation},
+        ${location.isScrapLocation},
+        ${adminUserId},
+        ${adminUserId},
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("locationCode") DO UPDATE SET
+        "locationName" = EXCLUDED."locationName",
+        "locationType" = EXCLUDED."locationType",
+        address = EXCLUDED.address,
+        "isStockLocation" = EXCLUDED."isStockLocation",
+        "isProcurementLocation" = EXCLUDED."isProcurementLocation",
+        "isProductionLocation" = EXCLUDED."isProductionLocation",
+        "isSalesLocation" = EXCLUDED."isSalesLocation",
+        "isTransitLocation" = EXCLUDED."isTransitLocation",
+        "isScrapLocation" = EXCLUDED."isScrapLocation",
+        "updatedById" = EXCLUDED."updatedById",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+      RETURNING "id", "locationCode"
+    `;
+    rows.push(result[0]);
   }
-  console.log(
-    `  ✓ ${documentNumberings.length} document numbering prefixes created`,
+
+  return rows;
+}
+
+async function seedUserRecord(
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    username: string;
+    role: string;
+    roleId: string;
+    phone: string;
+  },
+  password: string,
+) {
+  const rows = await sql<Array<{ id: string }>>`
+    INSERT INTO "User" (
+      "id",
+      "name",
+      "email",
+      "username",
+      "password",
+      "language",
+      "dateFormat",
+      "itemsPerPage",
+      "lastLogin",
+      "role",
+      "phone",
+      "isActive",
+      "isArchived",
+      "roleId",
+      "createdAt",
+      "updatedAt"
+    )
+    VALUES (
+      ${user.id},
+      ${user.name},
+      ${user.email},
+      ${user.username},
+      ${password},
+      'en',
+      'DD/MM/YYYY',
+      25,
+      NOW(),
+      ${user.role},
+      ${user.phone},
+      true,
+      false,
+      ${user.roleId},
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT ("email") DO UPDATE SET
+      "name" = EXCLUDED."name",
+      "username" = EXCLUDED."username",
+      "password" = EXCLUDED."password",
+      "language" = EXCLUDED."language",
+      "dateFormat" = EXCLUDED."dateFormat",
+      "itemsPerPage" = EXCLUDED."itemsPerPage",
+      "lastLogin" = EXCLUDED."lastLogin",
+      "role" = EXCLUDED."role",
+      "phone" = EXCLUDED."phone",
+      "isActive" = true,
+      "isArchived" = false,
+      "roleId" = EXCLUDED."roleId",
+      "updatedAt" = NOW()
+    RETURNING "id"
+  `;
+
+  return rows[0].id;
+}
+
+async function seedAdditionalUsers(roleIds: {
+  adminId: string;
+  userId: string;
+}) {
+  const password = await bcrypt.hash("1234", 12);
+  const managerUserId = await seedUserRecord(
+    {
+      id: makeSeedId("user", "operations-manager"),
+      name: "Operations Manager",
+      email: "manager@newerp.local",
+      username: "manager",
+      role: "Admin",
+      roleId: roleIds.adminId,
+      phone: "+254700000001",
+    },
+    password,
+  );
+  const clerkUserId = await seedUserRecord(
+    {
+      id: makeSeedId("user", "warehouse-clerk"),
+      name: "Warehouse Clerk",
+      email: "clerk@newerp.local",
+      username: "clerk",
+      role: "User",
+      roleId: roleIds.userId,
+      phone: "+254700000002",
+    },
+    password,
   );
 
-  // ── 6. Master Data: Categories ──
-  const categoriesData = [
-    { name: "Raw Materials", description: "Raw materials for production" },
-    { name: "Finished Goods", description: "Finished goods ready for sale" },
-    { name: "Packaging Materials", description: "Packaging supplies" },
-    { name: "Spare Parts", description: "Equipment spare parts" },
-    { name: "Office Supplies", description: "General office supplies" },
-    { name: "Consumables", description: "Consumable items" },
-    { name: "Semi-Finished Goods", description: "Work-in-progress items" },
-    { name: "Services", description: "Service items" },
-  ];
+  return { managerUserId, clerkUserId };
+}
 
-  for (const cat of categoriesData) {
-    await prisma.category.upsert({
-      where: { id: cat.name },
-      update: {},
-      create: {
-        id: cat.name,
-        name: cat.name,
-        description: cat.description,
-        isActive: true,
-      },
-    });
+async function seedUserLocations(userId: string, locationIds: string[]) {
+  for (let index = 0; index < locationIds.length; index += 1) {
+    const locationId = locationIds[index];
+    await sql`
+      INSERT INTO "UserLocation" ("id", "userId", "locationId", "isDefault")
+      VALUES (${`${userId}:${locationId}`}, ${userId}, ${locationId}, ${index === 0})
+      ON CONFLICT ("userId", "locationId") DO UPDATE SET
+        "isDefault" = EXCLUDED."isDefault"
+    `;
   }
-  console.log(`  ✓ ${categoriesData.length} categories created`);
+}
 
-  // ── 7. Master Data: Units ──
-  const unitsData = [
-    { name: "Kilogram", abbreviation: "kg", type: "WEIGHT" },
-    { name: "Gram", abbreviation: "g", type: "WEIGHT" },
-    { name: "Ton", abbreviation: "t", type: "WEIGHT" },
-    { name: "Liter", abbreviation: "L", type: "VOLUME" },
-    { name: "Milliliter", abbreviation: "mL", type: "VOLUME" },
-    { name: "Piece", abbreviation: "pc", type: "QUANTITY" },
-    { name: "Box", abbreviation: "bx", type: "QUANTITY" },
-    { name: "Carton", abbreviation: "ctn", type: "QUANTITY" },
-    { name: "Meter", abbreviation: "m", type: "LENGTH" },
-    { name: "Square Meter", abbreviation: "m²", type: "AREA" },
-    { name: "Packet", abbreviation: "pkt", type: "QUANTITY" },
-    { name: "Set", abbreviation: "set", type: "QUANTITY" },
-    { name: "Dozen", abbreviation: "doz", type: "QUANTITY" },
-    { name: "Roll", abbreviation: "rl", type: "QUANTITY" },
-    { name: "Bag", abbreviation: "bag", type: "QUANTITY" },
-  ];
-
-  for (const unit of unitsData) {
-    await prisma.unit.upsert({
-      where: { id: unit.name },
-      update: {},
-      create: {
-        id: unit.name,
-        name: unit.name,
-        abbreviation: unit.abbreviation,
-        type: unit.type,
-        isActive: true,
-      },
-    });
+async function seedMasterData() {
+  for (const category of categories) {
+    await sql`
+      INSERT INTO "Category" ("id", "code", "name", "description", "isActive", "isArchived", "createdAt", "updatedAt")
+      VALUES (${makeSeedId("category", category.code ?? category.name)}, ${category.code}, ${category.name}, ${category.description}, true, false, NOW(), NOW())
+      ON CONFLICT ("code") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "description" = EXCLUDED."description",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${unitsData.length} units created`);
 
-  // ── 8. Master Data: Locations ──
-  const locationsData = [
-    {
-      locationCode: "WH-MAIN",
-      locationName: "Main Warehouse",
-      locationType: "WAREHOUSE",
-      address: "Nairobi Industrial Area",
-    },
-    {
-      locationCode: "WH-MSA",
-      locationName: "Mombasa Warehouse",
-      locationType: "WAREHOUSE",
-      address: "Mombasa Port Area",
-    },
-    {
-      locationCode: "WH-KSM",
-      locationName: "Kisumu Warehouse",
-      locationType: "WAREHOUSE",
-      address: "Kisumu CBD",
-    },
-    {
-      locationCode: "STORE-PROD",
-      locationName: "Production Store",
-      locationType: "STORE",
-      address: "Factory Floor",
-    },
-    {
-      locationCode: "STORE-QC",
-      locationName: "QC Holding Store",
-      locationType: "STORE",
-      address: "QC Department",
-    },
-    {
-      locationCode: "SHOP-NAI",
-      locationName: "Nairobi Retail Shop",
-      locationType: "RETAIL",
-      address: "Nairobi City Centre",
-    },
-  ];
-
-  for (const loc of locationsData) {
-    await prisma.location.upsert({
-      where: { locationCode: loc.locationCode },
-      update: {},
-      create: loc,
-    });
+  for (const unit of units) {
+    await sql`
+      INSERT INTO "Unit" ("id", "code", "name", "abbreviation", "type", "isActive", "isArchived", "createdAt", "updatedAt")
+      VALUES (${makeSeedId("unit", unit.code ?? unit.abbreviation)}, ${unit.code}, ${unit.name}, ${unit.abbreviation}, ${unit.type}, true, false, NOW(), NOW())
+      ON CONFLICT ("code") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "abbreviation" = EXCLUDED."abbreviation",
+        "type" = EXCLUDED."type",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${locationsData.length} locations created`);
 
-  // ── 9. Master Data: Customers ──
-  const customersData = [
-    {
-      customerCode: "CUST-001",
-      name: "ABC Enterprises Ltd",
-      phone: "+254711000001",
-      email: "info@abcenterprises.co.ke",
-      address: "Nairobi, Kenya",
-      creditLimit: 500000,
-      paymentTerms: "NET30",
-    },
-    {
-      customerCode: "CUST-002",
-      name: "Nairobi Wholesalers",
-      phone: "+254711000002",
-      email: "orders@nairobwholesale.co.ke",
-      address: "Nairobi Industrial Area",
-      creditLimit: 1000000,
-      paymentTerms: "NET60",
-    },
-    {
-      customerCode: "CUST-003",
-      name: "Mombasa Traders",
-      phone: "+254711000003",
-      email: "info@mombasatraders.co.ke",
-      address: "Mombasa CBD",
-      creditLimit: 300000,
-      paymentTerms: "NET30",
-    },
-    {
-      customerCode: "CUST-004",
-      name: "Beta Supplies",
-      phone: "+254711000004",
-      email: "sales@betasupplies.co.ke",
-      address: "Kisumu, Kenya",
-      creditLimit: 200000,
-      paymentTerms: "CASH",
-    },
-    {
-      customerCode: "CUST-005",
-      name: "Retail Mart Ltd",
-      phone: "+254711000005",
-      email: "info@retailmart.co.ke",
-      address: "Nairobi Westlands",
-      creditLimit: 750000,
-      paymentTerms: "NET45",
-    },
-  ];
-
-  for (const c of customersData) {
-    await prisma.customer.upsert({
-      where: { customerCode: c.customerCode },
-      update: {},
-      create: c,
-    });
+  for (const itemType of itemTypes) {
+    await sql`
+      INSERT INTO "ItemType" (
+        "id",
+        "code",
+        "name",
+        "description",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("itemtype", itemType.code)},
+        ${itemType.code},
+        ${itemType.name},
+        ${itemType.description},
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("code") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "description" = EXCLUDED."description",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${customersData.length} customers created`);
 
-  // ── 10. Master Data: Suppliers ──
-  const suppliersData = [
-    {
-      supplierCode: "SUPP-001",
-      name: "Industrial Raw Materials Ltd",
-      contactPerson: "John Kamau",
-      phone: "+254722000001",
-      email: "john@irm.co.ke",
-      address: "Nairobi Industrial Area",
-      paymentTerms: "NET30",
-    },
-    {
-      supplierCode: "SUPP-002",
-      name: "Packaging Solutions Ltd",
-      contactPerson: "Mary Wanjiku",
-      phone: "+254722000002",
-      email: "mary@packsol.co.ke",
-      address: "Thika Road",
-      paymentTerms: "NET30",
-    },
-    {
-      supplierCode: "SUPP-003",
-      name: "Global Tech Imports",
-      contactPerson: "David Ochieng",
-      phone: "+254722000003",
-      email: "david@gti.co.ke",
-      address: "Mombasa Port",
-      paymentTerms: "LC",
-    },
-    {
-      supplierCode: "SUPP-004",
-      name: "Local Farmers Cooperative",
-      contactPerson: "Peter Mwangi",
-      phone: "+254722000004",
-      email: "peter@lfc.co.ke",
-      address: "Central Kenya",
-      paymentTerms: "CASH",
-    },
-    {
-      supplierCode: "SUPP-005",
-      name: "Office Essentials Ltd",
-      contactPerson: "Grace Akinyi",
-      phone: "+254722000005",
-      email: "grace@oessentials.co.ke",
-      address: "Nairobi CBD",
-      paymentTerms: "NET15",
-    },
-  ];
-
-  for (const s of suppliersData) {
-    await prisma.supplier.upsert({
-      where: { supplierCode: s.supplierCode },
-      update: {},
-      create: s,
-    });
+  for (const taxCode of taxCodes) {
+    await sql`
+      INSERT INTO "TaxCode" ("id", "code", "taxName", "taxType", "rate", "appliesTo", "isDefault", "isActive", "isArchived", "createdAt", "updatedAt")
+      VALUES (${makeSeedId("tax", taxCode.code ?? taxCode.taxName)}, ${taxCode.code}, ${taxCode.taxName}, ${taxCode.taxType}, ${taxCode.rate}, ${taxCode.appliesTo}, ${taxCode.isDefault ?? false}, true, false, NOW(), NOW())
+      ON CONFLICT ("code") DO UPDATE SET
+        "taxName" = EXCLUDED."taxName",
+        "taxType" = EXCLUDED."taxType",
+        "rate" = EXCLUDED."rate",
+        "appliesTo" = EXCLUDED."appliesTo",
+        "isDefault" = EXCLUDED."isDefault",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${suppliersData.length} suppliers created`);
 
-  // ── 11. Master Data: Banks ──
-  const banksData = [
-    { name: "Kenya Commercial Bank", shortName: "KCB" },
-    { name: "Equity Bank", shortName: "Equity" },
-    { name: "Co-operative Bank", shortName: "Co-op" },
-    { name: "Standard Chartered Bank", shortName: "StanChart" },
-    { name: "NCBA Bank", shortName: "NCBA" },
-  ];
-
-  for (const b of banksData) {
-    await prisma.bank.upsert({
-      where: { id: b.name },
-      update: {},
-      create: {
-        id: b.name,
-        name: b.name,
-        shortName: b.shortName,
-        isActive: true,
-      },
-    });
+  for (const department of departments) {
+    await sql`
+      INSERT INTO "Department" ("id", "code", "name", "isActive", "isArchived", "createdAt", "updatedAt")
+      VALUES (${makeSeedId("department", department.code)}, ${department.code}, ${department.name}, true, false, NOW(), NOW())
+      ON CONFLICT ("code") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${banksData.length} banks created`);
 
-  // ── 12. Master Data: Bank Accounts ──
-  const bankAccountsData = [
-    {
-      accountCode: "KCB-001",
-      accountName: "Main Operating Account",
-      accountType: "CURRENT",
-      bankId: "Kenya Commercial Bank",
-      accountNumber: "1100000001",
-      branch: "Head Office",
-      swiftCode: "KCBLKENX",
-      currency: "KES",
-      openingBalance: 5000000,
-      currentBalance: 5000000,
-    },
-    {
-      accountCode: "EQ-001",
-      accountName: "Payroll Account",
-      accountType: "CURRENT",
-      bankId: "Equity Bank",
-      accountNumber: "1200000001",
-      branch: "Moi Avenue",
-      swiftCode: "EQBLKENA",
-      currency: "KES",
-      openingBalance: 2000000,
-      currentBalance: 2000000,
-    },
-    {
-      accountCode: "COOP-001",
-      accountName: "Savings Account",
-      accountType: "SAVINGS",
-      bankId: "Co-operative Bank",
-      accountNumber: "1300000001",
-      branch: "Co-op House",
-      swiftCode: "COOPKENX",
-      currency: "KES",
-      openingBalance: 10000000,
-      currentBalance: 10000000,
-    },
-    {
-      accountCode: "SCB-USD",
-      accountName: "USD Dollar Account",
-      accountType: "FOREIGN",
-      bankId: "Standard Chartered Bank",
-      accountNumber: "1400000001",
-      branch: "Kenya",
-      swiftCode: "SCBLKENX",
-      currency: "USD",
-      openingBalance: 50000,
-      currentBalance: 50000,
-    },
-  ];
-
-  for (const ba of bankAccountsData) {
-    await prisma.bankAccount.upsert({
-      where: { accountCode: ba.accountCode },
-      update: {},
-      create: ba,
-    });
+  for (const bank of banks) {
+    await sql`
+      INSERT INTO "Bank" ("id", "name", "shortName", "isActive", "isArchived", "createdAt", "updatedAt")
+      VALUES (${bank.id}, ${bank.name}, ${bank.shortName}, true, false, NOW(), NOW())
+      ON CONFLICT ("id") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "shortName" = EXCLUDED."shortName",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${bankAccountsData.length} bank accounts created`);
 
-  // ── 13. Master Data: Departments ──
-  const departmentsData = [
-    { name: "Production", code: "PROD" },
-    { name: "Sales & Marketing", code: "SALES" },
-    { name: "Finance & Accounting", code: "FIN" },
-    { name: "Human Resources", code: "HR" },
-    { name: "Quality Control", code: "QC" },
-    { name: "Warehouse & Logistics", code: "WH" },
-    { name: "Procurement", code: "PROC" },
-    { name: "Maintenance", code: "MAINT" },
-    { name: "Information Technology", code: "IT" },
-    { name: "Fleet Management", code: "FLEET" },
-  ];
-
-  for (const d of departmentsData) {
-    await prisma.department.upsert({
-      where: { code: d.code },
-      update: {},
-      create: { name: d.name, code: d.code, isActive: true },
-    });
+  for (const customer of customers) {
+    await sql`
+      INSERT INTO "Customer" (
+        "id",
+        "customerCode",
+        "name",
+        phone,
+        email,
+        address,
+        "creditLimit",
+        "paymentTerms",
+        "vatRegistered",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("customer", customer.customerCode)},
+        ${customer.customerCode},
+        ${customer.name},
+        ${customer.phone},
+        ${customer.email},
+        ${customer.address},
+        ${customer.creditLimit},
+        ${customer.paymentTerms},
+        false,
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("customerCode") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        phone = EXCLUDED.phone,
+        email = EXCLUDED.email,
+        address = EXCLUDED.address,
+        "creditLimit" = EXCLUDED."creditLimit",
+        "paymentTerms" = EXCLUDED."paymentTerms",
+        "vatRegistered" = false,
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${departmentsData.length} departments created`);
 
-  // ── 14. Tax Codes ──
-  const taxCodesData = [
-    { taxName: "VAT 16%", taxType: "VAT", rate: 16 },
-    { taxName: "VAT 8%", taxType: "VAT", rate: 8 },
-    { taxName: "VAT 0%", taxType: "VAT", rate: 0 },
-    { taxName: "Excise Duty", taxType: "EXCISE", rate: 10 },
-    { taxName: "Withholding Tax 5%", taxType: "WITHHOLDING", rate: 5 },
-  ];
-
-  for (const t of taxCodesData) {
-    await prisma.taxCode.upsert({
-      where: { id: t.taxName },
-      update: {},
-      create: {
-        id: t.taxName,
-        taxName: t.taxName,
-        taxType: t.taxType,
-        rate: t.rate,
-        isActive: true,
-      },
-    });
+  for (const supplier of suppliers) {
+    await sql`
+      INSERT INTO "Supplier" (
+        "id",
+        "supplierCode",
+        "name",
+        "contactPerson",
+        phone,
+        email,
+        address,
+        "paymentTerms",
+        "vatRegistered",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("supplier", supplier.supplierCode)},
+        ${supplier.supplierCode},
+        ${supplier.name},
+        ${supplier.contactPerson},
+        ${supplier.phone},
+        ${supplier.email},
+        ${supplier.address},
+        ${supplier.paymentTerms},
+        false,
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("supplierCode") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "contactPerson" = EXCLUDED."contactPerson",
+        phone = EXCLUDED.phone,
+        email = EXCLUDED.email,
+        address = EXCLUDED.address,
+        "paymentTerms" = EXCLUDED."paymentTerms",
+        "vatRegistered" = false,
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${taxCodesData.length} tax codes created`);
 
-  // ── 15. Sample Items ──
-  const rawMaterialsCategory = await prisma.category.findFirst({
-    where: { name: "Raw Materials" },
-  });
-  const finishedGoodsCategory = await prisma.category.findFirst({
-    where: { name: "Finished Goods" },
-  });
-  const packagingCategory = await prisma.category.findFirst({
-    where: { name: "Packaging Materials" },
-  });
-  const kgUnit = await prisma.unit.findFirst({ where: { name: "Kilogram" } });
-  const pcUnit = await prisma.unit.findFirst({ where: { name: "Piece" } });
-  const literUnit = await prisma.unit.findFirst({ where: { name: "Liter" } });
+  const categoryRows = await sql<
+    Array<{ id: string; code: string | null }>
+  >`SELECT id, code FROM "Category" WHERE "isArchived" = false`;
+  const unitRows = await sql<
+    Array<{ id: string; code: string | null }>
+  >`SELECT id, code FROM "Unit" WHERE "isArchived" = false`;
+  const itemTypeRows = await sql<
+    Array<{ id: string; code: string }>
+  >`SELECT id, code FROM "ItemType" WHERE "isArchived" = false`;
+  const taxCodeRows = await sql<
+    Array<{ id: string; code: string | null }>
+  >`SELECT id, code FROM "TaxCode" WHERE "isArchived" = false`;
 
-  const itemsData = [
-    {
-      itemCode: "RM-001",
-      itemName: "Corn Flour - Grade A",
-      sku: "CF-GA-001",
-      categoryId: rawMaterialsCategory?.id,
-      itemType: "RAW_MATERIAL",
-      uomId: kgUnit?.id,
-      standardCost: 45,
-      sellingPrice: 65,
-    },
-    {
-      itemCode: "RM-002",
-      itemName: "Sugar - Refined",
-      sku: "SGR-REF-001",
-      categoryId: rawMaterialsCategory?.id,
-      itemType: "RAW_MATERIAL",
-      uomId: kgUnit?.id,
-      standardCost: 120,
-      sellingPrice: 150,
-    },
-    {
-      itemCode: "RM-003",
-      itemName: "Vegetable Oil",
-      sku: "VO-PALM-001",
-      categoryId: rawMaterialsCategory?.id,
-      itemType: "RAW_MATERIAL",
-      uomId: literUnit?.id,
-      standardCost: 180,
-      sellingPrice: 220,
-    },
-    {
-      itemCode: "FG-001",
-      itemName: "Maize Flour - 2kg Pack",
-      sku: "MF-2KG-001",
-      categoryId: finishedGoodsCategory?.id,
-      itemType: "FINISHED_GOOD",
-      uomId: pcUnit?.id,
-      standardCost: 110,
-      sellingPrice: 145,
-    },
-    {
-      itemCode: "FG-002",
-      itemName: "Wheat Flour - 1kg Pack",
-      sku: "WF-1KG-001",
-      categoryId: finishedGoodsCategory?.id,
-      itemType: "FINISHED_GOOD",
-      uomId: pcUnit?.id,
-      standardCost: 85,
-      sellingPrice: 115,
-    },
-    {
-      itemCode: "FG-003",
-      itemName: "Cooking Oil - 1L Bottle",
-      sku: "CO-1L-001",
-      categoryId: finishedGoodsCategory?.id,
-      itemType: "FINISHED_GOOD",
-      uomId: pcUnit?.id,
-      standardCost: 220,
-      sellingPrice: 280,
-    },
-    {
-      itemCode: "PKG-001",
-      itemName: "Plastic Bag - 2kg",
-      sku: "PB-2KG-001",
-      categoryId: packagingCategory?.id,
-      itemType: "PACKAGING",
-      uomId: pcUnit?.id,
-      standardCost: 5,
-      sellingPrice: 8,
-    },
-    {
-      itemCode: "PKG-002",
-      itemName: "Carton Box - Standard",
-      sku: "CB-STD-001",
-      categoryId: packagingCategory?.id,
-      itemType: "PACKAGING",
-      uomId: pcUnit?.id,
-      standardCost: 25,
-      sellingPrice: 35,
-    },
-  ];
+  const categoryByCode = new Map(
+    categoryRows.map((row) => [row.code ?? "", row.id]),
+  );
+  const unitByCode = new Map(unitRows.map((row) => [row.code ?? "", row.id]));
+  const itemTypeByCode = new Map(itemTypeRows.map((row) => [row.code, row.id]));
+  const taxCodeByCode = new Map(
+    taxCodeRows.map((row) => [row.code ?? "", row.id]),
+  );
+  const defaultTaxCodeId = taxCodeByCode.get("VAT16") ?? null;
 
-  for (const item of itemsData) {
-    await prisma.item.upsert({
-      where: { itemCode: item.itemCode },
-      update: {},
-      create: item,
-    });
-  }
-  console.log(`  ✓ ${itemsData.length} sample items created`);
-
-  // ── 16. Price List Items ──
-  const items = await prisma.item.findMany({ where: { isActive: true } });
   for (const item of items) {
-    await prisma.priceList.create({
-      data: {
-        itemId: item.id,
-        price: item.sellingPrice ?? 0,
-        isActive: true,
-      },
-    });
+    await sql`
+      INSERT INTO "Item" (
+        "id",
+        "itemCode",
+        "itemName",
+        sku,
+        "categoryId",
+        "itemTypeId",
+        "uomId",
+        "reorderPoint",
+        "standardCost",
+        "sellingPrice",
+        "vatApplicable",
+        "exciseApplicable",
+        "purchaseTaxCodeId",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("item", item.itemCode)},
+        ${item.itemCode},
+        ${item.itemName},
+        ${item.sku},
+        ${categoryByCode.get(item.categoryCode) ?? null},
+        ${itemTypeByCode.get(item.itemTypeCode) ?? null},
+        ${unitByCode.get(item.uomCode) ?? null},
+        ${item.reorderPoint},
+        ${item.standardCost ?? 0},
+        ${item.sellingPrice ?? 0},
+        ${item.vatApplicable},
+        ${item.exciseApplicable},
+        ${defaultTaxCodeId},
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("itemCode") DO UPDATE SET
+        "itemName" = EXCLUDED."itemName",
+        sku = EXCLUDED.sku,
+        "categoryId" = EXCLUDED."categoryId",
+        "itemTypeId" = EXCLUDED."itemTypeId",
+        "uomId" = EXCLUDED."uomId",
+        "reorderPoint" = EXCLUDED."reorderPoint",
+        "standardCost" = EXCLUDED."standardCost",
+        "sellingPrice" = EXCLUDED."sellingPrice",
+        "vatApplicable" = EXCLUDED."vatApplicable",
+        "exciseApplicable" = EXCLUDED."exciseApplicable",
+        "purchaseTaxCodeId" = EXCLUDED."purchaseTaxCodeId",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
   }
-  console.log(`  ✓ ${items.length} price list entries created`);
 
-  // ── 17. Associate admin user with Admin role ──
-  await prisma.user.update({
-    where: { id: adminUser.id },
-    data: { roleId: roles[0].id },
-  });
-  console.log("  ✓ Admin user assigned to Admin role");
+  for (const priceList of priceLists) {
+    await sql`
+      INSERT INTO "PriceList" (
+        "id",
+        "code",
+        "name",
+        "currency",
+        "customerGroup",
+        "price",
+        "effectiveFrom",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("pricelist", priceList.code ?? priceList.name ?? "default")},
+        ${priceList.code},
+        ${priceList.name},
+        ${priceList.currency},
+        ${priceList.customerGroup},
+        ${priceList.price},
+        ${priceList.effectiveFrom},
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("code") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "currency" = EXCLUDED."currency",
+        "customerGroup" = EXCLUDED."customerGroup",
+        "price" = EXCLUDED."price",
+        "effectiveFrom" = EXCLUDED."effectiveFrom",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
+  }
 
-  // ── 18. Create additional sample users ──
-  const sampleUsers = [
-    {
-      name: "Manager User",
-      email: "manager@konel.com",
-      password: "manager123",
-      role: "manager",
-      roleId: roles[1].id,
-    },
-    {
-      name: "Staff User",
-      email: "user@konel.com",
-      password: "user123",
-      role: "user",
-      roleId: roles[2].id,
-    },
-    {
-      name: "Viewer User",
-      email: "viewer@konel.com",
-      password: "viewer123",
-      role: "viewer",
-      roleId: roles[3].id,
-    },
+  for (const prefix of ["PO", "SO", "GRN", "INV", "PR", "REQ", "ST", "ADJ"]) {
+    await sql`
+      INSERT INTO "DocumentNumbering" (
+        "id",
+        "prefix",
+        "description",
+        "prefixFormat",
+        "separator",
+        "yearFormat",
+        "monthFormat",
+        "dayFormat",
+        "sequenceLength",
+        "currentSequence",
+        "isActive",
+        "isArchived"
+      )
+      VALUES (
+        ${makeSeedId("docnum", prefix)},
+        ${prefix},
+        ${titleCase(prefix)},
+        ${prefix},
+        '-',
+        'YYYY',
+        'MM',
+        'DD',
+        4,
+        0,
+        true,
+        false
+      )
+      ON CONFLICT ("prefix") DO UPDATE SET
+        "description" = EXCLUDED."description",
+        "prefixFormat" = EXCLUDED."prefixFormat",
+        "separator" = EXCLUDED."separator",
+        "yearFormat" = EXCLUDED."yearFormat",
+        "monthFormat" = EXCLUDED."monthFormat",
+        "dayFormat" = EXCLUDED."dayFormat",
+        "sequenceLength" = EXCLUDED."sequenceLength",
+        "currentSequence" = EXCLUDED."currentSequence",
+        "isActive" = true,
+        "isArchived" = false
+    `;
+  }
+}
+
+async function seedCompanyAndSettings() {
+  const companyRows = await sql<
+    Array<{ id: string }>
+  >`SELECT "id" FROM "Company" ORDER BY "createdAt" ASC LIMIT 1`;
+  if (companyRows[0]) {
+    await sql`
+      UPDATE "Company"
+      SET
+        "companyName" = 'NEW ERP',
+        "logo" = NULL,
+        "address" = 'Nairobi, Kenya',
+        "phone" = '+254700000000',
+        "email" = 'info@newerp.local',
+        "tinNumber" = 'TIN-NEW-ERP',
+        "vatNumber" = 'VAT-NEW-ERP',
+        "defaultCurrency" = 'ETB',
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+      WHERE "id" = ${companyRows[0].id}
+    `;
+  } else {
+    await sql`
+      INSERT INTO "Company" (
+        "id",
+        "companyName",
+        "logo",
+        "address",
+        "phone",
+        "email",
+        "tinNumber",
+        "vatNumber",
+        "defaultCurrency",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("company", "new-erp")},
+        'NEW ERP',
+        NULL,
+        'Nairobi, Kenya',
+        '+254700000000',
+        'info@newerp.local',
+        'TIN-NEW-ERP',
+        'VAT-NEW-ERP',
+        'ETB',
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+    `;
+  }
+
+  const settings = [
+    { key: "company_name", value: "NEW ERP", category: "general" },
+    { key: "default_currency", value: "ETB", category: "general" },
+    { key: "date_format", value: "DD/MM/YYYY", category: "general" },
+    { key: "timezone", value: "Africa/Nairobi", category: "general" },
+    { key: "enable_audit_log", value: "true", category: "security" },
   ];
 
-  for (const u of sampleUsers) {
-    const hashedPw = await bcrypt.hash(u.password, 12);
-    await prisma.user.upsert({
-      where: { email: u.email },
-      update: {},
-      create: {
-        name: u.name,
-        email: u.email,
-        password: hashedPw,
-        role: u.role,
-        roleId: u.roleId,
-        isActive: true,
-      },
-    });
+  for (const setting of settings) {
+    await sql`
+      INSERT INTO "SystemSetting" ("id", "key", "value", "category", "isArchived")
+      VALUES (${randomUUID()}, ${setting.key}, ${setting.value}, ${setting.category}, false)
+      ON CONFLICT ("key") DO UPDATE SET
+        "value" = EXCLUDED."value",
+        "category" = EXCLUDED."category",
+        "isArchived" = false
+    `;
   }
-  console.log(`  ✓ ${sampleUsers.length} sample users created`);
+}
 
-  console.log("\n✅ Seeding completed successfully!");
+async function main() {
+  console.log("Seeding database...");
+
+  await seedCompanyAndSettings();
+  const permissions = await seedPermissions();
+  const roles = await seedRoles(permissions);
+  const adminPassword = await bcrypt.hash("1234", 12);
+  const adminUserId = await seedUserRecord(
+    {
+      id: makeSeedId("user", "admin"),
+      name: "System Administrator",
+      email: "admin@newerp.local",
+      username: "admin",
+      role: "Super Admin",
+      roleId: roles.superAdminId,
+      phone: "+254700000000",
+    },
+    adminPassword,
+  );
+
+  const seededLocations = await seedLocations(adminUserId);
+  const additionalUsers = await seedAdditionalUsers({
+    adminId: roles.adminId,
+    userId: roles.userId,
+  });
+
+  await seedUserLocations(adminUserId, seededLocations.map((location) => location.id));
+  await seedUserLocations(additionalUsers.managerUserId, seededLocations.slice(0, 3).map((location) => location.id));
+  await seedUserLocations(additionalUsers.clerkUserId, seededLocations.slice(1, 3).map((location) => location.id));
+  await seedMasterData();
+
+  console.log("Seeding complete.");
 }
 
 main()
-  .catch((e) => {
-    console.error("❌ Seeding failed:", e);
+  .catch((error) => {
+    console.error("Seeding failed:", error);
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await sql.end({ timeout: 5 });
   });

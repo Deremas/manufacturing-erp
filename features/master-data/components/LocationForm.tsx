@@ -8,6 +8,7 @@ import type { LocationInput } from "@/validators/master-data";
 import type { Location } from "../types";
 import { colors } from "@/components/ui/colors";
 import { typography } from "@/components/ui/typography";
+import { LocationTypes } from "@/lib/constants";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -92,8 +93,6 @@ const checkboxStyle: React.CSSProperties = {
   cursor: "pointer",
   accentColor: colors.primary[600],
 };
-
-const locationTypeOptions = ["Warehouse", "Store", "Yard", "Office", "Plant"];
 
 // ----------------------------------------------------------------------------
 // Component
@@ -269,7 +268,7 @@ export default function LocationForm({
             "locationType",
             "Location Type",
             "select",
-            locationTypeOptions.map((t) => ({ label: t, value: t })),
+            LocationTypes.map((t) => ({ label: t, value: t })),
           )}
         </div>
         <div style={{ marginTop: "16px" }}>

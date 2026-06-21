@@ -1,8 +1,7 @@
-"use client";
+import { CustomersListPage } from "@/features/master-data/customers";
+import { getCustomers } from "@/lib/master-data-db";
 
-import React from "react";
-import { CustomersPage } from "@/features/master-data";
-
-export default function MasterDataCustomersPage() {
-  return <CustomersPage />;
+export default async function MasterDataCustomersPage() {
+  const customers = await getCustomers();
+  return <CustomersListPage initialData={customers} />;
 }

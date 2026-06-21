@@ -17,11 +17,11 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
  * Format a numeric amount as a currency string.
  *
  * @param amount  – The numeric value to format.
- * @param currency – ISO 4217 currency code (default "KES").
+ * @param currency – ISO 4217 currency code (default "ETB").
  */
 export function formatCurrency(
   amount: number,
-  currency: string = "KES",
+  currency: string = "ETB",
 ): string {
   return new Intl.NumberFormat("en-KE", {
     style: "currency",

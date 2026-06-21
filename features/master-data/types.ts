@@ -6,21 +6,29 @@ export interface Item {
   id: string;
   itemCode: string;
   itemName: string;
-  sku: string;
-  categoryId: string;
+  sku?: string;
+  description?: string;
+  categoryId?: string;
   categoryName?: string;
-  itemType: string;
-  uomId: string;
+  itemTypeId?: string;
+  itemType?: string;
+  itemTypeName?: string;
+  uomId?: string;
   uomName?: string;
-  purchaseUomId?: string;
-  salesUomId?: string;
-  conversionFactor?: number;
   reorderPoint: number;
-  standardCost: number;
-  sellingPrice: number;
+  standardCost?: number;
+  sellingPrice?: number;
+  purchaseTaxCodeId?: string;
+  purchaseTaxCodeName?: string;
+  batchTracking?: boolean;
+  expiryTracking?: boolean;
+  serialTracking?: boolean;
   vatApplicable: boolean;
-  exciseApplicable: boolean;
+  exciseApplicable?: boolean;
   isActive: boolean;
+  isArchived?: boolean;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -86,7 +94,6 @@ export interface BankAccount {
   id: string;
   accountCode: string;
   accountName: string;
-  accountType: string;
   bankId: string;
   bankName?: string;
   accountNumber: string;
@@ -102,18 +109,25 @@ export interface Location {
   id: string;
   locationCode: string;
   locationName: string;
-  locationType: string;
+  locationType?: string;
   address?: string;
   isActive: boolean;
 }
 
 export interface PriceList {
   id: string;
-  itemId: string;
+  name?: string;
+  itemId?: string;
   itemName?: string;
-  customerGroup: string;
-  price: number;
-  effectiveDate: string;
+  customerGroup?: string;
+  price?: number;
+  effectiveDate?: string;
+  code?: string;
+  currency?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  customerId?: string;
+  locationId?: string;
   isActive: boolean;
 }
 
@@ -122,5 +136,13 @@ export interface TaxCode {
   taxName: string;
   taxType: string;
   rate: number;
+  isActive: boolean;
+}
+
+export interface ItemType {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
   isActive: boolean;
 }

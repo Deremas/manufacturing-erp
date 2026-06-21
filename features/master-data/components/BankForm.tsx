@@ -14,7 +14,7 @@ import { typography } from "@/components/ui/typography";
 // ----------------------------------------------------------------------------
 export interface BankFormProps {
   initialData?: Bank;
-  onSubmit: (data: BankInput) => Promise<void>;
+  onSubmit?: (data: BankInput) => Promise<void>;
   loading?: boolean;
 }
 
@@ -138,7 +138,9 @@ export default function BankForm({
       return;
     }
 
-    await onSubmit(parsed.data);
+    if (onSubmit) {
+      await onSubmit(parsed.data);
+    }
   };
 
   const handleCancel = () => {

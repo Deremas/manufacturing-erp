@@ -118,7 +118,7 @@ export default function BankAccountDetail({
   );
 
   const formatCurrency = (val: number) =>
-    `${bankAccount.currency || "KES"} ${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    `${bankAccount.currency || "ETB"} ${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
   return (
     <FormCard
@@ -132,7 +132,6 @@ export default function BankAccountDetail({
         <div style={gridStyle}>
           {renderField("Account Code", bankAccount.accountCode)}
           {renderField("Account Name", bankAccount.accountName)}
-          {renderField("Account Type", bankAccount.accountType || "\u2014")}
           {renderField("Status", statusBadge)}
         </div>
       </div>
@@ -145,7 +144,7 @@ export default function BankAccountDetail({
           {renderField("Account Number", bankAccount.accountNumber)}
           {renderField("Branch", bankAccount.branch || "\u2014")}
           {renderField("Swift Code", bankAccount.swiftCode || "\u2014")}
-          {renderField("Currency", bankAccount.currency || "KES")}
+          {renderField("Currency", bankAccount.currency || "ETB")}
         </div>
       </div>
 

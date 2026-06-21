@@ -2,35 +2,22 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/shared";
-import { ItemForm } from "@/features/master-data/components";
+import { ItemFormPage } from "@/features/master-data/items";
+import type { Item } from "@/features/master-data/types";
+import type { CreateItemInput } from "@/types/master-data";
+import * as itemService from "@/services/master-data/itemService";
 
 export default function CreateItemPage() {
   const router = useRouter();
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist item
+  const handleSubmit = async (data: Partial<Item>) => {
+    const result = await itemService.create(data as CreateItemInput);
+    if (!result.success) {
+      alert(result.error || "Failed to create item");
+      return;
+    }
     router.push("/master-data/items");
   };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "24px",
-        padding: "24px",
-      }}
-    >
-      <PageHeader
-        title="Create Item"
-        breadcrumbs={[
-          { label: "Master Data", href: "/master-data" },
-          { label: "Items", href: "/master-data/items" },
-          { label: "Create" },
-        ]}
-      />
-      <ItemForm onSubmit={handleSubmit} />
-    </div>
-  );
+  return <ItemFormPage onSubmit={handleSubmit} />;
 }

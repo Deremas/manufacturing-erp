@@ -6,10 +6,16 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username?: string;
   role: string;
   phone: string;
   avatar?: string;
   isActive: boolean;
+  isSystem?: boolean;
+  lastLogin?: string;
+  roleId?: string;
+  defaultLocationId?: string;
+  accessibleLocationIds?: string[];
   permissions: string[];
   locations: string[];
   createdAt: string;
@@ -19,7 +25,20 @@ export interface Role {
   id: string;
   name: string;
   description: string;
+  isSystem?: boolean;
   permissions: string[];
+  isActive: boolean;
+  permissionsCount?: number;
+  usersCount?: number;
+  users?: Array<{ id: string; name: string; email?: string }>;
+}
+
+export interface Location {
+  id: string;
+  locationCode: string;
+  locationName: string;
+  locationType?: string;
+  address?: string;
   isActive: boolean;
 }
 

@@ -1,55 +1,74 @@
 generator client {
   provider = "prisma-client-js"
+  engineType = "binary"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Company {
-  id                String    @id @default(cuid())
-  companyName       String
-  logo              String?
-  address           String?
-  phone             String?
-  email             String?
-  tinNumber         String?
-  vatNumber         String?
-  defaultCurrency   String    @default("KES")
-  fiscalYearStart   DateTime?
-  invoiceFooter     String?
-  reportHeaderInfo  String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  companyName      String
+  logo             String?
+  address          String?
+  phone            String?
+  email            String?
+  tinNumber        String?
+  vatNumber        String?
+  defaultCurrency  String    @default("ETB")
+  fiscalYearStart  DateTime?
+  invoiceFooter    String?
+  reportHeaderInfo String?
+  isActive         Boolean   @default(true)
+  isArchived       Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model User {
-  id                  String           @id @default(cuid())
-  name                String
-  email               String           @unique
-  password            String?
-  role                String           @default("user")
-  phone               String?
-  avatar              String?
-  isActive            Boolean          @default(true)
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  roleId              String?
-  roleRel             Role?            @relation(fields: [roleId], references: [id])
+  id                String           @id @default(cuid())
+  name              String
+  email             String           @unique
+  username          String?          @unique
+  password          String?
+  language          String?          @default("en")
+  dateFormat        String?          @default("DD/MM/YYYY")
+  itemsPerPage      Int?             @default(25)
+  lastLogin         DateTime?
+  role              String           @default("user")
+  phone             String?
+  avatar            String?
+  isActive          Boolean          @default(true)
+  isArchived        Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  roleId            String?
+  roleRel           Role?            @relation(fields: [roleId], references: [id])
   locations           UserLocation[]
+  assignedLocations   UserLocation[]   @relation("AssignedLocations")
   auditLogs           AuditLog[]
   managedDepartments  Department[]
+  managedLocations    Location[]
+  locationsCreated    Location[]       @relation("LocationCreatedBy")
+  locationsUpdated    Location[]       @relation("LocationUpdatedBy")
+  itemsCreated        Item[]           @relation("ItemCreatedBy")
+  itemsUpdated        Item[]           @relation("ItemUpdatedBy")
+  documentAttachments DocumentAttachment[]
+  documentComments    DocumentComment[]
+  documentHistories   DocumentHistory[]
   stockMovementsCreated StockMovement[]
-  requestedApprovals  Approval[]       @relation("RequestedBy")
-  approvedApprovals   Approval[]       @relation("ApprovedBy")
+  requestedApprovals    Approval[]     @relation("RequestedBy")
+  approvedApprovals     Approval[]     @relation("ApprovedBy")
 }
 
 model Role {
   id          String           @id @default(cuid())
   name        String           @unique
   description String?
+  isSystem    Boolean          @default(false)
   isActive    Boolean          @default(true)
+  isArchived  Boolean          @default(false)
   permissions RolePermission[]
   users       User[]
   createdAt   DateTime         @default(now())
@@ -61,181 +80,397 @@ model Permission {
   module          String
   action          String
   label           String?
+  isArchived      Boolean          @default(false)
   rolePermissions RolePermission[]
 }
 
 model RolePermission {
-  id             String     @id @default(cuid())
-  roleId         String
-  role           Role       @relation(fields: [roleId], references: [id])
-  permission     String
-  module         String
-  action         String
-  permissionRel  Permission? @relation(fields: [permission], references: [id])
+  id            String     @id @default(cuid())
+  roleId        String
+  role          Role       @relation(fields: [roleId], references: [id])
+  permission    String
+  module        String
+  action        String
+  isArchived    Boolean    @default(false)
+  permissionRel Permission? @relation(fields: [permission], references: [id])
 }
 
 model Location {
-  id              String           @id @default(cuid())
-  locationCode    String           @unique
-  locationName    String
-  locationType    String
-  address         String?
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  userLocations   UserLocation[]
-  stockBalances   StockBalance[]
-  stockMovements  StockMovement[]
+  id                        String           @id @default(cuid())
+  locationCode              String           @unique
+  locationName              String
+  locationType              String
+  address                   String?
+  description               String?
+  parentLocationId          String?
+  parentLocation            Location?        @relation("LocationHierarchy", fields: [parentLocationId], references: [id])
+  childLocations            Location[]       @relation("LocationHierarchy")
+  displayOrder              Int?             @default(0)
+  city                      String?
+  region                    String?
+  country                   String?
+  gpsLatitude               String?
+  gpsLongitude              String?
+  managerId                 String?
+  manager                   User?            @relation(fields: [managerId], references: [id])
+  isStockLocation           Boolean          @default(true)
+  isProcurementLocation     Boolean          @default(false)
+  isProductionLocation      Boolean          @default(false)
+  isSalesLocation           Boolean          @default(false)
+  isTransitLocation         Boolean          @default(false)
+  isScrapLocation           Boolean          @default(false)
+  defaultPriceListId        String?
+  defaultBankAccountId      String?
+  allowNegativeStock        Boolean          @default(false)
+  requireTransferApproval   Boolean          @default(false)
+  enableLocationNumbering   Boolean          @default(false)
+  createdById               String?
+  createdBy                 User?            @relation("LocationCreatedBy", fields: [createdById], references: [id])
+  updatedById               String?
+  updatedBy                 User?            @relation("LocationUpdatedBy", fields: [updatedById], references: [id])
+  isActive                  Boolean          @default(true)
+  isArchived                Boolean          @default(false)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+  userLocations             UserLocation[]
+  stockBalances             StockBalance[]
+  stockMovements            StockMovement[]
 }
 
 model UserLocation {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  locationId String
-  location   Location @relation(fields: [locationId], references: [id])
-  isDefault  Boolean  @default(false)
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  locationId      String
+  location        Location @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  assignedUserId  String?
+  assignedUser    User?    @relation("AssignedLocations", fields: [assignedUserId], references: [id])
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, locationId])
 }
 
 model SystemSetting {
-  id       String @id @default(cuid())
-  key      String @unique
-  value    String
-  category String @default("general")
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  category  String   @default("general")
+  isArchived Boolean  @default(false)
 }
 
 // Master Data Models
 model Item {
-  id                String          @id @default(cuid())
-  itemCode          String          @unique
-  itemName          String
-  sku               String?
-  categoryId        String?
-  category          Category?       @relation(fields: [categoryId], references: [id])
-  itemType          String
-  uomId             String?
-  uom               Unit?           @relation("ItemUOM", fields: [uomId], references: [id])
-  purchaseUomId     String?
-  purchaseUom       Unit?           @relation("PurchaseUOM", fields: [purchaseUomId], references: [id])
-  salesUomId        String?
-  salesUom          Unit?           @relation("SalesUOM", fields: [salesUomId], references: [id])
-  conversionFactor  Float?          @default(1)
-  reorderPoint      Float?          @default(0)
-  standardCost      Float?          @default(0)
-  sellingPrice      Float?          @default(0)
-  vatApplicable     Boolean         @default(true)
-  exciseApplicable  Boolean         @default(false)
-  isActive          Boolean         @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  stockBalances     StockBalance[]
-  stockMovements    StockMovement[]
-  priceListItems    PriceList[]
+  id              String    @id @default(cuid())
+  itemCode        String    @unique
+  itemName        String
+  sku             String?
+  description     String?
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id])
+  itemTypeId      String?
+  itemType        ItemType? @relation(fields: [itemTypeId], references: [id])
+  uomId           String?
+  uom             Unit?     @relation("ItemUOM", fields: [uomId], references: [id])
+  batchTracking   Boolean   @default(false)
+  reorderPoint    Float?    @default(0)
+  standardCost    Float?    @default(0)
+  sellingPrice    Float?    @default(0)
+  expiryTracking  Boolean   @default(false)
+  serialTracking   Boolean   @default(false)
+  purchaseTaxCodeId String?
+  vatApplicable   Boolean   @default(true)
+  exciseApplicable Boolean   @default(false)
+  createdById     String?
+  createdBy       User?     @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  updatedById     String?
+  updatedBy       User?     @relation("ItemUpdatedBy", fields: [updatedById], references: [id])
+  isActive        Boolean   @default(true)
+  isArchived      Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  stockBalances   StockBalance[]
+  stockMovements  StockMovement[]
+  priceListItems   PriceListItem[]
 }
 
 model Category {
-  id                String     @id @default(cuid())
-  name              String
-  parentCategoryId  String?
-  parent            Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
-  children          Category[] @relation("CategoryHierarchy")
-  description       String?
-  isActive          Boolean    @default(true)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  items             Item[]
+  id               String     @id @default(cuid())
+  code             String?    @unique
+  name             String
+  parentCategoryId String?
+  parent           Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  children         Category[] @relation("CategoryHierarchy")
+  description      String?
+  displayOrder     Int?       @default(0)
+  createdById      String?
+  updatedById      String?
+  isActive         Boolean    @default(true)
+  isArchived       Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  items            Item[]
 }
 
 model Unit {
-  id             String  @id @default(cuid())
-  name           String
-  abbreviation   String
-  type           String
-  isActive       Boolean @default(true)
-  items          Item[]  @relation("ItemUOM")
-  purchaseItems  Item[]  @relation("PurchaseUOM")
-  salesItems     Item[]  @relation("SalesUOM")
+  id              String  @id @default(cuid())
+  code            String? @unique
+  name            String
+  abbreviation    String
+  type            String
+  decimalPrecision Int?   @default(0)
+  createdById     String?
+  updatedById     String?
+  isActive        Boolean @default(true)
+  isArchived      Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  items           Item[]           @relation("ItemUOM")
+  priceListItems  PriceListItem[]
+  conversionsFrom UnitConversion[] @relation("FromUnit")
+  conversionsTo   UnitConversion[] @relation("ToUnit")
 }
 
 model Customer {
-  id            String   @id @default(cuid())
-  customerCode  String   @unique
-  name          String
-  phone         String?
-  email         String?
-  address       String?
-  creditLimit   Float?   @default(0)
-  paymentTerms  String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  customerCode          String   @unique
+  name                  String
+  customerType          String?
+  tin                   String?
+  vatRegistered         Boolean  @default(false)
+  phone                 String?
+  email                 String?
+  address               String?
+  city                  String?
+  region                String?
+  creditLimit           Float?   @default(0)
+  paymentTerms          String?
+  defaultPriceListId    String?
+  defaultSalesLocationId String?
+  taxCodeId             String?
+  remarks               String?
+  createdById           String?
+  updatedById           String?
+  isActive              Boolean  @default(true)
+  isArchived            Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  contacts              CustomerContact[]
+  addresses             CustomerAddress[]
+}
+
+model CustomerContact {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  name       String
+  phone      String?
+  email      String?
+  isPrimary  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model CustomerAddress {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  type       String?
+  address    String?
+  city       String?
+  region     String?
+  country    String?
+  isPrimary  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Supplier {
-  id            String   @id @default(cuid())
-  supplierCode  String   @unique
-  name          String
-  contactPerson String?
-  phone         String?
-  email         String?
-  address       String?
-  paymentTerms  String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  supplierCode        String   @unique
+  name                String
+  contactPerson       String?
+  tin                 String?
+  vatRegistered       Boolean  @default(false)
+  phone               String?
+  email               String?
+  address             String?
+  city                String?
+  region              String?
+  paymentTerms        String?
+  defaultBankId       String?
+  defaultBankAccountId String?
+  taxCodeId           String?
+  remarks             String?
+  createdById         String?
+  updatedById         String?
+  isActive            Boolean  @default(true)
+  isArchived          Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  contacts            SupplierContact[]
+  addresses           SupplierAddress[]
+}
+
+model SupplierContact {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  name       String
+  phone      String?
+  email      String?
+  isPrimary  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SupplierAddress {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  type       String?
+  address    String?
+  city       String?
+  region     String?
+  country    String?
+  isPrimary  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Department {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique
-  managerId String?
-  manager   User?    @relation(fields: [managerId], references: [id])
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String     @id @default(cuid())
+  name              String
+  code              String     @unique
+  parentDepartmentId String?
+  parentDepartment  Department? @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
+  childDepartments  Department[] @relation("DepartmentHierarchy")
+  description       String?
+  locationId        String?
+  managerId         String?
+  manager           User?      @relation(fields: [managerId], references: [id])
+  createdById       String?
+  updatedById       String?
+  isActive          Boolean    @default(true)
+  isArchived        Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 }
 
 model Bank {
-  id        String        @id @default(cuid())
-  name      String
-  shortName String?
-  isActive  Boolean       @default(true)
-  accounts  BankAccount[]
+  id          String        @id @default(cuid())
+  code        String?       @unique
+  name        String
+  shortName   String?
+  swiftCode   String?
+  description String?
+  createdById String?
+  updatedById String?
+  isActive    Boolean       @default(true)
+  isArchived  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  accounts    BankAccount[]
 }
 
 model BankAccount {
-  id              String  @id @default(cuid())
-  accountCode     String  @unique
-  accountName     String
-  accountType     String
-  bankId          String
-  bank            Bank    @relation(fields: [bankId], references: [id])
-  accountNumber   String
-  branch          String?
-  swiftCode       String?
-  currency        String  @default("KES")
-  openingBalance  Float   @default(0)
-  currentBalance  Float   @default(0)
-  isActive        Boolean @default(true)
+  id                 String    @id @default(cuid())
+  accountCode        String    @unique
+  accountName        String
+  bankId             String
+  bank               Bank      @relation(fields: [bankId], references: [id])
+  accountNumber      String
+  branch             String?
+  swiftCode          String?
+  locationId         String?
+  currency           String    @default("ETB")
+  openingBalance     Float     @default(0)
+  currentBalance     Float     @default(0)
+  isDefault          Boolean   @default(false)
+  allowPayments      Boolean   @default(true)
+  allowReceipts      Boolean   @default(true)
+  openingBalanceDate DateTime?
+  createdById        String?
+  updatedById        String?
+  isActive           Boolean   @default(true)
+  isArchived         Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model PriceList {
   id            String    @id @default(cuid())
-  itemId        String
-  item          Item      @relation(fields: [itemId], references: [id])
+  code          String?   @unique
+  name          String?
+  currency      String    @default("ETB")
   customerGroup String?
-  price         Float
+  price         Float?
   effectiveDate DateTime?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  customerId    String?
+  locationId    String?
+  createdById   String?
+  updatedById   String?
   isActive      Boolean   @default(true)
+  isArchived    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  items         PriceListItem[]
+}
+
+model PriceListItem {
+  id           String   @id @default(cuid())
+  priceListId  String
+  priceList    PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  unitId       String?
+  unit         Unit?    @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  sellingPrice Float
+  minimumPrice Float?
+  taxIncluded  Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  isArchived   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([priceListId, itemId])
 }
 
 model TaxCode {
-  id       String   @id @default(cuid())
-  taxName  String
-  taxType  String
-  rate     Float
-  isActive Boolean  @default(true)
+  id          String   @id @default(cuid())
+  code        String?  @unique
+  taxName     String
+  taxType     String
+  rate        Float
+  description String?
+  appliesTo   String?  @default("BOTH")
+  isDefault   Boolean  @default(false)
+  createdById String?
+  updatedById String?
+  isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ItemType {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  name                String
+  description         String?
+  isActive            Boolean  @default(true)
+  isArchived          Boolean  @default(false)
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  items               Item[]
 }
 
 // Document Numbering
@@ -251,6 +486,7 @@ model DocumentNumbering {
   sequenceLength  Int     @default(4)
   currentSequence Int     @default(0)
   isActive        Boolean @default(true)
+  isArchived      Boolean @default(false)
 }
 
 // Audit Log
@@ -265,6 +501,7 @@ model AuditLog {
   newValue  String?
   ipAddress String?
   userAgent String?
+  isArchived Boolean @default(false)
   timestamp DateTime @default(now())
 }
 
@@ -280,6 +517,7 @@ model StockBalance {
   availableQuantity Float     @default(0)
   averageCost       Float     @default(0)
   lastMovementDate  DateTime?
+  isArchived        Boolean   @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -304,6 +542,7 @@ model StockMovement {
   remarks        String?
   createdById    String
   createdBy      User     @relation(fields: [createdById], references: [id])
+  isArchived     Boolean  @default(false)
   createdAt      DateTime @default(now())
 }
 
@@ -318,35 +557,41 @@ model Approval {
   approvedById   String?
   approvedBy     User?    @relation("ApprovedBy", fields: [approvedById], references: [id])
   comment        String?
+  isArchived     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
 
 // Master Data — Extended Models
-
 model Brand {
   id          String   @id @default(cuid())
+  code        String?  @unique
   name        String
   description String?
   isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 model Color {
   id          String   @id @default(cuid())
+  code        String?  @unique
   name        String
   value       String?
   isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 model Size {
   id          String   @id @default(cuid())
+  code        String?  @unique
   name        String
   value       String?
   isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -356,6 +601,7 @@ model Attribute {
   name        String
   type        String            @default("text") // text | select | boolean
   isActive    Boolean           @default(true)
+  isArchived  Boolean           @default(false)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   options     AttributeOption[]
@@ -367,6 +613,7 @@ model AttributeOption {
   attribute   Attribute @relation(fields: [attributeId], references: [id])
   value       String
   sortOrder   Int       @default(0)
+  isArchived  Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
   @@unique([attributeId, value])
@@ -375,18 +622,24 @@ model AttributeOption {
 model UnitConversion {
   id         String   @id @default(cuid())
   fromUnitId String
+  fromUnit   Unit     @relation("FromUnit", fields: [fromUnitId], references: [id], onDelete: Restrict)
   toUnitId   String
+  toUnit     Unit     @relation("ToUnit", fields: [toUnitId], references: [id], onDelete: Restrict)
   factor     Float
+  isActive   Boolean  @default(true)
+  isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([fromUnitId, toUnitId])
 }
 
 model PrintSetting {
-  id       String @id @default(cuid())
-  module   String
-  template String
-  options  String @default("{}")
+  id        String   @id @default(cuid())
+  module    String
+  template  String
+  options   String   @default("{}")
+  isArchived Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -398,8 +651,52 @@ model ModuleSetting {
   module    String
   key       String
   value     String   @default("")
+  isArchived Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([module, key])
+}
+
+// ── Transaction Engine Models ─────────────────────────────────────────────────
+
+model DocumentAttachment {
+  id            String   @id @default(cuid())
+  referenceType String
+  referenceId   String
+  fileName      String
+  fileSize      Int?
+  mimeType      String?
+  fileUrl       String
+  uploadedById  String
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
+  isArchived    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model DocumentComment {
+  id            String   @id @default(cuid())
+  referenceType String
+  referenceId   String
+  content       String
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  isArchived    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model DocumentHistory {
+  id            String   @id @default(cuid())
+  referenceType String
+  referenceId   String
+  action        String
+  fieldName     String?
+  oldValue      String?
+  newValue      String?
+  comment       String?
+  performedById String
+  performedBy   User     @relation(fields: [performedById], references: [id])
+  isArchived    Boolean  @default(false)
+  createdAt     DateTime @default(now())
 }

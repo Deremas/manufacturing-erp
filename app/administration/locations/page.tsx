@@ -1,15 +1,7 @@
-"use client";
+import { LocationsPage } from "@/features/administration/locations";
+import { getLocations } from "@/lib/master-data-db";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
-
-export default function LocationsPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Locations" subtitle="Manage system locations" />
-      <EmptyState title="Locations" message="Module coming soon." />
-    </div>
-  );
+export default async function AdministrationLocationsPage() {
+  const locations = await getLocations();
+  return <LocationsPage initialData={locations} />;
 }

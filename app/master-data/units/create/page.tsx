@@ -8,8 +8,17 @@ import { UnitForm } from "@/features/master-data/components";
 export default function CreateUnitPage() {
   const router = useRouter();
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — persist unit
+  const handleSubmit = async (data: unknown) => {
+    const response = await fetch("/api/master-data/units", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to create unit");
+    }
+
     router.push("/master-data/units");
   };
 

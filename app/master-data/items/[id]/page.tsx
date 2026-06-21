@@ -1,75 +1,40 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { PageHeader } from "@/components/shared";
-import { ItemDetail } from "@/features/master-data/components";
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ItemDetailPage } from "@/features/master-data/items";
 import type { Item } from "@/features/master-data/types";
+import * as itemService from "@/services/master-data/itemService";
 
-export default function ItemDetailPage() {
-  const router = useRouter();
+export default function ItemDetailRoutePage() {
   const params = useParams();
-  const [data, setData] = useState<Item | null>(null);
+  const router = useRouter();
+  const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: API integration — fetch item by ID
-    setData({
-      id: params.id as string,
-      itemCode: "ITM-001",
-      itemName: "Sample Item",
-      sku: "SKU-001",
-      categoryId: "cat-1",
-      categoryName: "Raw Materials",
-      itemType: "raw_material",
-      uomId: "uom-1",
-      uomName: "Pieces",
-      reorderPoint: 10,
-      standardCost: 50,
-      sellingPrice: 75,
-      vatApplicable: true,
-      exciseApplicable: false,
-      isActive: true,
-      createdAt: "2025-01-01T00:00:00Z",
-      updatedAt: "2025-01-01T00:00:00Z",
-    } as Item);
-    setLoading(false);
+    async function loadItem() {
+      const result = await itemService.getById(params.id as string);
+      setItem(result.success ? result.data ?? null : null);
+      setLoading(false);
+    }
+
+    loadItem();
   }, [params.id]);
 
-  const handleEdit = () => {
-    router.push(`/master-data/items/${params.id}/edit`);
-  };
-
-  const handleBack = () => {
-    router.push("/master-data/items");
-  };
-
   if (loading) {
-    return <div style={{ padding: "24px" }}>Loading…</div>;
+    return <div style={{ padding: 24 }}>Loading...</div>;
   }
 
-  if (!data) {
-    return <div style={{ padding: "24px" }}>Item not found</div>;
+  if (!item) {
+    return <div style={{ padding: 24 }}>Item not found</div>;
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "24px",
-        padding: "24px",
-      }}
-    >
-      <PageHeader
-        title={data.itemName}
-        breadcrumbs={[
-          { label: "Master Data", href: "/master-data" },
-          { label: "Items", href: "/master-data/items" },
-          { label: data.itemCode },
-        ]}
-      />
-      <ItemDetail item={data} onEdit={handleEdit} onBack={handleBack} />
-    </div>
+    <ItemDetailPage
+      item={item}
+      onEdit={() => router.push(`/master-data/items/${params.id}/edit`)}
+      onBack={() => router.push("/master-data/items")}
+    />
   );
 }

@@ -1,8 +1,7 @@
-"use client";
+import { RolesListPage } from "@/features/administration/roles";
+import { getRoles } from "@/lib/administration-db";
 
-import React from "react";
-import { RolesPage } from "@/features/administration";
-
-export default function AdministrationRolesPage() {
-  return <RolesPage />;
+export default async function AdministrationRolesPage() {
+  const roles = await getRoles();
+  return <RolesListPage initialData={roles} />;
 }

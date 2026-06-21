@@ -93,21 +93,14 @@ export type ItemType = (typeof ItemTypes)[number];
 // ─── Location Types ──────────────────────────────────────────────────────────
 
 export const LocationTypes = [
+  "Factory",
   "Raw Material Store",
   "Finished Goods Store",
-  "Production Floor",
+  "Scrap",
   "Branch",
-  "Truck",
-  "Office",
 ] as const;
 
 export type LocationType = (typeof LocationTypes)[number];
-
-// ─── Bank Account Types ──────────────────────────────────────────────────────
-
-export const BankAccountTypes = ["Checking", "Savings", "Petty Cash"] as const;
-
-export type BankAccountType = (typeof BankAccountTypes)[number];
 
 // ─── Tax Types ───────────────────────────────────────────────────────────────
 

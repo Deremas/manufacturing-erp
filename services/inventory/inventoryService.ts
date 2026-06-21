@@ -262,7 +262,8 @@ export async function reserveStock(
  */
 export async function releaseReservation(reference: string): Promise<void> {
   // Find all reservations for this reference
-  for (const [key, qty] of reservations.entries()) {
+  const entries = Array.from(reservations.entries());
+  for (const [key, qty] of entries) {
     if (key.endsWith(`_${reference}`)) {
       const [itemId, locationId] = key.split("_");
       if (!itemId || !locationId) continue;

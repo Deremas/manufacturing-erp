@@ -91,7 +91,7 @@ const badgeInactiveStyle: React.CSSProperties = {
   border: `1px solid ${colors.secondary[200]}`,
 };
 
-const toggleValueStyle = (value: boolean): React.CSSProperties => ({
+const toggleValueStyle = (value: boolean | undefined): React.CSSProperties => ({
   ...valueStyle,
   color: value ? colors.success[600] : colors.text.secondary,
 });
@@ -188,9 +188,6 @@ export default function ItemDetail({
         <h4 style={sectionTitleStyle}>UOM & Pricing</h4>
         <div style={gridStyle}>
           {renderField("UOM", item.uomName || item.uomId || "\u2014")}
-          {renderField("Purchase UOM", item.purchaseUomId || "\u2014")}
-          {renderField("Sales UOM", item.salesUomId || "\u2014")}
-          {renderField("Conversion Factor", item.conversionFactor ?? 1)}
           {renderField("Standard Cost", formatCurrency(item.standardCost ?? 0))}
           {renderField("Selling Price", formatCurrency(item.sellingPrice ?? 0))}
         </div>
@@ -200,7 +197,7 @@ export default function ItemDetail({
       <div style={sectionStyle}>
         <h4 style={sectionTitleStyle}>Status & Settings</h4>
         <div style={gridStyle}>
-          {renderField("Reorder Point", item.reorderPoint ?? 0)}
+          {renderField("Low Stock Alert Level", item.reorderPoint ?? 0)}
           {renderField(
             "VAT Applicable",
             <span style={toggleValueStyle(item.vatApplicable)}>

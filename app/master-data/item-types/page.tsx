@@ -1,15 +1,7 @@
-"use client";
+import { ItemTypesListPage } from "@/features/master-data/item-types";
+import { getItemTypes } from "@/lib/master-data-db";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
-
-export default function ItemTypesPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Item Types" subtitle="Manage item types" />
-      <EmptyState title="Item Types" message="Module coming soon." />
-    </div>
-  );
+export default async function ItemTypesPage() {
+  const itemTypes = await getItemTypes();
+  return <ItemTypesListPage initialData={itemTypes} />;
 }

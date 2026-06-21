@@ -1,40 +1,20 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { DepartmentForm } from "@/features/master-data/components";
-import type { Department } from "@/features/master-data/types";
+import { getDepartmentById } from "@/lib/master-data-db";
 
-export default function EditDepartmentPage() {
-  const router = useRouter();
-  const params = useParams();
-  const [data, setData] = useState<Department | null>(null);
-  const [loading, setLoading] = useState(true);
+interface EditDepartmentRouteProps {
+  params: { id: string };
+}
 
-  useEffect(() => {
-    // TODO: API integration — fetch department by ID
-    setData({
-      id: params.id as string,
-      name: "Production",
-      code: "DEPT-PROD",
-      managerName: "Jane Smith",
-      isActive: true,
-    } as Department);
-    setLoading(false);
-  }, [params.id]);
+export default async function EditDepartmentRoute({
+  params,
+}: EditDepartmentRouteProps) {
+  const { id } = params;
+  const department = await getDepartmentById(id);
 
-  const handleSubmit = async (_data: unknown) => {
-    // TODO: API integration — update department
-    router.push("/master-data/departments");
-  };
-
-  if (loading) {
-    return <div style={{ padding: "24px" }}>Loading…</div>;
-  }
-
-  if (!data) {
-    return <div style={{ padding: "24px" }}>Department not found</div>;
+  if (!department) {
+    notFound();
   }
 
   return (
@@ -47,15 +27,15 @@ export default function EditDepartmentPage() {
       }}
     >
       <PageHeader
-        title={`Edit: ${data.name}`}
+        title={`Edit: ${department.name}`}
         breadcrumbs={[
           { label: "Master Data", href: "/master-data" },
           { label: "Departments", href: "/master-data/departments" },
-          { label: data.code },
+          { label: department.code },
           { label: "Edit" },
         ]}
       />
-      <DepartmentForm initialData={data} onSubmit={handleSubmit} />
+      <DepartmentForm initialData={department} />
     </div>
   );
 }
