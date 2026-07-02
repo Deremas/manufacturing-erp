@@ -8,7 +8,7 @@ export default function ProductionRoutePage() {
     <ModuleLandingPage
       title="Production"
       subtitle="Manufacturing planning and costing"
-      description="Open bills of materials, cost settings, and cost reports for production operations."
+      description="Open bills of materials, cost settings, and cost reports for production operations. Inventory issue/output integration helpers are ready for raw material consumption and finished goods receipt."
       links={
         productionItem?.children?.map((child) => ({
           title: child.title,

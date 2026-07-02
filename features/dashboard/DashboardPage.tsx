@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { spacing } from "@/components/ui/spacing";
 import { colors } from "@/components/ui/colors";
 import {
@@ -15,8 +13,7 @@ import {
   getRecentActivities,
   getPendingApprovals,
 } from "@/services/dashboard/dashboard.service";
-import type { DashboardMetrics } from "@/services/dashboard/dashboard.service";
-
+import { getCurrentUser } from "@/lib/auth/auth";
 interface Activity {
   id: string;
   action: string;
@@ -177,32 +174,13 @@ const CheckCircleIcon = (
   </svg>
 );
 
-export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [metricsData, activitiesData, approvalsData] = await Promise.all([
-          getDashboardMetrics(),
-          getRecentActivities(),
-          getPendingApprovals(),
-        ]);
-        setMetrics(metricsData);
-        setActivities(activitiesData as Activity[]);
-        setPendingApprovals(approvalsData);
-      } catch {
-        // Keep empty state if data cannot be loaded.
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, []);
+export default async function DashboardPage() {
+  const user = await getCurrentUser();
+  const [metrics, activities, pendingApprovals] = await Promise.all([
+    getDashboardMetrics(),
+    getRecentActivities(),
+    getPendingApprovals(user?.id),
+  ]);
 
   const allZero =
     metrics &&
@@ -226,9 +204,7 @@ export default function DashboardPage() {
         icon={DashboardIcon}
       />
 
-      {loading ? (
-        <EmptyState title="Loading dashboard" message="Fetching current metrics..." />
-      ) : allZero ? (
+      {allZero ? (
         <EmptyState
           icon={CheckCircleIcon}
           title="No data yet"
@@ -238,31 +214,31 @@ export default function DashboardPage() {
         <div style={metricGridStyle}>
           <MetricCard
             label="Total Items"
-            value={metrics?.totalItems ?? 0}
+            value={metrics.totalItems}
             icon={PackageIcon}
             borderColor={colors.primary[500]}
           />
           <MetricCard
             label="Active Suppliers"
-            value={metrics?.activeSuppliers ?? 0}
+            value={metrics.activeSuppliers}
             icon={UsersIcon}
             borderColor={colors.success[500]}
           />
           <MetricCard
             label="Open Purchase Orders"
-            value={metrics?.openPOs ?? 0}
+            value={metrics.openPOs}
             icon={ShoppingCartIcon}
             borderColor={colors.warning[500]}
           />
           <MetricCard
             label="Low Stock Items"
-            value={metrics?.lowStockItems ?? 0}
+            value={metrics.lowStockItems}
             icon={AlertTriangleIcon}
             borderColor={colors.danger[500]}
           />
           <MetricCard
             label="Pending Approvals"
-            value={metrics?.pendingApprovals ?? 0}
+            value={metrics.pendingApprovals}
             icon={ClockIcon}
             borderColor={colors.secondary[500]}
           />

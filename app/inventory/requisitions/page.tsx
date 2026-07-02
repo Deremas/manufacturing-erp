@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { RequisitionsListPage } from "@/features/inventory";
-
-export default function RequisitionsRoute() {
-  return <RequisitionsListPage />;
+export default function RequisitionsAliasRoute() {
+  redirect("/inventory/srv");
 }

@@ -1,15 +1,7 @@
-"use client";
+import { GeneralLedgerLivePage } from "@/features/accounting/accounting-pages";
+import { getGeneralLedgerRows } from "@/services/accounting/accounting.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
-
-export default function GeneralLedgerPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="General Ledger" subtitle="View general ledger" />
-      <EmptyState title="General Ledger" message="Module coming soon." />
-    </div>
-  );
+export default async function GeneralLedgerPage() {
+  const rows = await getGeneralLedgerRows();
+  return <GeneralLedgerLivePage rows={rows} />;
 }

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { sql } from "@/lib/db";
+import { seedOpeningStock } from "@/lib/server/stock-seed";
 
 const permissionModules = [
   "administration",
@@ -900,7 +901,7 @@ async function seedMasterData() {
     `;
   }
 
-  for (const prefix of ["PO", "SO", "GRN", "INV", "PR", "REQ", "ST", "ADJ"]) {
+  for (const prefix of ["PO", "SO", "GRN", "INV", "PR", "REQ", "ST", "ADJ", "SRET", "SINV", "SPAY"]) {
     await sql`
       INSERT INTO "DocumentNumbering" (
         "id",
@@ -1007,6 +1008,15 @@ async function seedCompanyAndSettings() {
     { key: "date_format", value: "DD/MM/YYYY", category: "general" },
     { key: "timezone", value: "Africa/Nairobi", category: "general" },
     { key: "enable_audit_log", value: "true", category: "security" },
+    { key: "inventory_require_adjustment_approval", value: "false", category: "inventory" },
+    { key: "inventory_require_issue_approval", value: "false", category: "inventory" },
+    { key: "inventory_require_return_approval", value: "false", category: "inventory" },
+    { key: "inventory_require_requisition_approval", value: "false", category: "inventory" },
+    { key: "inventory_policy_transfer", value: JSON.stringify({ documentType: "transfer", title: "Transfer Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
+    { key: "inventory_policy_adjustment", value: JSON.stringify({ documentType: "adjustment", title: "Adjustment Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
+    { key: "inventory_policy_issue", value: JSON.stringify({ documentType: "issue", title: "Issue Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
+    { key: "inventory_policy_return", value: JSON.stringify({ documentType: "return", title: "Return Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
+    { key: "inventory_policy_requisition", value: JSON.stringify({ documentType: "requisition", title: "Store Requisition Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
   ];
 
   for (const setting of settings) {
@@ -1017,6 +1027,26 @@ async function seedCompanyAndSettings() {
         "value" = EXCLUDED."value",
         "category" = EXCLUDED."category",
         "isArchived" = false
+    `;
+  }
+
+  const moduleSettings = [
+    { module: "procurement", key: "pr.requireApproval", value: "false" },
+    { module: "procurement", key: "po.requireApproval", value: "false" },
+    { module: "procurement", key: "grn.requireApproval", value: "false" },
+    { module: "procurement", key: "supplierReturn.requireApproval", value: "false" },
+    { module: "procurement", key: "invoice.requireApproval", value: "false" },
+    { module: "procurement", key: "payment.requireApproval", value: "false" },
+  ];
+
+  for (const setting of moduleSettings) {
+    await sql`
+      INSERT INTO "ModuleSetting" ("id", "module", "key", "value", "isArchived", "createdAt", "updatedAt")
+      VALUES (${randomUUID()}, ${setting.module}, ${setting.key}, ${setting.value}, false, NOW(), NOW())
+      ON CONFLICT ("module", "key") DO UPDATE SET
+        "value" = EXCLUDED."value",
+        "isArchived" = false,
+        "updatedAt" = NOW()
     `;
   }
 }
@@ -1051,6 +1081,14 @@ async function main() {
   await seedUserLocations(additionalUsers.managerUserId, seededLocations.slice(0, 3).map((location) => location.id));
   await seedUserLocations(additionalUsers.clerkUserId, seededLocations.slice(1, 3).map((location) => location.id));
   await seedMasterData();
+
+  if (process.env.SEED_OPENING_STOCK === "true") {
+    const stockSeed = await seedOpeningStock({
+      createdById: adminUserId,
+      remarks: "Opening stock seeded from prisma seed",
+    });
+    console.log("Opening stock seed result:", stockSeed);
+  }
 
   console.log("Seeding complete.");
 }

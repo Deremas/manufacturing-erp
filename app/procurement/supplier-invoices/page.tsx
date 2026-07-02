@@ -1,18 +1,51 @@
-"use client";
+import type { Column } from "@/components/shared";
+import { AccountsPayableListPage } from "@/features/procurement/ap-pages";
+import { listSupplierInvoices } from "@/services/procurement/supplier-invoice.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+function formatMoney(value: string | number) {
+  return Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
-export default function SupplierInvoicesPage() {
+export default async function SupplierInvoicesPage() {
+  const invoices = await listSupplierInvoices();
+
+  const columns: Column<Record<string, string | number>>[] = [
+    { key: "invoiceNo", label: "Invoice No", sortable: true },
+    { key: "supplierInvoiceNo", label: "Supplier Invoice No" },
+    { key: "invoiceDate", label: "Date" },
+    { key: "supplierName", label: "Supplier" },
+    { key: "poNo", label: "PO Reference" },
+    { key: "grnNo", label: "GRN Reference" },
+    { key: "totalAmount", label: "Total Amount" },
+    { key: "amountPaid", label: "Amount Paid" },
+    { key: "balanceDue", label: "Balance Due" },
+    { key: "status", label: "Status" },
+  ];
+
   return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Supplier Invoices"
-        subtitle="Manage supplier invoices"
-      />
-      <EmptyState title="Supplier Invoices" message="Module coming soon." />
-    </div>
+    <AccountsPayableListPage
+      title="Supplier Invoices"
+      subtitle="Track supplier liabilities from approved purchase orders and posted receipts."
+      breadcrumbs={[
+        { label: "Procurement", href: "/procurement" },
+        { label: "Supplier Invoices" },
+      ]}
+      createHref="/procurement/supplier-invoices/create"
+      baseHref="/procurement/supplier-invoices"
+      columns={columns}
+      rows={invoices.map((invoice) => ({
+        id: invoice.id,
+        invoiceNo: invoice.invoiceNo,
+        supplierInvoiceNo: invoice.supplierInvoiceNo,
+        invoiceDate: new Date(invoice.invoiceDate).toLocaleDateString("en-KE"),
+        supplierName: invoice.supplierName,
+        poNo: invoice.poNo ?? "-",
+        grnNo: invoice.grnNo ?? "-",
+        totalAmount: formatMoney(invoice.totalAmount),
+        amountPaid: formatMoney(invoice.amountPaid),
+        balanceDue: formatMoney(invoice.balanceDue),
+        status: invoice.status,
+      }))}
+    />
   );
 }

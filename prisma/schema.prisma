@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
@@ -27,39 +27,80 @@ model Company {
 }
 
 model User {
-  id                String           @id @default(cuid())
-  name              String
-  email             String           @unique
-  username          String?          @unique
-  password          String?
-  language          String?          @default("en")
-  dateFormat        String?          @default("DD/MM/YYYY")
-  itemsPerPage      Int?             @default(25)
-  lastLogin         DateTime?
-  role              String           @default("user")
-  phone             String?
-  avatar            String?
-  isActive          Boolean          @default(true)
-  isArchived        Boolean          @default(false)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  roleId            String?
-  roleRel           Role?            @relation(fields: [roleId], references: [id])
-  locations           UserLocation[]
-  assignedLocations   UserLocation[]   @relation("AssignedLocations")
-  auditLogs           AuditLog[]
-  managedDepartments  Department[]
-  managedLocations    Location[]
-  locationsCreated    Location[]       @relation("LocationCreatedBy")
-  locationsUpdated    Location[]       @relation("LocationUpdatedBy")
-  itemsCreated        Item[]           @relation("ItemCreatedBy")
-  itemsUpdated        Item[]           @relation("ItemUpdatedBy")
-  documentAttachments DocumentAttachment[]
-  documentComments    DocumentComment[]
-  documentHistories   DocumentHistory[]
-  stockMovementsCreated StockMovement[]
-  requestedApprovals    Approval[]     @relation("RequestedBy")
-  approvedApprovals     Approval[]     @relation("ApprovedBy")
+  id                           String                      @id @default(cuid())
+  name                         String
+  email                        String                      @unique
+  username                     String?                     @unique
+  password                     String?
+  language                     String?                     @default("en")
+  dateFormat                   String?                     @default("DD/MM/YYYY")
+  itemsPerPage                 Int?                        @default(25)
+  lastLogin                    DateTime?
+  role                         String                      @default("user")
+  phone                        String?
+  avatar                       String?
+  isActive                     Boolean                     @default(true)
+  isArchived                   Boolean                     @default(false)
+  createdAt                    DateTime                    @default(now())
+  updatedAt                    DateTime                    @updatedAt
+  roleId                       String?
+  roleRel                      Role?                       @relation(fields: [roleId], references: [id])
+  locations                    UserLocation[]
+  assignedLocations            UserLocation[]              @relation("AssignedLocations")
+  auditLogs                    AuditLog[]
+  managedDepartments           Department[]
+  managedLocations             Location[]
+  locationsCreated             Location[]                  @relation("LocationCreatedBy")
+  locationsUpdated             Location[]                  @relation("LocationUpdatedBy")
+  itemsCreated                 Item[]                      @relation("ItemCreatedBy")
+  itemsUpdated                 Item[]                      @relation("ItemUpdatedBy")
+  documentAttachments          DocumentAttachment[]
+  documentComments             DocumentComment[]
+  documentHistories            DocumentHistory[]
+  stockMovementsCreated        StockMovement[]
+  requestedApprovals           Approval[]                  @relation("RequestedBy")
+  approvedApprovals            Approval[]                  @relation("ApprovedBy")
+  assignedApprovals            Approval[]                  @relation("AssignedApprover")
+  stockTransfersCreated        StockTransfer[]             @relation("StockTransferCreatedBy")
+  stockTransfersApproved       StockTransfer[]             @relation("StockTransferApprovedBy")
+  stockTransfersPosted         StockTransfer[]             @relation("StockTransferPostedBy")
+  stockAdjustmentsCreated      StockAdjustment[]           @relation("StockAdjustmentCreatedBy")
+  stockAdjustmentsApproved     StockAdjustment[]           @relation("StockAdjustmentApprovedBy")
+  stockAdjustmentsPosted       StockAdjustment[]           @relation("StockAdjustmentPostedBy")
+  stockIssuesCreated           StockIssue[]                @relation("StockIssueCreatedBy")
+  stockIssuesApproved          StockIssue[]                @relation("StockIssueApprovedBy")
+  stockIssuesPosted            StockIssue[]                @relation("StockIssuePostedBy")
+  stockReturnsCreated          StockReturn[]               @relation("StockReturnCreatedBy")
+  stockReturnsApproved         StockReturn[]               @relation("StockReturnApprovedBy")
+  stockReturnsPosted           StockReturn[]               @relation("StockReturnPostedBy")
+  requisitionsCreated          StoreRequisition[]          @relation("StoreRequisitionCreatedBy")
+  goodsReceiptsCreated         GoodsReceipt[]              @relation("GoodsReceiptCreatedBy")
+  goodsReceiptsApproved        GoodsReceipt[]              @relation("GoodsReceiptApprovedBy")
+  goodsReceiptsPosted          GoodsReceipt[]              @relation("GoodsReceiptPostedBy")
+  procurementFinancePosts      ProcurementFinancePosting[] @relation("ProcurementFinancePostedBy")
+  journalEntriesPosted         JournalEntry[]              @relation("JournalEntryPostedBy")
+  bomsCreated                  BOM[]                       @relation("BOMCreatedBy")
+  bomsUpdated                  BOM[]                       @relation("BOMUpdatedBy")
+  overheadCostsCreated         OverheadCostSetting[]       @relation("OverheadCostCreatedBy")
+  overheadCostsUpdated         OverheadCostSetting[]       @relation("OverheadCostUpdatedBy")
+  shiftSessionsStarted         ShiftSession[]              @relation("ShiftSessionStartedBy")
+  shiftSessionsEnded           ShiftSession[]              @relation("ShiftSessionEndedBy")
+  shiftAttendances             ShiftAttendance[]
+  productionBatchesPosted      ProductionBatch[]           @relation("ProductionBatchPostedBy")
+  productionBatchesCreated     ProductionBatch[]           @relation("ProductionBatchCreatedBy")
+  productionBatchesUpdated     ProductionBatch[]           @relation("ProductionBatchUpdatedBy")
+  productionIssuesPosted       ProductionMaterialIssue[]   @relation("ProductionMaterialIssuePostedBy")
+  productionIssuesCreated      ProductionMaterialIssue[]   @relation("ProductionMaterialIssueCreatedBy")
+  productionReturnsPosted      ProductionMaterialReturn[]  @relation("ProductionMaterialReturnPostedBy")
+  productionReturnsCreated     ProductionMaterialReturn[]  @relation("ProductionMaterialReturnCreatedBy")
+  productionDowntimes          ProductionDowntime[]        @relation("ProductionDowntimeCreatedBy")
+  qcTestsTested                QCTest[]                    @relation("QCTestTestedBy")
+  qcTestsApproved              QCTest[]                    @relation("QCTestApprovedBy")
+  qcHoldsReleased              QCHoldRelease[]             @relation("QCHoldReleasedBy")
+  qcHoldsCreated               QCHoldRelease[]             @relation("QCHoldCreatedBy")
+  qcNonconformitiesResponsible QCNonconformity[]           @relation("QCNonconformityResponsible")
+  qcNonconformitiesCreated     QCNonconformity[]           @relation("QCNonconformityCreatedBy")
+  qcNonconformitiesClosed      QCNonconformity[]           @relation("QCNonconformityClosedBy")
 }
 
 model Role {
@@ -85,113 +126,145 @@ model Permission {
 }
 
 model RolePermission {
-  id            String     @id @default(cuid())
+  id            String      @id @default(cuid())
   roleId        String
-  role          Role       @relation(fields: [roleId], references: [id])
+  role          Role        @relation(fields: [roleId], references: [id])
   permission    String
   module        String
   action        String
-  isArchived    Boolean    @default(false)
+  isArchived    Boolean     @default(false)
   permissionRel Permission? @relation(fields: [permission], references: [id])
 }
 
 model Location {
-  id                        String           @id @default(cuid())
-  locationCode              String           @unique
-  locationName              String
-  locationType              String
-  address                   String?
-  description               String?
-  parentLocationId          String?
-  parentLocation            Location?        @relation("LocationHierarchy", fields: [parentLocationId], references: [id])
-  childLocations            Location[]       @relation("LocationHierarchy")
-  displayOrder              Int?             @default(0)
-  city                      String?
-  region                    String?
-  country                   String?
-  gpsLatitude               String?
-  gpsLongitude              String?
-  managerId                 String?
-  manager                   User?            @relation(fields: [managerId], references: [id])
-  isStockLocation           Boolean          @default(true)
-  isProcurementLocation     Boolean          @default(false)
-  isProductionLocation      Boolean          @default(false)
-  isSalesLocation           Boolean          @default(false)
-  isTransitLocation         Boolean          @default(false)
-  isScrapLocation           Boolean          @default(false)
-  defaultPriceListId        String?
-  defaultBankAccountId      String?
-  allowNegativeStock        Boolean          @default(false)
-  requireTransferApproval   Boolean          @default(false)
-  enableLocationNumbering   Boolean          @default(false)
-  createdById               String?
-  createdBy                 User?            @relation("LocationCreatedBy", fields: [createdById], references: [id])
-  updatedById               String?
-  updatedBy                 User?            @relation("LocationUpdatedBy", fields: [updatedById], references: [id])
-  isActive                  Boolean          @default(true)
-  isArchived                Boolean          @default(false)
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
-  userLocations             UserLocation[]
-  stockBalances             StockBalance[]
-  stockMovements            StockMovement[]
+  id                      String                     @id @default(cuid())
+  locationCode            String                     @unique
+  locationName            String
+  locationType            String
+  address                 String?
+  description             String?
+  parentLocationId        String?
+  parentLocation          Location?                  @relation("LocationHierarchy", fields: [parentLocationId], references: [id])
+  childLocations          Location[]                 @relation("LocationHierarchy")
+  displayOrder            Int?                       @default(0)
+  city                    String?
+  region                  String?
+  country                 String?
+  gpsLatitude             String?
+  gpsLongitude            String?
+  managerId               String?
+  manager                 User?                      @relation(fields: [managerId], references: [id])
+  isStockLocation         Boolean                    @default(true)
+  isProcurementLocation   Boolean                    @default(false)
+  isProductionLocation    Boolean                    @default(false)
+  isSalesLocation         Boolean                    @default(false)
+  isTransitLocation       Boolean                    @default(false)
+  isScrapLocation         Boolean                    @default(false)
+  defaultPriceListId      String?
+  defaultBankAccountId    String?
+  allowNegativeStock      Boolean                    @default(false)
+  requireTransferApproval Boolean                    @default(false)
+  enableLocationNumbering Boolean                    @default(false)
+  createdById             String?
+  createdBy               User?                      @relation("LocationCreatedBy", fields: [createdById], references: [id])
+  updatedById             String?
+  updatedBy               User?                      @relation("LocationUpdatedBy", fields: [updatedById], references: [id])
+  isActive                Boolean                    @default(true)
+  isArchived              Boolean                    @default(false)
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  userLocations           UserLocation[]
+  stockBalances           StockBalance[]
+  stockMovements          StockMovement[]
+  stockTransfersFrom      StockTransfer[]            @relation("StockTransferFromLocation")
+  stockTransfersTo        StockTransfer[]            @relation("StockTransferToLocation")
+  stockAdjustments        StockAdjustment[]
+  stockIssues             StockIssue[]
+  stockReturns            StockReturn[]
+  storeRequisitionsFrom   StoreRequisition[]         @relation("StoreRequisitionFromLocation")
+  storeRequisitionsTo     StoreRequisition[]         @relation("StoreRequisitionToLocation")
+  goodsReceipts           GoodsReceipt[]
+  shiftSessions           ShiftSession[]
+  productionBatches       ProductionBatch[]
+  productionIssueStores   ProductionMaterialIssue[]  @relation("ProductionIssueStoreLocation")
+  productionIssueFloors   ProductionMaterialIssue[]  @relation("ProductionIssueProductionLocation")
+  productionReturnFroms   ProductionMaterialReturn[] @relation("ProductionReturnFromLocation")
+  productionReturnStores  ProductionMaterialReturn[] @relation("ProductionReturnToStoreLocation")
+  qcTests                 QCTest[]
+  qcHoldReleases          QCHoldRelease[]
+  qcNonconformities       QCNonconformity[]
 }
 
 model UserLocation {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  locationId      String
-  location        Location @relation(fields: [locationId], references: [id], onDelete: Restrict)
-  assignedUserId  String?
-  assignedUser    User?    @relation("AssignedLocations", fields: [assignedUserId], references: [id])
-  isDefault       Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  locationId     String
+  location       Location @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  assignedUserId String?
+  assignedUser   User?    @relation("AssignedLocations", fields: [assignedUserId], references: [id])
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   @@unique([userId, locationId])
 }
 
 model SystemSetting {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     String
-  category  String   @default("general")
-  isArchived Boolean  @default(false)
+  id         String  @id @default(cuid())
+  key        String  @unique
+  value      String
+  category   String  @default("general")
+  isArchived Boolean @default(false)
 }
 
 // Master Data Models
 model Item {
-  id              String    @id @default(cuid())
-  itemCode        String    @unique
-  itemName        String
-  sku             String?
-  description     String?
-  categoryId      String?
-  category        Category? @relation(fields: [categoryId], references: [id])
-  itemTypeId      String?
-  itemType        ItemType? @relation(fields: [itemTypeId], references: [id])
-  uomId           String?
-  uom             Unit?     @relation("ItemUOM", fields: [uomId], references: [id])
-  batchTracking   Boolean   @default(false)
-  reorderPoint    Float?    @default(0)
-  standardCost    Float?    @default(0)
-  sellingPrice    Float?    @default(0)
-  expiryTracking  Boolean   @default(false)
-  serialTracking   Boolean   @default(false)
-  purchaseTaxCodeId String?
-  vatApplicable   Boolean   @default(true)
-  exciseApplicable Boolean   @default(false)
-  createdById     String?
-  createdBy       User?     @relation("ItemCreatedBy", fields: [createdById], references: [id])
-  updatedById     String?
-  updatedBy       User?     @relation("ItemUpdatedBy", fields: [updatedById], references: [id])
-  isActive        Boolean   @default(true)
-  isArchived      Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  stockBalances   StockBalance[]
-  stockMovements  StockMovement[]
-  priceListItems   PriceListItem[]
+  id                    String                         @id @default(cuid())
+  itemCode              String                         @unique
+  itemName              String
+  sku                   String?
+  description           String?
+  categoryId            String?
+  category              Category?                      @relation(fields: [categoryId], references: [id])
+  itemTypeId            String?
+  itemType              ItemType?                      @relation(fields: [itemTypeId], references: [id])
+  uomId                 String?
+  uom                   Unit?                          @relation("ItemUOM", fields: [uomId], references: [id])
+  batchTracking         Boolean                        @default(false)
+  reorderPoint          Float?                         @default(0)
+  standardCost          Float?                         @default(0)
+  sellingPrice          Float?                         @default(0)
+  expiryTracking        Boolean                        @default(false)
+  serialTracking        Boolean                        @default(false)
+  purchaseTaxCodeId     String?
+  vatApplicable         Boolean                        @default(true)
+  exciseApplicable      Boolean                        @default(false)
+  createdById           String?
+  createdBy             User?                          @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  updatedById           String?
+  updatedBy             User?                          @relation("ItemUpdatedBy", fields: [updatedById], references: [id])
+  isActive              Boolean                        @default(true)
+  isArchived            Boolean                        @default(false)
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+  stockBalances         StockBalance[]
+  stockMovements        StockMovement[]
+  priceListItems        PriceListItem[]
+  stockTransferItems    StockTransferItem[]
+  stockAdjustmentItems  StockAdjustmentItem[]
+  stockIssueItems       StockIssueItem[]
+  stockReturnItems      StockReturnItem[]
+  storeRequisitionItems StoreRequisitionItem[]
+  goodsReceiptItems     GoodsReceiptItem[]
+  supplierInvoiceItems  SupplierInvoiceItem[]
+  bomsAsFinishedGood    BOM[]                          @relation("BOMFinishedGood")
+  bomComponents         BOMItem[]                      @relation("BOMComponentItem")
+  productionBatches     ProductionBatch[]              @relation("ProductionBatchFinishedGood")
+  productionIssueItems  ProductionMaterialIssueItem[]  @relation("ProductionMaterialIssueItem")
+  productionReturnItems ProductionMaterialReturnItem[] @relation("ProductionMaterialReturnItem")
+  qcTestItems           QCTest[]                       @relation("QCTestItem")
+  qcHoldItems           QCHoldRelease[]                @relation("QCHoldReleaseItem")
+  qcNonconformityItems  QCNonconformity[]              @relation("QCNonconformityItem")
 }
 
 model Category {
@@ -213,50 +286,54 @@ model Category {
 }
 
 model Unit {
-  id              String  @id @default(cuid())
-  code            String? @unique
-  name            String
-  abbreviation    String
-  type            String
-  decimalPrecision Int?   @default(0)
-  createdById     String?
-  updatedById     String?
-  isActive        Boolean @default(true)
-  isArchived      Boolean @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  items           Item[]           @relation("ItemUOM")
-  priceListItems  PriceListItem[]
-  conversionsFrom UnitConversion[] @relation("FromUnit")
-  conversionsTo   UnitConversion[] @relation("ToUnit")
+  id                            String                         @id @default(cuid())
+  code                          String?                        @unique
+  name                          String
+  abbreviation                  String
+  type                          String
+  decimalPrecision              Int?                           @default(0)
+  createdById                   String?
+  updatedById                   String?
+  isActive                      Boolean                        @default(true)
+  isArchived                    Boolean                        @default(false)
+  createdAt                     DateTime                       @default(now())
+  updatedAt                     DateTime                       @updatedAt
+  items                         Item[]                         @relation("ItemUOM")
+  priceListItems                PriceListItem[]
+  conversionsFrom               UnitConversion[]               @relation("FromUnit")
+  conversionsTo                 UnitConversion[]               @relation("ToUnit")
+  boms                          BOM[]
+  bomitems                      BOMItem[]
+  productionMaterialIssueItems  ProductionMaterialIssueItem[]
+  productionMaterialReturnItems ProductionMaterialReturnItem[]
 }
 
 model Customer {
-  id                    String   @id @default(cuid())
-  customerCode          String   @unique
-  name                  String
-  customerType          String?
-  tin                   String?
-  vatRegistered         Boolean  @default(false)
-  phone                 String?
-  email                 String?
-  address               String?
-  city                  String?
-  region                String?
-  creditLimit           Float?   @default(0)
-  paymentTerms          String?
-  defaultPriceListId    String?
+  id                     String            @id @default(cuid())
+  customerCode           String            @unique
+  name                   String
+  customerType           String?
+  tin                    String?
+  vatRegistered          Boolean           @default(false)
+  phone                  String?
+  email                  String?
+  address                String?
+  city                   String?
+  region                 String?
+  creditLimit            Float?            @default(0)
+  paymentTerms           String?
+  defaultPriceListId     String?
   defaultSalesLocationId String?
-  taxCodeId             String?
-  remarks               String?
-  createdById           String?
-  updatedById           String?
-  isActive              Boolean  @default(true)
-  isArchived            Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  contacts              CustomerContact[]
-  addresses             CustomerAddress[]
+  taxCodeId              String?
+  remarks                String?
+  createdById            String?
+  updatedById            String?
+  isActive               Boolean           @default(true)
+  isArchived             Boolean           @default(false)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  contacts               CustomerContact[]
+  addresses              CustomerAddress[]
 }
 
 model CustomerContact {
@@ -288,30 +365,34 @@ model CustomerAddress {
 }
 
 model Supplier {
-  id                  String   @id @default(cuid())
-  supplierCode        String   @unique
-  name                String
-  contactPerson       String?
-  tin                 String?
-  vatRegistered       Boolean  @default(false)
-  phone               String?
-  email               String?
-  address             String?
-  city                String?
-  region              String?
-  paymentTerms        String?
-  defaultBankId       String?
-  defaultBankAccountId String?
-  taxCodeId           String?
-  remarks             String?
-  createdById         String?
-  updatedById         String?
-  isActive            Boolean  @default(true)
-  isArchived          Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  contacts            SupplierContact[]
-  addresses           SupplierAddress[]
+  id                         String                      @id @default(cuid())
+  supplierCode               String                      @unique
+  name                       String
+  contactPerson              String?
+  tin                        String?
+  vatRegistered              Boolean                     @default(false)
+  phone                      String?
+  email                      String?
+  address                    String?
+  city                       String?
+  region                     String?
+  paymentTerms               String?
+  defaultBankId              String?
+  defaultBankAccountId       String?
+  taxCodeId                  String?
+  remarks                    String?
+  createdById                String?
+  updatedById                String?
+  isActive                   Boolean                     @default(true)
+  isArchived                 Boolean                     @default(false)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  contacts                   SupplierContact[]
+  addresses                  SupplierAddress[]
+  goodsReceipts              GoodsReceipt[]
+  supplierInvoices           SupplierInvoice[]
+  supplierPayments           SupplierPayment[]
+  procurementFinancePostings ProcurementFinancePosting[]
 }
 
 model SupplierContact {
@@ -343,22 +424,23 @@ model SupplierAddress {
 }
 
 model Department {
-  id                String     @id @default(cuid())
-  name              String
-  code              String     @unique
+  id                 String             @id @default(cuid())
+  name               String
+  code               String             @unique
   parentDepartmentId String?
-  parentDepartment  Department? @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
-  childDepartments  Department[] @relation("DepartmentHierarchy")
-  description       String?
-  locationId        String?
-  managerId         String?
-  manager           User?      @relation(fields: [managerId], references: [id])
-  createdById       String?
-  updatedById       String?
-  isActive          Boolean    @default(true)
-  isArchived        Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  parentDepartment   Department?        @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
+  childDepartments   Department[]       @relation("DepartmentHierarchy")
+  description        String?
+  locationId         String?
+  managerId          String?
+  manager            User?              @relation(fields: [managerId], references: [id])
+  createdById        String?
+  updatedById        String?
+  isActive           Boolean            @default(true)
+  isArchived         Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  storeRequisitions  StoreRequisition[]
 }
 
 model Bank {
@@ -378,35 +460,37 @@ model Bank {
 }
 
 model BankAccount {
-  id                 String    @id @default(cuid())
-  accountCode        String    @unique
+  id                 String                      @id @default(cuid())
+  accountCode        String                      @unique
   accountName        String
   bankId             String
-  bank               Bank      @relation(fields: [bankId], references: [id])
+  bank               Bank                        @relation(fields: [bankId], references: [id])
   accountNumber      String
   branch             String?
   swiftCode          String?
   locationId         String?
-  currency           String    @default("ETB")
-  openingBalance     Float     @default(0)
-  currentBalance     Float     @default(0)
-  isDefault          Boolean   @default(false)
-  allowPayments      Boolean   @default(true)
-  allowReceipts      Boolean   @default(true)
+  currency           String                      @default("ETB")
+  openingBalance     Float                       @default(0)
+  currentBalance     Float                       @default(0)
+  isDefault          Boolean                     @default(false)
+  allowPayments      Boolean                     @default(true)
+  allowReceipts      Boolean                     @default(true)
   openingBalanceDate DateTime?
   createdById        String?
   updatedById        String?
-  isActive           Boolean   @default(true)
-  isArchived         Boolean   @default(false)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  isActive           Boolean                     @default(true)
+  isArchived         Boolean                     @default(false)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  supplierPayments   SupplierPayment[]
+  financePostings    ProcurementFinancePosting[]
 }
 
 model PriceList {
-  id            String    @id @default(cuid())
-  code          String?   @unique
+  id            String          @id @default(cuid())
+  code          String?         @unique
   name          String?
-  currency      String    @default("ETB")
+  currency      String          @default("ETB")
   customerGroup String?
   price         Float?
   effectiveDate DateTime?
@@ -416,28 +500,28 @@ model PriceList {
   locationId    String?
   createdById   String?
   updatedById   String?
-  isActive      Boolean   @default(true)
-  isArchived    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isActive      Boolean         @default(true)
+  isArchived    Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   items         PriceListItem[]
 }
 
 model PriceListItem {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   priceListId  String
   priceList    PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   itemId       String
-  item         Item     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  item         Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
   unitId       String?
-  unit         Unit?    @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  unit         Unit?     @relation(fields: [unitId], references: [id], onDelete: Restrict)
   sellingPrice Float
   minimumPrice Float?
-  taxIncluded  Boolean  @default(false)
-  isActive     Boolean  @default(true)
-  isArchived   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  taxIncluded  Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  isArchived   Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([priceListId, itemId])
 }
@@ -460,17 +544,17 @@ model TaxCode {
 }
 
 model ItemType {
-  id                  String   @id @default(cuid())
-  code                String   @unique
-  name                String
-  description         String?
-  isActive            Boolean  @default(true)
-  isArchived          Boolean  @default(false)
-  createdById         String?
-  updatedById         String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  items               Item[]
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       Item[]
 }
 
 // Document Numbering
@@ -491,18 +575,18 @@ model DocumentNumbering {
 
 // Audit Log
 model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  action    String
-  module    String
-  recordId  String?
-  oldValue  String?
-  newValue  String?
-  ipAddress String?
-  userAgent String?
-  isArchived Boolean @default(false)
-  timestamp DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  module     String
+  recordId   String?
+  oldValue   String?
+  newValue   String?
+  ipAddress  String?
+  userAgent  String?
+  isArchived Boolean  @default(false)
+  timestamp  DateTime @default(now())
 }
 
 // Inventory Models
@@ -525,41 +609,933 @@ model StockBalance {
 }
 
 model StockMovement {
-  id             String   @id @default(cuid())
-  movementNumber String   @unique
-  date           DateTime @default(now())
-  itemId         String
-  item           Item     @relation(fields: [itemId], references: [id])
-  locationId     String
-  location       Location @relation(fields: [locationId], references: [id])
-  movementType   String
-  quantityIn     Float    @default(0)
-  quantityOut    Float    @default(0)
-  unitCost       Float?
-  totalCost      Float?
-  referenceType  String?
-  referenceId    String?
+  id               String            @id @default(cuid())
+  movementNumber   String            @unique
+  date             DateTime          @default(now())
+  itemId           String
+  item             Item              @relation(fields: [itemId], references: [id])
+  locationId       String
+  location         Location          @relation(fields: [locationId], references: [id])
+  movementType     StockMovementType
+  sourceModule     String?
+  sourceDocumentId String?
+  quantityIn       Float             @default(0)
+  quantityOut      Float             @default(0)
+  unitCost         Float?
+  totalCost        Float?
+  referenceType    String?
+  referenceId      String?
+  remarks          String?
+  createdById      String
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  isArchived       Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+}
+
+enum StockMovementType {
+  OPENING
+  PURCHASE_RECEIPT
+  PURCHASE_RETURN
+  PRODUCTION_ISSUE
+  PRODUCTION_RECEIPT
+  SALES_ISSUE
+  SALES_RETURN
+  TRANSFER_OUT
+  TRANSFER_IN
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  STORE_ISSUE
+  STORE_RETURN
+  SCRAP
+  DAMAGED
+  EXPIRED
+}
+
+enum InventoryDocumentStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  POSTED
+  CANCELLED
+  PARTIALLY_ISSUED
+  ISSUED
+}
+
+model StockTransfer {
+  id             String                  @id @default(cuid())
+  transferNo     String                  @unique
+  transferDate   DateTime
+  fromLocationId String
+  fromLocation   Location                @relation("StockTransferFromLocation", fields: [fromLocationId], references: [id])
+  toLocationId   String
+  toLocation     Location                @relation("StockTransferToLocation", fields: [toLocationId], references: [id])
+  status         InventoryDocumentStatus @default(DRAFT)
   remarks        String?
   createdById    String
-  createdBy      User     @relation(fields: [createdById], references: [id])
-  isArchived     Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  createdBy      User                    @relation("StockTransferCreatedBy", fields: [createdById], references: [id])
+  approvedById   String?
+  approvedBy     User?                   @relation("StockTransferApprovedBy", fields: [approvedById], references: [id])
+  postedById     String?
+  postedBy       User?                   @relation("StockTransferPostedBy", fields: [postedById], references: [id])
+  postedAt       DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  items          StockTransferItem[]
+}
+
+model StockTransferItem {
+  id         String        @id @default(cuid())
+  transferId String
+  transfer   StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       Item          @relation(fields: [itemId], references: [id])
+  quantity   Float
+  unitCost   Float
+  remarks    String?
+}
+
+model StockAdjustment {
+  id             String                  @id @default(cuid())
+  adjustmentNo   String                  @unique
+  adjustmentDate DateTime
+  locationId     String
+  location       Location                @relation(fields: [locationId], references: [id])
+  reason         String
+  status         InventoryDocumentStatus @default(DRAFT)
+  remarks        String?
+  createdById    String
+  createdBy      User                    @relation("StockAdjustmentCreatedBy", fields: [createdById], references: [id])
+  approvedById   String?
+  approvedBy     User?                   @relation("StockAdjustmentApprovedBy", fields: [approvedById], references: [id])
+  postedById     String?
+  postedBy       User?                   @relation("StockAdjustmentPostedBy", fields: [postedById], references: [id])
+  postedAt       DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  items          StockAdjustmentItem[]
+}
+
+model StockAdjustmentItem {
+  id            String          @id @default(cuid())
+  adjustmentId  String
+  adjustment    StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  itemId        String
+  item          Item            @relation(fields: [itemId], references: [id])
+  systemQty     Float
+  physicalQty   Float
+  differenceQty Float
+  unitCost      Float
+  remarks       String?
+}
+
+model StockIssue {
+  id           String                  @id @default(cuid())
+  issueNo      String                  @unique
+  issueDate    DateTime
+  locationId   String
+  location     Location                @relation(fields: [locationId], references: [id])
+  issuedToType String
+  issuedToId   String
+  purpose      String
+  status       InventoryDocumentStatus @default(DRAFT)
+  remarks      String?
+  createdById  String
+  createdBy    User                    @relation("StockIssueCreatedBy", fields: [createdById], references: [id])
+  approvedById String?
+  approvedBy   User?                   @relation("StockIssueApprovedBy", fields: [approvedById], references: [id])
+  postedById   String?
+  postedBy     User?                   @relation("StockIssuePostedBy", fields: [postedById], references: [id])
+  postedAt     DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  items        StockIssueItem[]
+}
+
+model StockIssueItem {
+  id       String     @id @default(cuid())
+  issueId  String
+  issue    StockIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     Item       @relation(fields: [itemId], references: [id])
+  quantity Float
+  unitCost Float
+  remarks  String?
+}
+
+model StockReturn {
+  id               String                  @id @default(cuid())
+  returnNo         String                  @unique
+  returnDate       DateTime
+  locationId       String
+  location         Location                @relation(fields: [locationId], references: [id])
+  returnedFromType String
+  returnedFromId   String
+  reason           String
+  status           InventoryDocumentStatus @default(DRAFT)
+  remarks          String?
+  createdById      String
+  createdBy        User                    @relation("StockReturnCreatedBy", fields: [createdById], references: [id])
+  approvedById     String?
+  approvedBy       User?                   @relation("StockReturnApprovedBy", fields: [approvedById], references: [id])
+  postedById       String?
+  postedBy         User?                   @relation("StockReturnPostedBy", fields: [postedById], references: [id])
+  postedAt         DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  items            StockReturnItem[]
+}
+
+model StockReturnItem {
+  id        String      @id @default(cuid())
+  returnId  String
+  returnDoc StockReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item        @relation(fields: [itemId], references: [id])
+  quantity  Float
+  unitCost  Float
+  remarks   String?
+}
+
+model StoreRequisition {
+  id              String                  @id @default(cuid())
+  requisitionNo   String                  @unique
+  requisitionDate DateTime
+  requestedById   String
+  requestedBy     User                    @relation("StoreRequisitionCreatedBy", fields: [requestedById], references: [id])
+  fromLocationId  String?
+  fromLocation    Location?               @relation("StoreRequisitionFromLocation", fields: [fromLocationId], references: [id])
+  toLocationId    String?
+  toLocation      Location?               @relation("StoreRequisitionToLocation", fields: [toLocationId], references: [id])
+  toDepartmentId  String?
+  toDepartment    Department?             @relation(fields: [toDepartmentId], references: [id])
+  purpose         String
+  status          InventoryDocumentStatus @default(DRAFT)
+  remarks         String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  items           StoreRequisitionItem[]
+}
+
+model StoreRequisitionItem {
+  id            String           @id @default(cuid())
+  requisitionId String
+  requisition   StoreRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  itemId        String
+  item          Item             @relation(fields: [itemId], references: [id])
+  requestedQty  Float
+  approvedQty   Float
+  issuedQty     Float
+  remarks       String?
+}
+
+model GoodsReceipt {
+  id                  String                    @id @default(cuid())
+  grnNo               String                    @unique
+  grnDate             DateTime
+  poId                String?
+  supplierId          String
+  supplier            Supplier                  @relation(fields: [supplierId], references: [id])
+  receivingLocationId String                    @map("receivingLocationId")
+  location            Location                  @relation(fields: [receivingLocationId], references: [id])
+  deliveryNoteNo      String?
+  supplierInvoiceNo   String?
+  vehiclePlate        String?
+  deliveredBy         String?
+  receivedById        String?
+  status              ProcurementDocumentStatus @default(DRAFT)
+  subtotal            Float                     @default(0)
+  taxAmount           Float                     @default(0)
+  totalAmount         Float                     @default(0)
+  remarks             String?
+  createdById         String
+  createdBy           User                      @relation("GoodsReceiptCreatedBy", fields: [createdById], references: [id])
+  updatedById         String?
+  approvedById        String?
+  approvedBy          User?                     @relation("GoodsReceiptApprovedBy", fields: [approvedById], references: [id])
+  postedById          String?
+  postedBy            User?                     @relation("GoodsReceiptPostedBy", fields: [postedById], references: [id])
+  postedAt            DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  items               GoodsReceiptItem[]
+}
+
+model GoodsReceiptItem {
+  id                    String       @id @default(cuid())
+  goodsReceiptId        String
+  goodsReceipt          GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  poItemId              String?
+  itemId                String
+  item                  Item         @relation(fields: [itemId], references: [id])
+  uomId                 String?
+  orderedQty            Float        @default(0)
+  previouslyReceivedQty Float        @default(0)
+  receivedQty           Float        @map("quantityReceived")
+  acceptedQty           Float        @default(0)
+  rejectedQty           Float        @default(0)
+  unitCost              Float
+  taxAmount             Float        @default(0)
+  lineTotal             Float        @default(0)
+  remarks               String?
+}
+
+enum ProcurementDocumentStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PARTIALLY_CONVERTED
+  CONVERTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  PARTIALLY_RETURNED
+  RETURNED
+  PARTIAL_PAID
+  PAID
+  POSTED
+  CANCELLED
+  CLOSED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  CHEQUE
+  MOBILE_MONEY
+}
+
+model PurchaseRequisition {
+  id              String                    @id @default(cuid())
+  requisitionNo   String                    @unique
+  requisitionDate DateTime
+  requestedById   String
+  departmentId    String
+  locationId      String
+  neededByDate    DateTime?
+  purpose         String
+  status          ProcurementDocumentStatus @default(DRAFT)
+  remarks         String?
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedById    String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  createdById     String
+  updatedById     String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+}
+
+model PurchaseRequisitionItem {
+  id                 String  @id @default(cuid())
+  requisitionId      String
+  itemId             String
+  uomId              String?
+  requestedQty       Float
+  approvedQty        Float
+  estimatedUnitPrice Float
+  estimatedTotal     Float
+  remarks            String?
+}
+
+model PurchaseOrder {
+  id                   String                    @id @default(cuid())
+  poNo                 String                    @unique
+  poDate               DateTime
+  supplierId           String
+  prId                 String?
+  deliveryLocationId   String
+  expectedDeliveryDate DateTime?
+  paymentTerms         String?
+  status               ProcurementDocumentStatus @default(DRAFT)
+  subtotal             Float                     @default(0)
+  taxAmount            Float                     @default(0)
+  discountAmount       Float                     @default(0)
+  totalAmount          Float                     @default(0)
+  remarks              String?
+  approvedById         String?
+  approvedAt           DateTime?
+  createdById          String
+  updatedById          String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+}
+
+model PurchaseOrderItem {
+  id          String  @id @default(cuid())
+  poId        String
+  prItemId    String?
+  itemId      String
+  uomId       String?
+  orderedQty  Float
+  receivedQty Float
+  returnedQty Float
+  unitPrice   Float
+  taxCodeId   String?
+  taxRate     Float
+  taxAmount   Float
+  lineTotal   Float
+  remarks     String?
+}
+
+model SupplierReturn {
+  id               String                    @id @default(cuid())
+  returnNo         String                    @unique
+  returnDate       DateTime
+  supplierId       String
+  grnId            String?
+  poId             String?
+  returnLocationId String
+  reason           String
+  status           ProcurementDocumentStatus @default(DRAFT)
+  subtotal         Float                     @default(0)
+  taxAmount        Float                     @default(0)
+  totalAmount      Float                     @default(0)
+  postedById       String?
+  postedAt         DateTime?
+  remarks          String?
+  createdById      String
+  updatedById      String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+}
+
+model SupplierReturnItem {
+  id        String  @id @default(cuid())
+  returnId  String
+  grnItemId String?
+  poItemId  String?
+  itemId    String
+  uomId     String?
+  returnQty Float
+  unitCost  Float
+  taxAmount Float
+  lineTotal Float
+  reason    String?
+  remarks   String?
+}
+
+model SupplierInvoice {
+  id                String                      @id @default(cuid())
+  invoiceNo         String                      @unique
+  supplierInvoiceNo String
+  invoiceDate       DateTime
+  dueDate           DateTime?
+  supplierId        String
+  poId              String?
+  grnId             String?
+  status            ProcurementDocumentStatus   @default(DRAFT)
+  subtotal          Float                       @default(0)
+  taxAmount         Float                       @default(0)
+  discountAmount    Float                       @default(0)
+  totalAmount       Float                       @default(0)
+  amountPaid        Float                       @default(0)
+  balanceDue        Float                       @default(0)
+  recordedById      String
+  approvedById      String?
+  approvedAt        DateTime?
+  remarks           String?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  supplier          Supplier                    @relation(fields: [supplierId], references: [id])
+  items             SupplierInvoiceItem[]
+  payments          SupplierPayment[]
+  financePostings   ProcurementFinancePosting[]
+}
+
+model SupplierInvoiceItem {
+  id        String          @id @default(cuid())
+  invoiceId String
+  itemId    String
+  uomId     String?
+  quantity  Float
+  unitPrice Float
+  taxAmount Float
+  lineTotal Float
+  remarks   String?
+  invoice   SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  item      Item            @relation(fields: [itemId], references: [id])
+}
+
+model SupplierPayment {
+  id              String                      @id @default(cuid())
+  paymentNo       String                      @unique
+  paymentDate     DateTime
+  supplierId      String
+  invoiceId       String
+  paymentMethod   PaymentMethod
+  bankAccountId   String?
+  cashAccountId   String?
+  referenceNo     String?
+  amount          Float
+  remarks         String?
+  status          ProcurementDocumentStatus   @default(DRAFT)
+  createdById     String
+  approvedById    String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  supplier        Supplier                    @relation(fields: [supplierId], references: [id])
+  invoice         SupplierInvoice             @relation(fields: [invoiceId], references: [id])
+  bankAccount     BankAccount?                @relation(fields: [bankAccountId], references: [id])
+  financePostings ProcurementFinancePosting[]
+}
+
+model ProcurementFinancePosting {
+  id            String           @id @default(cuid())
+  sourceType    String
+  sourceId      String
+  postingType   String
+  supplierId    String
+  supplier      Supplier         @relation(fields: [supplierId], references: [id])
+  invoiceId     String?
+  invoice       SupplierInvoice? @relation(fields: [invoiceId], references: [id])
+  paymentId     String?
+  payment       SupplierPayment? @relation(fields: [paymentId], references: [id])
+  bankAccountId String?
+  bankAccount   BankAccount?     @relation(fields: [bankAccountId], references: [id])
+  amount        Float
+  currency      String           @default("ETB")
+  status        String           @default("POSTED")
+  memo          String?
+  postedById    String?
+  postedBy      User?            @relation("ProcurementFinancePostedBy", fields: [postedById], references: [id])
+  postedAt      DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([sourceType, sourceId])
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+model Account {
+  id               String        @id @default(cuid())
+  accountCode      String        @unique
+  accountName      String
+  accountType      AccountType
+  parentAccountId  String?
+  parentAccount    Account?      @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  children         Account[]     @relation("AccountHierarchy")
+  description      String?
+  isControlAccount Boolean       @default(false)
+  isActive         Boolean       @default(true)
+  isArchived       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  journalLines     JournalLine[]
+}
+
+model JournalEntry {
+  id          String             @id @default(cuid())
+  journalNo   String             @unique
+  entryDate   DateTime
+  sourceType  String
+  sourceId    String
+  description String
+  status      JournalEntryStatus @default(POSTED)
+  totalDebit  Float              @default(0)
+  totalCredit Float              @default(0)
+  postedById  String?
+  postedBy    User?              @relation("JournalEntryPostedBy", fields: [postedById], references: [id])
+  postedAt    DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  lines       JournalLine[]
+
+  @@unique([sourceType, sourceId])
+}
+
+model JournalLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id])
+  description    String?
+  debit          Float        @default(0)
+  credit         Float        @default(0)
+  createdAt      DateTime     @default(now())
+}
+
+enum ProductionStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  POSTED
+  CANCELLED
+}
+
+enum BOMStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum QCResult {
+  PASSED
+  FAILED
+  REJECTED
+  PENDING
+}
+
+enum HoldStatus {
+  ON_HOLD
+  RELEASED
+  REJECTED
+  SCRAPPED
+}
+
+enum DowntimeReason {
+  MACHINE_BREAKDOWN
+  POWER_INTERRUPTION
+  MATERIAL_SHORTAGE
+  QUALITY_ISSUE
+  OPERATOR_DELAY
+  MAINTENANCE
+  OTHER
+}
+
+enum CostAllocationMethod {
+  FIXED_PER_SHIFT
+  COST_PER_UNIT
+  COST_PER_HOUR
+}
+
+model BOM {
+  id                String            @id @default(cuid())
+  bomNo             String            @unique
+  bomName           String
+  finishedGoodId    String
+  finishedGood      Item              @relation("BOMFinishedGood", fields: [finishedGoodId], references: [id])
+  outputQty         Float
+  uomId             String?
+  uom               Unit?             @relation(fields: [uomId], references: [id])
+  version           String            @default("1.0")
+  isDefault         Boolean           @default(false)
+  status            BOMStatus         @default(ACTIVE)
+  description       String?
+  createdById       String?
+  createdBy         User?             @relation("BOMCreatedBy", fields: [createdById], references: [id])
+  updatedById       String?
+  updatedBy         User?             @relation("BOMUpdatedBy", fields: [updatedById], references: [id])
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  items             BOMItem[]
+  productionBatches ProductionBatch[]
+}
+
+model BOMItem {
+  id              String  @id @default(cuid())
+  bomId           String
+  bom             BOM     @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  componentItemId String
+  componentItem   Item    @relation("BOMComponentItem", fields: [componentItemId], references: [id])
+  uomId           String?
+  uom             Unit?   @relation(fields: [uomId], references: [id])
+  quantity        Float
+  wastagePercent  Float   @default(0)
+  required        Boolean @default(true)
+  remarks         String?
+
+  @@unique([bomId, componentItemId])
+}
+
+model OverheadCostSetting {
+  id               String               @id @default(cuid())
+  categoryName     String
+  allocationMethod CostAllocationMethod
+  rate             Float
+  effectiveFrom    DateTime
+  status           String               @default("ACTIVE")
+  description      String?
+  createdById      String?
+  createdBy        User?                @relation("OverheadCostCreatedBy", fields: [createdById], references: [id])
+  updatedById      String?
+  updatedBy        User?                @relation("OverheadCostUpdatedBy", fields: [updatedById], references: [id])
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+}
+
+model ShiftSession {
+  id              String                     @id @default(cuid())
+  sessionNo       String                     @unique
+  productionDate  DateTime
+  shiftCode       String
+  locationId      String
+  location        Location                   @relation(fields: [locationId], references: [id])
+  status          ProductionStatus           @default(ACTIVE)
+  startedById     String?
+  startedBy       User?                      @relation("ShiftSessionStartedBy", fields: [startedById], references: [id])
+  startedAt       DateTime?
+  endedById       String?
+  endedBy         User?                      @relation("ShiftSessionEndedBy", fields: [endedById], references: [id])
+  endedAt         DateTime?
+  remarks         String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  attendance      ShiftAttendance[]
+  batches         ProductionBatch[]
+  materialIssues  ProductionMaterialIssue[]
+  materialReturns ProductionMaterialReturn[]
+  downtimes       ProductionDowntime[]
+}
+
+model ShiftAttendance {
+  id             String       @id @default(cuid())
+  shiftSessionId String
+  shiftSession   ShiftSession @relation(fields: [shiftSessionId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  role           String?
+  present        Boolean      @default(true)
+  remarks        String?
+}
+
+model ProductionBatch {
+  id                        String                     @id @default(cuid())
+  batchNo                   String                     @unique
+  shiftSessionId            String
+  shiftSession              ShiftSession               @relation(fields: [shiftSessionId], references: [id])
+  bomId                     String?
+  bom                       BOM?                       @relation(fields: [bomId], references: [id])
+  finishedGoodId            String
+  finishedGood              Item                       @relation("ProductionBatchFinishedGood", fields: [finishedGoodId], references: [id])
+  locationId                String
+  location                  Location                   @relation(fields: [locationId], references: [id])
+  producedQty               Float                      @default(0)
+  acceptedQty               Float                      @default(0)
+  rejectedQty               Float                      @default(0)
+  wastageQty                Float                      @default(0)
+  status                    ProductionStatus           @default(DRAFT)
+  postedById                String?
+  postedBy                  User?                      @relation("ProductionBatchPostedBy", fields: [postedById], references: [id])
+  postedAt                  DateTime?
+  remarks                   String?
+  createdById               String?
+  createdBy                 User?                      @relation("ProductionBatchCreatedBy", fields: [createdById], references: [id])
+  updatedById               String?
+  updatedBy                 User?                      @relation("ProductionBatchUpdatedBy", fields: [updatedById], references: [id])
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  qctests                   QCTest[]
+  holdReleases              QCHoldRelease[]
+  nonconformities           QCNonconformity[]
+  costRecords               ProductionCostRecord[]
+  productionMaterialIssues  ProductionMaterialIssue[]
+  productionMaterialReturns ProductionMaterialReturn[]
+}
+
+model ProductionMaterialIssue {
+  id                   String                        @id @default(cuid())
+  issueNo              String                        @unique
+  shiftSessionId       String
+  shiftSession         ShiftSession                  @relation(fields: [shiftSessionId], references: [id])
+  productionBatchId    String?
+  productionBatch      ProductionBatch?              @relation(fields: [productionBatchId], references: [id])
+  storeLocationId      String
+  storeLocation        Location                      @relation("ProductionIssueStoreLocation", fields: [storeLocationId], references: [id])
+  productionLocationId String
+  productionLocation   Location                      @relation("ProductionIssueProductionLocation", fields: [productionLocationId], references: [id])
+  status               ProductionStatus              @default(DRAFT)
+  postedById           String?
+  postedBy             User?                         @relation("ProductionMaterialIssuePostedBy", fields: [postedById], references: [id])
+  postedAt             DateTime?
+  remarks              String?
+  createdById          String?
+  createdBy            User?                         @relation("ProductionMaterialIssueCreatedBy", fields: [createdById], references: [id])
+  createdAt            DateTime                      @default(now())
+  items                ProductionMaterialIssueItem[]
+}
+
+model ProductionMaterialIssueItem {
+  id           String                  @id @default(cuid())
+  issueId      String
+  issue        ProductionMaterialIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         Item                    @relation("ProductionMaterialIssueItem", fields: [itemId], references: [id])
+  uomId        String?
+  uom          Unit?                   @relation(fields: [uomId], references: [id])
+  requestedQty Float                   @default(0)
+  issuedQty    Float                   @default(0)
+  unitCost     Float                   @default(0)
+  remarks      String?
+}
+
+model ProductionMaterialReturn {
+  id                String                         @id @default(cuid())
+  returnNo          String                         @unique
+  shiftSessionId    String
+  shiftSession      ShiftSession                   @relation(fields: [shiftSessionId], references: [id])
+  productionBatchId String?
+  productionBatch   ProductionBatch?               @relation(fields: [productionBatchId], references: [id])
+  fromLocationId    String
+  fromLocation      Location                       @relation("ProductionReturnFromLocation", fields: [fromLocationId], references: [id])
+  toStoreLocationId String
+  toStoreLocation   Location                       @relation("ProductionReturnToStoreLocation", fields: [toStoreLocationId], references: [id])
+  status            ProductionStatus               @default(DRAFT)
+  postedById        String?
+  postedBy          User?                          @relation("ProductionMaterialReturnPostedBy", fields: [postedById], references: [id])
+  postedAt          DateTime?
+  remarks           String?
+  createdById       String?
+  createdBy         User?                          @relation("ProductionMaterialReturnCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime                       @default(now())
+  items             ProductionMaterialReturnItem[]
+}
+
+model ProductionMaterialReturnItem {
+  id          String                   @id @default(cuid())
+  returnId    String
+  returnDoc   ProductionMaterialReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        Item                     @relation("ProductionMaterialReturnItem", fields: [itemId], references: [id])
+  uomId       String?
+  uom         Unit?                    @relation(fields: [uomId], references: [id])
+  returnedQty Float
+  condition   String                   @default("Good")
+  remarks     String?
+}
+
+model ProductionDowntime {
+  id              String         @id @default(cuid())
+  shiftSessionId  String
+  shiftSession    ShiftSession   @relation(fields: [shiftSessionId], references: [id], onDelete: Cascade)
+  startTime       DateTime
+  endTime         DateTime
+  durationMinutes Int
+  reason          DowntimeReason
+  machine         String?
+  remarks         String?
+  createdById     String?
+  createdBy       User?          @relation("ProductionDowntimeCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
+}
+
+model QCTest {
+  id                String            @id @default(cuid())
+  testNo            String            @unique
+  testType          String
+  productionBatchId String?
+  productionBatch   ProductionBatch?  @relation(fields: [productionBatchId], references: [id])
+  itemId            String?
+  item              Item?             @relation("QCTestItem", fields: [itemId], references: [id])
+  locationId        String?
+  location          Location?         @relation(fields: [locationId], references: [id])
+  sampleDate        DateTime
+  result            QCResult          @default(PENDING)
+  status            String            @default("PENDING")
+  testedById        String?
+  testedBy          User?             @relation("QCTestTestedBy", fields: [testedById], references: [id])
+  approvedById      String?
+  approvedBy        User?             @relation("QCTestApprovedBy", fields: [approvedById], references: [id])
+  remarks           String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  parameters        QCTestParameter[]
+}
+
+model QCTestParameter {
+  id            String   @id @default(cuid())
+  qcTestId      String
+  qcTest        QCTest   @relation(fields: [qcTestId], references: [id], onDelete: Cascade)
+  parameterName String
+  expectedValue String?
+  actualValue   String?
+  unit          String?
+  result        QCResult @default(PENDING)
+  remarks       String?
+}
+
+model QCHoldRelease {
+  id                String           @id @default(cuid())
+  holdNo            String           @unique
+  productionBatchId String?
+  productionBatch   ProductionBatch? @relation(fields: [productionBatchId], references: [id])
+  itemId            String
+  item              Item             @relation("QCHoldReleaseItem", fields: [itemId], references: [id])
+  locationId        String
+  location          Location         @relation(fields: [locationId], references: [id])
+  quantity          Float
+  holdReason        String
+  status            HoldStatus       @default(ON_HOLD)
+  releasedById      String?
+  releasedBy        User?            @relation("QCHoldReleasedBy", fields: [releasedById], references: [id])
+  releasedAt        DateTime?
+  remarks           String?
+  createdById       String?
+  createdBy         User?            @relation("QCHoldCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+}
+
+model QCNonconformity {
+  id                  String           @id @default(cuid())
+  ncNo                String           @unique
+  productionBatchId   String?
+  productionBatch     ProductionBatch? @relation(fields: [productionBatchId], references: [id])
+  itemId              String?
+  item                Item?            @relation("QCNonconformityItem", fields: [itemId], references: [id])
+  locationId          String?
+  location            Location?        @relation(fields: [locationId], references: [id])
+  issueDescription    String
+  severity            String
+  correctiveAction    String?
+  responsiblePersonId String?
+  responsiblePerson   User?            @relation("QCNonconformityResponsible", fields: [responsiblePersonId], references: [id])
+  reinspectionResult  String?
+  status              String           @default("OPEN")
+  createdById         String?
+  createdBy           User?            @relation("QCNonconformityCreatedBy", fields: [createdById], references: [id])
+  closedById          String?
+  closedBy            User?            @relation("QCNonconformityClosedBy", fields: [closedById], references: [id])
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+}
+
+model ProductionCostRecord {
+  id           String          @id @default(cuid())
+  batchId      String
+  batch        ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  materialCost Float           @default(0)
+  wastageCost  Float           @default(0)
+  overheadCost Float           @default(0)
+  laborCost    Float           @default(0)
+  totalCost    Float           @default(0)
+  costPerUnit  Float           @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([batchId])
 }
 
 // Approval Model
 model Approval {
-  id             String   @id @default(cuid())
-  referenceType  String
-  referenceId    String
-  status         String   @default("PENDING")
-  requestedById  String
-  requestedBy    User     @relation("RequestedBy", fields: [requestedById], references: [id])
-  approvedById   String?
-  approvedBy     User?    @relation("ApprovedBy", fields: [approvedById], references: [id])
-  comment        String?
-  isArchived     Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  referenceType      String
+  referenceId        String
+  status             String   @default("PENDING")
+  requestedById      String
+  requestedBy        User     @relation("RequestedBy", fields: [requestedById], references: [id])
+  assignedApproverId String?
+  assignedApprover   User?    @relation("AssignedApprover", fields: [assignedApproverId], references: [id])
+  approvedById       String?
+  approvedBy         User?    @relation("ApprovedBy", fields: [approvedById], references: [id])
+  comment            String?
+  isArchived         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 // Master Data — Extended Models
@@ -575,36 +1551,36 @@ model Brand {
 }
 
 model Color {
-  id          String   @id @default(cuid())
-  code        String?  @unique
-  name        String
-  value       String?
-  isActive    Boolean  @default(true)
-  isArchived  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  code       String?  @unique
+  name       String
+  value      String?
+  isActive   Boolean  @default(true)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Size {
-  id          String   @id @default(cuid())
-  code        String?  @unique
-  name        String
-  value       String?
-  isActive    Boolean  @default(true)
-  isArchived  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  code       String?  @unique
+  name       String
+  value      String?
+  isActive   Boolean  @default(true)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Attribute {
-  id          String            @id @default(cuid())
-  name        String
-  type        String            @default("text") // text | select | boolean
-  isActive    Boolean           @default(true)
-  isArchived  Boolean           @default(false)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  options     AttributeOption[]
+  id         String            @id @default(cuid())
+  name       String
+  type       String            @default("text") // text | select | boolean
+  isActive   Boolean           @default(true)
+  isArchived Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  options    AttributeOption[]
 }
 
 model AttributeOption {
@@ -635,25 +1611,25 @@ model UnitConversion {
 }
 
 model PrintSetting {
-  id        String   @id @default(cuid())
-  module    String
-  template  String
-  options   String   @default("{}")
+  id         String   @id @default(cuid())
+  module     String
+  template   String
+  options    String   @default("{}")
   isArchived Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([module, template])
 }
 
 model ModuleSetting {
-  id        String   @id @default(cuid())
-  module    String
-  key       String
-  value     String   @default("")
+  id         String   @id @default(cuid())
+  module     String
+  key        String
+  value      String   @default("")
   isArchived Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([module, key])
 }

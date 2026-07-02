@@ -1,7 +1,5 @@
-"use client";
-
-import { BinCardsPage } from "@/features/inventory";
+import { redirect } from "next/navigation";
 
 export default function BinCardsRoute() {
-  return <BinCardsPage />;
+  redirect("/inventory/bin-card");
 }

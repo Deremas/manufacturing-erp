@@ -3,15 +3,25 @@
 // ----------------------------------------------------------------------------
 
 export interface StockBalanceView {
+  itemId?: string;
   itemCode: string;
   itemName: string;
+  categoryId?: string;
   category: string;
+  itemTypeId?: string;
+  itemType?: string;
+  uomId?: string;
+  uom?: string;
+  locationId?: string;
   location: string;
   quantity: number;
   reserved: number;
   available: number;
+  lowStockAlertLevel?: number;
   unitCost: number;
+  totalValue?: number;
   lastMovementDate: string | null;
+  status?: "OUT_OF_STOCK" | "LOW_STOCK" | "NORMAL";
 }
 
 export interface BinCardEntry {

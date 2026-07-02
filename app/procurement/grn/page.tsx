@@ -1,18 +1,22 @@
-"use client";
+import { GoodsReceiptListPage } from "@/features/procurement/grn/grn-pages";
+import { listGoodsReceipts } from "@/services/procurement/grn.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export default async function GoodsReceiptsPage() {
+  const receipts = await listGoodsReceipts();
 
-export default function GoodsReceiptsPage() {
   return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Goods Receipts / GRN"
-        subtitle="Manage goods received notes"
-      />
-      <EmptyState title="Goods Receipts / GRN" message="Module coming soon." />
-    </div>
+    <GoodsReceiptListPage
+      rows={receipts.map((receipt) => ({
+        id: receipt.id,
+        number: receipt.grnNo,
+        date: receipt.grnDate,
+        status: receipt.status,
+        poNo: receipt.poNo ?? "-",
+        supplierName: receipt.supplierName,
+        locationName: receipt.locationName,
+        itemCount: receipt.itemCount,
+        totalAmount: receipt.totalAmount,
+      }))}
+    />
   );
 }

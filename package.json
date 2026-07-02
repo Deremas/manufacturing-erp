@@ -11,6 +11,9 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed-stock": "tsx scripts/seed-opening-stock.ts",
+    "test:inventory": "node --test --test-concurrency=1 --import tsx tests/inventory/*.test.ts tests/procurement/*.test.ts",
+    "test:inventory-regression": "tsx scripts/inventory-regression.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

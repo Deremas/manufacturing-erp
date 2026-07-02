@@ -1,7 +1,5 @@
-"use client";
-
-import { SRVCardPage } from "@/features/inventory";
+import { redirect } from "next/navigation";
 
 export default function SRVCardRoute() {
-  return <SRVCardPage />;
+  redirect("/inventory/srv");
 }

@@ -8,7 +8,7 @@ export default function ProcurementRoutePage() {
     <ModuleLandingPage
       title="Procurement"
       subtitle="Purchasing and supplier workflow"
-      description="Jump into purchase requisitions, purchase orders, GRN, supplier invoices, payments, performance tracking, and commitment registers."
+      description="Jump into purchase requisitions, purchase orders, GRN, supplier invoices, payments, performance tracking, and commitment registers. Inventory receipt/return posting hooks are now available for GRN and supplier return workflows."
       links={
         procurementItem?.children?.map((child) => ({
           title: child.title,

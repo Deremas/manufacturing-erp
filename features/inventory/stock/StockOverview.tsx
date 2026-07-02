@@ -22,16 +22,24 @@ import type { StockBalanceView } from "../types";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 
-const stockData: StockBalanceView[] = [];
+type Option = { label: string; value: string };
+
+interface StockOverviewProps {
+  initialData?: StockBalanceView[];
+  locationOptions?: Option[];
+  categoryOptions?: Option[];
+  itemTypeOptions?: Option[];
+}
 
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
-const STOCK_THRESHOLD = 100; // items with available <= threshold are "low stock"
+const STOCK_THRESHOLD = 100; // fallback when reorder point is not available
 
 function getStockStatus(item: StockBalanceView): string {
+  const threshold = item.lowStockAlertLevel ?? STOCK_THRESHOLD;
   if (item.available <= 0) return "out-of-stock";
-  if (item.available <= STOCK_THRESHOLD) return "low-stock";
+  if (item.available <= threshold) return "low-stock";
   return "in-stock";
 }
 
@@ -42,8 +50,13 @@ function formatCurrency(value: number): string {
 // ----------------------------------------------------------------------------
 // Page Component
 // ----------------------------------------------------------------------------
-export default function StockOverview() {
-  const [data] = useState<StockBalanceView[]>(stockData);
+export default function StockOverview({
+  initialData = [],
+  locationOptions = [],
+  categoryOptions = [],
+  itemTypeOptions = [],
+}: StockOverviewProps) {
+  const [data] = useState<StockBalanceView[]>(initialData);
   const [search, setSearch] = useState("");
 
   const breadcrumbs: Breadcrumb[] = [
@@ -57,24 +70,21 @@ export default function StockOverview() {
       key: "location",
       label: "Location",
       placeholder: "All Locations",
-      options: [
-        { label: "Main Warehouse", value: "Main Warehouse" },
-        { label: "Store B", value: "Store B" },
-        { label: "Chemicals Store", value: "Chemicals Store" },
-      ],
+      options: locationOptions,
     },
     {
       type: "select",
       key: "category",
       label: "Category",
       placeholder: "All Categories",
-      options: [
-        { label: "Preforms", value: "Preforms" },
-        { label: "Caps", value: "Caps" },
-        { label: "Labels", value: "Labels" },
-        { label: "Chemicals", value: "Chemicals" },
-        { label: "Bottles", value: "Bottles" },
-      ],
+      options: categoryOptions,
+    },
+    {
+      type: "select",
+      key: "itemType",
+      label: "Item Type",
+      placeholder: "All Item Types",
+      options: itemTypeOptions,
     },
     {
       type: "text",
@@ -87,11 +97,13 @@ export default function StockOverview() {
   // Compute metrics
   const totalItems = data.length;
   const totalStockValue = data.reduce(
-    (sum, item) => sum + item.quantity * item.unitCost,
+    (sum, item) => sum + (item.totalValue ?? item.quantity * item.unitCost),
     0,
   );
   const lowStockCount = data.filter(
-    (item) => item.available > 0 && item.available <= STOCK_THRESHOLD,
+    (item) =>
+      item.available > 0 &&
+      item.available <= (item.lowStockAlertLevel ?? STOCK_THRESHOLD),
   ).length;
   const outOfStockCount = data.filter((item) => item.available <= 0).length;
 

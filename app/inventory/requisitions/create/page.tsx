@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { RequisitionFormPage } from "@/features/inventory";
-
-export default function CreateRequisitionRoute() {
-  return <RequisitionFormPage />;
+export default function RequisitionsCreateAliasRoute() {
+  redirect("/inventory/srv/create");
 }

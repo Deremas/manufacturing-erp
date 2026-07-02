@@ -1,18 +1,7 @@
-"use client";
+import { ChartOfAccountsLivePage } from "@/features/accounting/accounting-pages";
+import { listAccounts } from "@/services/accounting/accounting.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
-
-export default function ChartOfAccountsPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Chart of Accounts"
-        subtitle="Manage chart of accounts"
-      />
-      <EmptyState title="Chart of Accounts" message="Module coming soon." />
-    </div>
-  );
+export default async function ChartOfAccountsPage() {
+  const rows = await listAccounts();
+  return <ChartOfAccountsLivePage rows={rows} />;
 }

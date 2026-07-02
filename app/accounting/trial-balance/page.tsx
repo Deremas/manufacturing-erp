@@ -1,15 +1,7 @@
-"use client";
+import { TrialBalanceLivePage } from "@/features/accounting/accounting-pages";
+import { getTrialBalanceRows } from "@/services/accounting/accounting.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
-
-export default function TrialBalancePage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Trial Balance" subtitle="View trial balance" />
-      <EmptyState title="Trial Balance" message="Module coming soon." />
-    </div>
-  );
+export default async function TrialBalancePage() {
+  const rows = await getTrialBalanceRows();
+  return <TrialBalanceLivePage rows={rows} />;
 }

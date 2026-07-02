@@ -1,18 +1,33 @@
-"use client";
+import { ProcurementListPage } from "@/features/procurement/document-pages";
+import { listPurchaseRequisitions } from "@/services/procurement/requisition.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export default async function PurchaseRequisitionsPage() {
+  const requisitions = await listPurchaseRequisitions();
 
-export default function PurchaseRequisitionsPage() {
   return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Purchase Requisitions"
-        subtitle="Manage purchase requisitions"
-      />
-      <EmptyState title="Purchase Requisitions" message="Module coming soon." />
-    </div>
+    <ProcurementListPage
+      title="Purchase Requisitions"
+      subtitle="Manage internal buying requests before they become supplier-facing purchase orders."
+      breadcrumbs={[
+        { label: "Procurement", href: "/procurement" },
+        { label: "Purchase Requisitions" },
+      ]}
+      createHref="/procurement/requisitions/create"
+      baseHref="/procurement/requisitions"
+      primaryLabel="Department"
+      secondaryLabel="Location"
+      ownerLabel="Requested By"
+      rows={requisitions.map((row) => ({
+        id: row.id,
+        number: row.requisitionNo,
+        date: row.requisitionDate,
+        status: row.status,
+        primary: row.departmentName,
+        secondary: row.locationName,
+        owner: row.requestedByName,
+        itemCount: row.itemCount,
+        amount: row.estimatedTotal,
+      }))}
+    />
   );
 }

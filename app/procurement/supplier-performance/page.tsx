@@ -1,18 +1,7 @@
-"use client";
+import { SupplierPerformanceReportPage } from "@/features/procurement/report-pages";
+import { getSupplierPerformanceReport } from "@/services/procurement/procurement-report.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
-
-export default function SupplierPerformancePage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Supplier Performance"
-        subtitle="Track supplier performance metrics"
-      />
-      <EmptyState title="Supplier Performance" message="Module coming soon." />
-    </div>
-  );
+export default async function SupplierPerformancePage() {
+  const rows = await getSupplierPerformanceReport();
+  return <SupplierPerformanceReportPage rows={rows} />;
 }

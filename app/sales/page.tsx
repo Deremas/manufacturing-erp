@@ -8,7 +8,7 @@ export default function SalesRoutePage() {
     <ModuleLandingPage
       title="Sales"
       subtitle="Order capture and fulfillment"
-      description="Open POS, sales history, container tracking, and truck sales from one sales workspace."
+      description="Open POS, sales history, container tracking, and truck sales from one sales workspace. Inventory sales issue and sales return integration helpers are ready for invoice and POS posting."
       links={
         salesItem?.children?.map((child) => ({
           title: child.title,

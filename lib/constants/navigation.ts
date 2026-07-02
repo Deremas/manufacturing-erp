@@ -16,6 +16,7 @@ export const navigation: NavItem[] = [
       { title: "Purchase Requisitions", href: "/procurement/requisitions" },
       { title: "Purchase Orders", href: "/procurement/purchase-orders" },
       { title: "Goods Receipts / GRN", href: "/procurement/grn" },
+      { title: "Supplier Returns", href: "/procurement/supplier-returns" },
       { title: "Supplier Invoices", href: "/procurement/supplier-invoices" },
       { title: "Supplier Payments", href: "/procurement/payments" },
       {
@@ -31,13 +32,15 @@ export const navigation: NavItem[] = [
     icon: "Package2",
     children: [
       { title: "Stock Overview", href: "/inventory/stock" },
-      { title: "Bin Cards", href: "/inventory/bin-cards" },
-      { title: "Store Requisitions", href: "/inventory/requisitions" },
-      { title: "Issue Vouchers", href: "/inventory/issues" },
-      { title: "Return Vouchers", href: "/inventory/returns" },
-      { title: "Stock Transfers", href: "/inventory/transfers" },
+      { title: "Stock Movements", href: "/inventory/movements" },
+      { title: "Bin Card", href: "/inventory/bin-card" },
+      { title: "Low Stock", href: "/inventory/low-stock" },
+      { title: "Transfers", href: "/inventory/transfers" },
       { title: "Stock Adjustments", href: "/inventory/adjustments" },
-      { title: "SRV Card", href: "/inventory/srv-card" },
+      { title: "Store Requisitions", href: "/inventory/requisitions" },
+      { title: "Stock Issues", href: "/inventory/issues" },
+      { title: "Stock Returns", href: "/inventory/returns" },
+      { title: "SRV Card", href: "/inventory/srv" },
     ],
   },
   {
@@ -52,7 +55,8 @@ export const navigation: NavItem[] = [
     children: [
       { title: "Bill of Materials", href: "/production/bom" },
       { title: "Cost Settings", href: "/production/cost-settings" },
-      { title: "Cost Reports", href: "/production/cost-reports" },
+      { title: "Batch Cost Report", href: "/production/cost-reports/batch-report" },
+      { title: "Daily Cost Summary", href: "/production/cost-reports/daily-summary" },
     ],
   },
   {
@@ -61,9 +65,9 @@ export const navigation: NavItem[] = [
     icon: "CalendarClock",
     children: [
       { title: "Shift Sessions", href: "/shifts/sessions" },
-      { title: "Daily Report", href: "/shifts/daily-report" },
-      { title: "Efficiency Report", href: "/shifts/efficiency" },
-      { title: "Downtime Report", href: "/shifts/downtime" },
+      { title: "Daily Report", href: "/shifts/reports/daily" },
+      { title: "Efficiency Report", href: "/shifts/reports/efficiency" },
+      { title: "Downtime Report", href: "/shifts/reports/downtime" },
     ],
   },
   {
@@ -88,6 +92,8 @@ export const navigation: NavItem[] = [
       { title: "Preform Inspection", href: "/qc/preform-inspection" },
       { title: "Handle Inspection", href: "/qc/handle-inspection" },
       { title: "Cap Inspection", href: "/qc/cap-inspection" },
+      { title: "Hold / Release", href: "/qc/hold-release" },
+      { title: "Nonconformity", href: "/qc/nonconformity" },
     ],
   },
   {
@@ -177,10 +183,12 @@ export const navigation: NavItem[] = [
       { title: "Locations", href: "/administration/locations" },
       { title: "Company Settings", href: "/administration/company-settings" },
       { title: "System Settings", href: "/administration/system-settings" },
+      { title: "Inventory Policies", href: "/administration/inventory-policies" },
       {
         title: "Document Numbering",
         href: "/administration/document-numbering",
       },
+      { title: "Approval Queue", href: "/administration/approvals" },
       { title: "Audit Logs", href: "/administration/audit-logs" },
     ],
   },

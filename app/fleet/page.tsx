@@ -8,7 +8,7 @@ export default function FleetRoutePage() {
     <ModuleLandingPage
       title="Fleet"
       subtitle="Vehicle and trip management"
-      description="Open fleet vehicles, drivers, trips, and fuel records."
+      description="Open fleet vehicles, drivers, trips, and fuel records. Fleet fuel and spare-part issue/return integration can now route through inventory posting helpers."
       links={
         fleetItem?.children?.map((child) => ({
           title: child.title,

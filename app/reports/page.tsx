@@ -1,15 +1,22 @@
-"use client";
+import InventoryReportsPage from "@/features/reports/InventoryReportsPage";
+import { listInventoryReportRows } from "@/services/inventory/inventory-insights.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export default async function ReportsRoute() {
+  const [transfers, adjustments, issues, returns, requisitions] = await Promise.all([
+    listInventoryReportRows("transfers"),
+    listInventoryReportRows("adjustments"),
+    listInventoryReportRows("issues"),
+    listInventoryReportRows("returns"),
+    listInventoryReportRows("requisitions"),
+  ]);
 
-export default function ReportsPage() {
   return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Reports" subtitle="View system reports" />
-      <EmptyState title="Reports" message="Module coming soon." />
-    </div>
+    <InventoryReportsPage
+      transfers={transfers}
+      adjustments={adjustments}
+      issues={issues}
+      returns={returns}
+      requisitions={requisitions}
+    />
   );
 }

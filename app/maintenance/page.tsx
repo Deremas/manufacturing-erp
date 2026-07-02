@@ -5,7 +5,7 @@ export default function MaintenanceRoutePage() {
     <ModuleLandingPage
       title="Maintenance"
       subtitle="Assets and work orders"
-      description="Open work orders, preventive maintenance, and asset register pages."
+      description="Open work orders, preventive maintenance, and asset register pages. Maintenance spare issue/return integration can now route through the inventory stock engine."
       links={[
         { title: "Work Orders", href: "/maintenance/tickets", icon: "Wrench" },
         { title: "PM Schedule", href: "/maintenance/pm", icon: "CalendarClock" },
