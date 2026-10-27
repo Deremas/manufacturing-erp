@@ -1,7 +1,5 @@
-import { QcTestsLivePage } from "@/features/qc/live-pages";
-import { listQcTests } from "@/services/qc/qc.service";
+import { redirect } from "next/navigation";
 
-export default async function WaterTestPage() {
-  const rows = await listQcTests("water-test");
-  return <QcTestsLivePage title="Water Test" rows={rows} />;
+export default function Page() {
+  redirect("/qc/water");
 }

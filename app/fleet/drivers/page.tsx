@@ -1,15 +1,9 @@
-"use client";
+import { DriversPage as FleetDriversPage } from "@/features/fleet/FleetMasterPages";
+import { getFleetDrivers } from "@/services/fleet/fleet.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function DriversPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Drivers" subtitle="Manage fleet drivers" />
-      <EmptyState title="Drivers" message="Module coming soon." />
-    </div>
-  );
+export default async function DriversPage() {
+  const items = await getFleetDrivers();
+  return <FleetDriversPage initialItems={items} />;
 }

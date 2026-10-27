@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { ItemTypeFormPage } from "@/features/master-data/item-types";
+import { publicViewUrlFromPayload } from "@/lib/routing/urls";
 
 export default function CreateItemTypePage() {
   const router = useRouter();
@@ -14,12 +15,15 @@ export default function CreateItemTypePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string; publicId?: number }
+      | null;
 
     if (!response.ok) {
-      throw new Error("Failed to create item type");
+      throw new Error(payload?.error ?? "Failed to create item type");
     }
 
-    router.push("/master-data/item-types");
+    router.push(publicViewUrlFromPayload("master-data.item-type", payload, "/master-data/item-types"));
   };
 
   return (

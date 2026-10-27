@@ -241,6 +241,7 @@ export default function UnitDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="md.unit"
         title={unit.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { runWithTransientDbRetry } from "@/tests/_db-test-utils";
+export { postOpeningStock } from "@/services/inventory/inventory-posting.service";
 import { postOpeningStock } from "@/services/inventory/inventory-posting.service";
 import {
   listInventoryApprovalPolicies,
@@ -31,92 +33,94 @@ export interface InventoryTestContext {
 }
 
 export async function createInventoryTestContext(): Promise<InventoryTestContext> {
-  const [users, locations, departmentRows, supportRows] = await Promise.all([
-    sql<Array<{ id: string }>>`
-      SELECT id
-      FROM "User"
-      WHERE "isArchived" = false
-      ORDER BY "createdAt" ASC
-      LIMIT 2
-    `,
-    sql<Array<{ id: string }>>`
-      SELECT id
-      FROM "Location"
-      WHERE "isArchived" = false
-        AND "isStockLocation" = true
-      ORDER BY "createdAt" ASC
-      LIMIT 3
-    `,
-    sql<Array<{ id: string }>>`
-      SELECT id
-      FROM "Department"
-      WHERE "isArchived" = false
-      ORDER BY "createdAt" ASC
-      LIMIT 1
-    `,
-    sql<Array<{ categoryId: string | null; itemTypeId: string | null; uomId: string | null }>>`
-      SELECT
-        (SELECT id FROM "Category" WHERE "isArchived" = false ORDER BY "createdAt" ASC LIMIT 1) AS "categoryId",
-        (SELECT id FROM "ItemType" WHERE "isArchived" = false ORDER BY "createdAt" ASC LIMIT 1) AS "itemTypeId",
-        (SELECT id FROM "Unit" WHERE "isArchived" = false ORDER BY "createdAt" ASC LIMIT 1) AS "uomId"
-    `,
-  ]);
+  return runWithTransientDbRetry(async () => {
+    const [users, locations, departmentRows, supportRows] = await Promise.all([
+      sql<Array<{ id: string }>>`
+        SELECT id
+        FROM "User"
+        WHERE "isArchived" = false
+        ORDER BY "createdAt" ASC
+        LIMIT 2
+      `,
+      sql<Array<{ id: string }>>`
+        SELECT id
+        FROM "Location"
+        WHERE "isArchived" = false
+          AND "isStockLocation" = true
+        ORDER BY "createdAt" ASC
+        LIMIT 3
+      `,
+      sql<Array<{ id: string }>>`
+        SELECT id
+        FROM "Department"
+        WHERE "isArchived" = false
+        ORDER BY "createdAt" ASC
+        LIMIT 1
+      `,
+      sql<Array<{ categoryId: string | null; itemTypeId: string | null; uomId: string | null }>>`
+        SELECT
+          (SELECT id FROM "Category" WHERE "isArchived" = false ORDER BY "createdAt" ASC LIMIT 1) AS "categoryId",
+          (SELECT id FROM "ItemType" WHERE "isArchived" = false ORDER BY "createdAt" ASC LIMIT 1) AS "itemTypeId",
+          (SELECT id FROM "Unit" WHERE "isArchived" = false ORDER BY "createdAt" ASC LIMIT 1) AS "uomId"
+      `,
+    ]);
 
-  if (users.length < 2) {
-    throw new Error("Inventory tests require at least two active users");
-  }
-  if (locations.length < 3) {
-    throw new Error("Inventory tests require at least three active stock locations");
-  }
-  if (!departmentRows[0]?.id) {
-    throw new Error("Inventory tests require at least one active department");
-  }
+    if (users.length < 2) {
+      throw new Error("Inventory tests require at least two active users");
+    }
+    if (locations.length < 3) {
+      throw new Error("Inventory tests require at least three active stock locations");
+    }
+    if (!departmentRows[0]?.id) {
+      throw new Error("Inventory tests require at least one active department");
+    }
 
-  const support = supportRows[0];
-  const itemCode = `TEST-INV-${Date.now()}-${randomUUID().slice(0, 6).toUpperCase()}`;
-  const itemId = randomUUID();
+    const support = supportRows[0];
+    const itemCode = `TEST-INV-${Date.now()}-${randomUUID().slice(0, 6).toUpperCase()}`;
+    const itemId = randomUUID();
 
-  await sql`
-    INSERT INTO "Item" (
-      id,
-      "itemCode",
-      "itemName",
-      "categoryId",
-      "itemTypeId",
-      "uomId",
-      "reorderPoint",
-      "standardCost",
-      "isActive",
-      "isArchived",
-      "createdAt",
-      "updatedAt"
-    )
-    VALUES (
-      ${itemId},
-      ${itemCode},
-      ${`Inventory Test Item ${itemCode}`},
-      ${support?.categoryId ?? null},
-      ${support?.itemTypeId ?? null},
-      ${support?.uomId ?? null},
-      5,
-      10,
-      true,
-      false,
-      NOW(),
-      NOW()
-    )
-  `;
+    await sql`
+      INSERT INTO "Item" (
+        id,
+        "itemCode",
+        "itemName",
+        "categoryId",
+        "itemTypeId",
+        "uomId",
+        "reorderPoint",
+        "standardCost",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${itemId},
+        ${itemCode},
+        ${`Inventory Test Item ${itemCode}`},
+        ${support?.categoryId ?? null},
+        ${support?.itemTypeId ?? null},
+        ${support?.uomId ?? null},
+        5,
+        10,
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+    `;
 
-  return {
-    adminUserId: users[0].id,
-    secondUserId: users[1].id,
-    departmentId: departmentRows[0].id,
-    sourceLocationId: locations[0].id,
-    destinationLocationId: locations[1].id,
-    quarantineLocationId: locations[2].id,
-    itemId,
-    itemCode,
-  };
+    return {
+      adminUserId: users[0].id,
+      secondUserId: users[1].id,
+      departmentId: departmentRows[0].id,
+      sourceLocationId: locations[0].id,
+      destinationLocationId: locations[1].id,
+      quarantineLocationId: locations[2].id,
+      itemId,
+      itemCode,
+    };
+  });
 }
 
 export async function ensureStock(

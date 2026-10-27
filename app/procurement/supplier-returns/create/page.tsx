@@ -2,11 +2,14 @@ import { getProcurementReferenceData } from "@/app/procurement/_lib/reference-da
 import { SupplierReturnEditor } from "@/features/procurement/supplier-return-pages";
 import { listGoodsReceipts } from "@/services/procurement/grn.service";
 import { getSupplierReturnPrefillFromReceipt } from "@/services/procurement/supplier-return.service";
+import { getGoodsReceiptById } from "@/services/procurement/grn.service";
 
 export default async function CreateSupplierReturnPage(
-  { searchParams }: { searchParams: Promise<{ grnId?: string }> },
+  { searchParams }: { searchParams: Promise<{ grnPublicId?: string }> },
 ) {
-  const { grnId } = await searchParams;
+  const { grnPublicId } = await searchParams;
+  const linkedGrn = grnPublicId ? await getGoodsReceiptById(grnPublicId) : null;
+  const grnId = linkedGrn?.id;
   const [referenceData, receipts, prefill] = await Promise.all([
     getProcurementReferenceData(),
     listGoodsReceipts(),
@@ -27,7 +30,6 @@ export default async function CreateSupplierReturnPage(
       successHref="/procurement/supplier-returns"
       suppliers={referenceData.suppliers}
       locations={referenceData.locations}
-      approvers={referenceData.users}
       grnOptions={receipts.filter((entry) => entry.status === "POSTED").map((entry) => ({
         value: entry.id,
         label: `${entry.grnNo} - ${entry.supplierName}`,

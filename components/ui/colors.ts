@@ -40,6 +40,8 @@ export interface ThemeColors {
   background: string;
   surface: string;
   border: string;
+  /** Unfocused form field outline — visible, not heavy */
+  inputBorder: string;
   text: TextColors;
 }
 
@@ -148,7 +150,8 @@ export const colors: ThemeColors = {
   info,
   background: "#f8fafc",
   surface: "#ffffff",
-  border: "#e5e7eb",
+  border: "#cbd5e1",
+  inputBorder: "#94a3b8",
   text: {
     primary: "#1f2937",
     secondary: "#6b7280",

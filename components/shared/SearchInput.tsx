@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { X } from "lucide-react";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
@@ -29,7 +30,7 @@ const wrapperStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "8px 12px 8px 36px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -115,12 +116,12 @@ export default function SearchInput({
             colors.primary[500];
         }}
         onBlur={(e) => {
-          (e.currentTarget as HTMLElement).style.borderColor = colors.border;
+          (e.currentTarget as HTMLElement).style.borderColor = colors.inputBorder;
         }}
       />
       {value && value.length > 0 && (
-        <button style={clearButtonStyle} onClick={handleClear} type="button">
-          \u2715
+        <button style={clearButtonStyle} onClick={handleClear} type="button" aria-label="Clear search" title="Clear search">
+          <X size={10} strokeWidth={3} />
         </button>
       )}
     </div>

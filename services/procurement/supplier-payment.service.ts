@@ -1,8 +1,10 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/procurement/routes";
 import {
   approveProcurementApproval,
+  assertCanSubmitProcurementStatus,
   nextProcurementDocumentNumber,
   normalizeProcurementStatus,
   rejectProcurementApproval,
@@ -16,11 +18,13 @@ import { syncSupplierPaymentFinancePosting } from "@/services/procurement/procur
 
 export interface SupplierPaymentSummary {
   id: string;
+  publicId: number;
   paymentNo: string;
   paymentDate: string;
   supplierId: string;
   supplierName: string;
   invoiceId: string;
+  invoicePublicId?: number | null;
   invoiceNo: string;
   paymentMethod: string;
   bankAccountId: string | null;
@@ -101,6 +105,7 @@ export async function listSupplierPayments(): Promise<SupplierPaymentSummary[]> 
     return await sql<Array<SupplierPaymentSummary>>`
       SELECT
         sp.id,
+        sp."publicId",
         sp."paymentNo",
         sp."paymentDate"::text,
         sp."supplierId",
@@ -125,16 +130,18 @@ export async function listSupplierPayments(): Promise<SupplierPaymentSummary[]> 
   }
 }
 
-export async function getSupplierPaymentById(id: string): Promise<SupplierPaymentDetail | null> {
+export async function getSupplierPaymentById(key: string): Promise<SupplierPaymentDetail | null> {
   try {
     const rows = await sql<Array<SupplierPaymentDetail>>`
       SELECT
         sp.id,
+        sp."publicId",
         sp."paymentNo",
         sp."paymentDate"::text,
         sp."supplierId",
         s.name AS "supplierName",
         sp."invoiceId",
+        si."publicId" AS "invoicePublicId",
         si."invoiceNo",
         sp."paymentMethod"::text AS "paymentMethod",
         sp."bankAccountId",
@@ -148,7 +155,7 @@ export async function getSupplierPaymentById(id: string): Promise<SupplierPaymen
       INNER JOIN "Supplier" s ON s.id = sp."supplierId"
       INNER JOIN "SupplierInvoice" si ON si.id = sp."invoiceId"
       LEFT JOIN "BankAccount" ba ON ba.id = sp."bankAccountId"
-      WHERE sp.id = ${id}
+      WHERE ${isPublicIdParam(key) ? sql`sp."publicId" = ${Number(key)}` : sql`sp.id = ${key}`}
       LIMIT 1
     `;
     return rows[0] ?? null;
@@ -172,7 +179,7 @@ export async function createSupplierPayment(payload: SupplierPaymentPayload) {
     const id = randomUUID();
     const paymentNo = await nextProcurementDocumentNumber(tx, "SPAY", "Supplier Payment");
 
-    await tx`
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "SupplierPayment" (
         id, "paymentNo", "paymentDate", "supplierId", "invoiceId", "paymentMethod",
         "bankAccountId", "cashAccountId", "referenceNo", amount, remarks, status, "createdById", "createdAt", "updatedAt"
@@ -194,6 +201,7 @@ export async function createSupplierPayment(payload: SupplierPaymentPayload) {
         NOW(),
         NOW()
       )
+      RETURNING "publicId"
     `;
     await syncProcurementApproval(tx, {
       referenceType: "procurement.payment",
@@ -201,12 +209,12 @@ export async function createSupplierPayment(payload: SupplierPaymentPayload) {
       documentType: "payment",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.payment", "CREATE", id, payload);
     await writeProcurementHistory(tx, "procurement.payment", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, paymentNo };
+    return { id, paymentNo, publicId: inserted[0]?.publicId };
   });
 }
 
@@ -249,7 +257,7 @@ export async function updateSupplierPayment(id: string, payload: SupplierPayment
       documentType: "payment",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.payment", "UPDATE", id, payload);
@@ -258,7 +266,7 @@ export async function updateSupplierPayment(id: string, payload: SupplierPayment
   });
 }
 
-export async function approveSupplierPayment(id: string, userId: string) {
+export async function approveSupplierPayment(id: string, userId: string, comment?: string) {
   const payment = await getSupplierPaymentById(id);
   if (!payment) throw new Error("Supplier payment not found");
   const invoice = await getInvoiceBalance(payment.invoiceId);
@@ -267,7 +275,7 @@ export async function approveSupplierPayment(id: string, userId: string) {
   if (Number(payment.amount) > Number(invoice.balanceDue ?? 0)) {
     throw new Error("Payment amount exceeds the current invoice balance");
   }
-  await approveProcurementApproval("procurement.payment", id, userId);
+  await approveProcurementApproval("procurement.payment", id, userId, comment);
   await sql.begin(async (tx) => {
     await tx`
       UPDATE "SupplierPayment"
@@ -276,8 +284,8 @@ export async function approveSupplierPayment(id: string, userId: string) {
     `;
     await applyPaymentToInvoice(tx, payment.invoiceId);
     await syncSupplierPaymentFinancePosting(tx, { paymentId: id, userId });
-    await writeProcurementAudit(tx, userId, "procurement.payment", "APPROVE", id, { id });
-    await writeProcurementHistory(tx, "procurement.payment", id, "APPROVE", userId, payment.paymentNo);
+    await writeProcurementAudit(tx, userId, "procurement.payment", "APPROVE", id, { id, comment });
+    await writeProcurementHistory(tx, "procurement.payment", id, "APPROVE", userId, comment ?? payment.paymentNo);
     await writeProcurementHistory(tx, "procurement.payment", id, "FINANCE_POST", userId, `Finance posting synced for ${payment.paymentNo}`);
   });
   return { id };
@@ -318,6 +326,35 @@ export async function cancelSupplierPayment(id: string, userId: string) {
     });
     await writeProcurementAudit(tx, userId, "procurement.payment", "CANCEL", id, { id });
     await writeProcurementHistory(tx, "procurement.payment", id, "CANCEL", userId, payment.paymentNo);
+  });
+  return { id };
+}
+
+export async function submitSupplierPayment(
+  id: string,
+  userId: string,
+  input?: { approverId?: string; comment?: string },
+) {
+  const payment = await getSupplierPaymentById(id);
+  if (!payment) throw new Error("Supplier payment not found");
+  assertCanSubmitProcurementStatus(payment.status);
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE "SupplierPayment"
+      SET status = 'SUBMITTED', "updatedAt" = NOW()
+      WHERE id = ${id}
+    `;
+    await syncProcurementApproval(tx, {
+      referenceType: "procurement.payment",
+      referenceId: id,
+      documentType: "payment",
+      status: "SUBMITTED",
+      requestedById: userId,
+      assignedApproverId: null,
+      comment: input?.comment,
+    });
+    await writeProcurementAudit(tx, userId, "procurement.payment", "SUBMIT", id, { id, ...input });
+    await writeProcurementHistory(tx, "procurement.payment", id, "SUBMIT", userId, input?.comment ?? payment.paymentNo);
   });
   return { id };
 }

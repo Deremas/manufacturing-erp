@@ -1,21 +1,74 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { PageHeader, FormCard, ActionButtons } from "@/components/shared";
 import type { Breadcrumb, Action } from "@/components/shared";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
-import { Building2, Printer, DollarSign, Save, X, Upload } from "lucide-react";
+import {
+  Building2,
+  Printer,
+  DollarSign,
+  Save,
+  X,
+  Upload,
+} from "lucide-react";
+import { showToast, notifyActionError } from "@/components/shared/toast";
+import {
+  settingsFormShellStyle,
+  settingsPageStyle,
+  settingsRowStyle,
+  settingsStickyFooterStyle,
+} from "@/features/administration/settings/settings-layout";
 
-// ----------------------------------------------------------------------------
-// Styles
-// ----------------------------------------------------------------------------
-const pageStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: `${spacing.page.gap}px`,
+type TaxCodeOption = {
+  id: string;
+  taxName: string;
+  rate: number;
+};
+
+type CompanyFormState = {
+  companyName: string;
+  tradeName: string;
+  tinNumber: string;
+  vatNumber: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  printLogo: boolean;
+  printCompanyName: boolean;
+  footerText: string;
+  signatureLabel: string;
+  defaultCurrency: string;
+  fiscalYearStart: string;
+  defaultTaxCodeId: string;
+  procurementVatEnabled: boolean;
+  reportHeaderInfo: string;
+  invoiceFooter: string;
+};
+
+const DEFAULT_STATE: CompanyFormState = {
+  companyName: "",
+  tradeName: "",
+  tinNumber: "",
+  vatNumber: "",
+  address: "",
+  phone: "",
+  email: "",
+  website: "",
+  printLogo: true,
+  printCompanyName: true,
+  footerText: "",
+  signatureLabel: "Authorized Signature",
+  defaultCurrency: "ETB",
+  fiscalYearStart: "",
+  defaultTaxCodeId: "",
+  procurementVatEnabled: true,
+  reportHeaderInfo: "",
+  invoiceFooter: "",
 };
 
 const formGroupStyle: React.CSSProperties = {
@@ -33,8 +86,9 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
+  maxWidth: 420,
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -50,31 +104,13 @@ const selectStyle: React.CSSProperties = {
   ...inputStyle,
   cursor: "pointer",
   appearance: "auto",
-  height: "48px",
 };
 
 const textareaStyle: React.CSSProperties = {
   ...inputStyle,
+  maxWidth: "100%",
   height: "80px",
   resize: "vertical",
-};
-
-const rowStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "16px",
-};
-
-const stickyFooterStyle: React.CSSProperties = {
-  position: "sticky",
-  bottom: 0,
-  zIndex: 10,
-  backgroundColor: "#f8fafc",
-  borderTop: `1px solid ${colors.border}`,
-  padding: "16px 40px",
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: "8px",
 };
 
 const toggleRowStyle: React.CSSProperties = {
@@ -84,98 +120,171 @@ const toggleRowStyle: React.CSSProperties = {
   paddingTop: "4px",
 };
 
-// ----------------------------------------------------------------------------
-// Page Component
-// ----------------------------------------------------------------------------
 export default function CompanySettingsPage() {
-  const [companyName, setCompanyName] = useState("New Manufacturing PLC");
-  const [tradeName, setTradeName] = useState("New Mfg");
-  const [tin, setTin] = useState("TIN-0012345678");
-  const [vatNumber, setVatNumber] = useState("VAT-8765432100");
-  const [address, setAddress] = useState(
-    "Bole Subcity, Woreda 03\nAddis Ababa, Ethiopia",
-  );
-  const [phone, setPhone] = useState("+251-11-555-0100");
-  const [email, setEmail] = useState("info@newmanufacturing.com");
-  const [website, setWebsite] = useState("www.newmanufacturing.com");
-  const [printLogo, setPrintLogo] = useState(true);
-  const [printCompanyName, setPrintCompanyName] = useState(true);
-  const [footerText, setFooterText] = useState("Thank you for your business!");
-  const [signatureLabel, setSignatureLabel] = useState("Authorized Signature");
-  const [currency, setCurrency] = useState("ETB");
-  const [fiscalYearStart, setFiscalYearStart] = useState("2026-07-01");
-  const [defaultTaxCode, setDefaultTaxCode] = useState("VAT-15");
+  const [form, setForm] = useState<CompanyFormState>(DEFAULT_STATE);
+  const [taxCodes, setTaxCodes] = useState<TaxCodeOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Administration", href: "/administration" },
     { label: "Company Settings" },
   ];
 
-  const handleSave = () => console.log("Save company settings");
-  const handleCancel = () => console.log("Cancel");
+  async function loadSettings() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/administration/company-settings", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        settings?: Partial<CompanyFormState>;
+        taxCodes?: TaxCodeOption[];
+      };
+
+      if (!response.ok || !payload.settings) {
+        throw new Error(payload.error || "Failed to load company settings");
+      }
+
+      setForm({
+        ...DEFAULT_STATE,
+        ...payload.settings,
+        companyName: payload.settings.companyName ?? "",
+        tradeName: payload.settings.tradeName ?? payload.settings.companyName ?? "",
+        fiscalYearStart: payload.settings.fiscalYearStart ?? "",
+        defaultCurrency: payload.settings.defaultCurrency ?? "ETB",
+      });
+      setTaxCodes(payload.taxCodes ?? []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load company settings",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadSettings();
+  }, []);
+
+  const updateField = <K extends keyof CompanyFormState>(
+    key: K,
+    value: CompanyFormState[K],
+  ) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/administration/company-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to save company settings");
+      }
+      showToast({
+        tone: "success",
+        title: "Settings saved",
+        message: "Company settings were updated successfully.",
+      });
+    } catch (saveError) {
+      const text =
+        saveError instanceof Error
+          ? saveError.message
+          : "Failed to save company settings";
+      setError(text);
+      notifyActionError(text);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const footerActions: Action[] = [
     {
       label: "Cancel",
       variant: "secondary",
       icon: <X size={16} />,
-      onClick: handleCancel,
+      onClick: () => void loadSettings(),
+      disabled: saving,
     },
     {
       label: "Save",
       variant: "primary",
       icon: <Save size={16} />,
-      onClick: handleSave,
+      onClick: () => void handleSave(),
+      loading: saving,
     },
   ];
 
   return (
-    <div style={pageStyle}>
+    <div style={settingsPageStyle}>
       <PageHeader title="Company Settings" breadcrumbs={breadcrumbs} />
 
+      {error ? (
+        <div style={{ color: colors.danger[600], fontFamily: typography.fontFamily }}>
+          {error}
+        </div>
+      ) : null}
+
+      <div style={settingsFormShellStyle}>
       <FormCard
         title="Company Profile"
         icon={<Building2 size={18} />}
         variant="teal-header"
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={rowStyle}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: loading ? 0.7 : 1 }}>
+          <div style={settingsRowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Company Name</label>
               <input
                 type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                value={form.companyName}
+                onChange={(event) => updateField("companyName", event.target.value)}
                 style={inputStyle}
+                disabled={loading}
               />
             </div>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Trade Name</label>
               <input
                 type="text"
-                value={tradeName}
-                onChange={(e) => setTradeName(e.target.value)}
+                value={form.tradeName}
+                onChange={(event) => updateField("tradeName", event.target.value)}
                 style={inputStyle}
+                disabled={loading}
               />
             </div>
           </div>
-          <div style={rowStyle}>
+          <div style={settingsRowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>TIN</label>
               <input
                 type="text"
-                value={tin}
-                onChange={(e) => setTin(e.target.value)}
+                value={form.tinNumber}
+                onChange={(event) => updateField("tinNumber", event.target.value)}
                 style={inputStyle}
+                disabled={loading}
               />
             </div>
             <div style={formGroupStyle}>
               <label style={labelStyle}>VAT Number</label>
               <input
                 type="text"
-                value={vatNumber}
-                onChange={(e) => setVatNumber(e.target.value)}
+                value={form.vatNumber}
+                onChange={(event) => updateField("vatNumber", event.target.value)}
                 style={inputStyle}
+                disabled={loading}
               />
             </div>
           </div>
@@ -197,9 +306,11 @@ export default function CompanySettingsPage() {
                   fontWeight: 600,
                 }}
               >
-                K
+                {form.companyName.trim().charAt(0).toUpperCase() || "C"}
               </div>
               <button
+                type="button"
+                disabled
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -208,131 +319,140 @@ export default function CompanySettingsPage() {
                   border: `1px solid ${colors.border}`,
                   borderRadius: radius.components.button,
                   backgroundColor: colors.surface,
-                  color: colors.text.primary,
-                  cursor: "pointer",
+                  color: colors.text.secondary,
+                  cursor: "not-allowed",
                   fontFamily: typography.fontFamily,
                   fontSize: typography.sizes.body.fontSize,
                 }}
               >
-                <Upload size={16} /> Upload Logo
+                <Upload size={16} /> Logo upload will be wired next
               </button>
             </div>
           </div>
           <div style={formGroupStyle}>
             <label style={labelStyle}>Address</label>
             <textarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              value={form.address}
+              onChange={(event) => updateField("address", event.target.value)}
               style={textareaStyle}
               rows={3}
+              disabled={loading}
             />
           </div>
-          <div style={rowStyle}>
+          <div style={settingsRowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Phone</label>
               <input
                 type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={form.phone}
+                onChange={(event) => updateField("phone", event.target.value)}
                 style={inputStyle}
+                disabled={loading}
               />
             </div>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Email</label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
                 style={inputStyle}
+                disabled={loading}
               />
             </div>
           </div>
-          <div style={formGroupStyle}>
-            <label style={labelStyle}>Website</label>
-            <input
-              type="text"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              style={inputStyle}
-            />
+          <div style={settingsRowStyle}>
+            <div style={formGroupStyle}>
+              <label style={labelStyle}>Website</label>
+              <input
+                type="text"
+                value={form.website}
+                onChange={(event) => updateField("website", event.target.value)}
+                style={inputStyle}
+                disabled={loading}
+              />
+            </div>
+            <div style={formGroupStyle}>
+              <label style={labelStyle}>Report Header Info</label>
+              <input
+                type="text"
+                value={form.reportHeaderInfo}
+                onChange={(event) =>
+                  updateField("reportHeaderInfo", event.target.value)
+                }
+                style={inputStyle}
+                disabled={loading}
+              />
+            </div>
           </div>
         </div>
       </FormCard>
 
       <FormCard title="Print Settings" icon={<Printer size={18} />}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: loading ? 0.7 : 1 }}>
           <div style={toggleRowStyle}>
             <input
               type="checkbox"
-              checked={printLogo}
-              onChange={(e) => setPrintLogo(e.target.checked)}
-              style={{
-                width: "18px",
-                height: "18px",
-                accentColor: colors.primary[600],
-              }}
+              checked={form.printLogo}
+              onChange={(event) => updateField("printLogo", event.target.checked)}
+              style={{ width: "18px", height: "18px", accentColor: colors.primary[600] }}
+              disabled={loading}
             />
-            <span
-              style={{
-                fontFamily: typography.fontFamily,
-                fontSize: typography.sizes.body.fontSize,
-                color: colors.text.primary,
-              }}
-            >
+            <span style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.body.fontSize, color: colors.text.primary }}>
               Print Logo on documents
             </span>
           </div>
           <div style={toggleRowStyle}>
             <input
               type="checkbox"
-              checked={printCompanyName}
-              onChange={(e) => setPrintCompanyName(e.target.checked)}
-              style={{
-                width: "18px",
-                height: "18px",
-                accentColor: colors.primary[600],
-              }}
+              checked={form.printCompanyName}
+              onChange={(event) =>
+                updateField("printCompanyName", event.target.checked)
+              }
+              style={{ width: "18px", height: "18px", accentColor: colors.primary[600] }}
+              disabled={loading}
             />
-            <span
-              style={{
-                fontFamily: typography.fontFamily,
-                fontSize: typography.sizes.body.fontSize,
-                color: colors.text.primary,
-              }}
-            >
+            <span style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.body.fontSize, color: colors.text.primary }}>
               Print Company Name on documents
             </span>
           </div>
           <div style={formGroupStyle}>
             <label style={labelStyle}>Footer Text</label>
             <textarea
-              value={footerText}
-              onChange={(e) => setFooterText(e.target.value)}
+              value={form.footerText}
+              onChange={(event) => updateField("footerText", event.target.value)}
               style={textareaStyle}
               rows={2}
+              disabled={loading}
             />
           </div>
           <div style={formGroupStyle}>
             <label style={labelStyle}>Signature Label</label>
             <input
               type="text"
-              value={signatureLabel}
-              onChange={(e) => setSignatureLabel(e.target.value)}
+              value={form.signatureLabel}
+              onChange={(event) =>
+                updateField("signatureLabel", event.target.value)
+              }
               style={inputStyle}
+              disabled={loading}
             />
           </div>
         </div>
       </FormCard>
 
       <FormCard title="Fiscal Settings" icon={<DollarSign size={18} />}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={rowStyle}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: loading ? 0.7 : 1 }}>
+          <div style={settingsRowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Currency</label>
               <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
+                value={form.defaultCurrency}
+                onChange={(event) =>
+                  updateField("defaultCurrency", event.target.value)
+                }
                 style={selectStyle}
+                disabled={loading}
               >
                 <option value="ETB">ETB - Ethiopian Birr</option>
                 <option value="USD">USD - US Dollar</option>
@@ -343,29 +463,67 @@ export default function CompanySettingsPage() {
               <label style={labelStyle}>Fiscal Year Start</label>
               <input
                 type="date"
-                value={fiscalYearStart}
-                onChange={(e) => setFiscalYearStart(e.target.value)}
+                value={form.fiscalYearStart}
+                onChange={(event) =>
+                  updateField("fiscalYearStart", event.target.value)
+                }
                 style={inputStyle}
+                disabled={loading}
               />
             </div>
           </div>
-          <div style={formGroupStyle}>
-            <label style={labelStyle}>Default Tax Code</label>
-            <select
-              value={defaultTaxCode}
-              onChange={(e) => setDefaultTaxCode(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="VAT-15">VAT 15%</option>
-              <option value="VAT-0">VAT 0%</option>
-              <option value="EXEMPT">Tax Exempt</option>
-            </select>
+          <div style={settingsRowStyle}>
+            <div style={formGroupStyle}>
+              <label style={labelStyle}>Default Procurement VAT</label>
+              <select
+                value={form.defaultTaxCodeId}
+                onChange={(event) =>
+                  updateField("defaultTaxCodeId", event.target.value)
+                }
+                style={selectStyle}
+                disabled={loading}
+              >
+                <option value="">Select ...</option>
+                {taxCodes.map((taxCode) => (
+                  <option key={taxCode.id} value={taxCode.id}>
+                    {taxCode.taxName} ({taxCode.rate}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={formGroupStyle}>
+              <label style={labelStyle}>Invoice Footer</label>
+              <input
+                type="text"
+                value={form.invoiceFooter}
+                onChange={(event) =>
+                  updateField("invoiceFooter", event.target.value)
+                }
+                style={inputStyle}
+                disabled={loading}
+              />
+            </div>
+          </div>
+          <div style={toggleRowStyle}>
+            <input
+              type="checkbox"
+              checked={form.procurementVatEnabled}
+              onChange={(event) =>
+                updateField("procurementVatEnabled", event.target.checked)
+              }
+              style={{ width: "18px", height: "18px", accentColor: colors.primary[600] }}
+              disabled={loading}
+            />
+            <span style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.body.fontSize, color: colors.text.primary }}>
+              Apply VAT on purchase orders
+            </span>
           </div>
         </div>
       </FormCard>
 
-      <div style={stickyFooterStyle}>
+      <div style={settingsStickyFooterStyle}>
         <ActionButtons actions={footerActions} />
+      </div>
       </div>
     </div>
   );

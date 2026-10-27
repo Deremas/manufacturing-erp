@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
     return record;
-  });
+  }, "view");
 }
 
 export async function PUT(
@@ -21,5 +21,8 @@ export async function PUT(
 ) {
   const { document, id } = await params;
   const body = await request.json();
-  return withInventoryDocument(document, async (key, userId) => updateDocument(key, id, body, userId));
+  return withInventoryDocument(document, async (key, userId) => updateDocument(key, id, body, userId), "update", {
+    locationId: String(body.locationId ?? body.fromLocationId ?? body.fromStoreLocationId ?? "") || null,
+    departmentId: String(body.departmentId ?? body.requestingDepartmentId ?? "") || null,
+  });
 }

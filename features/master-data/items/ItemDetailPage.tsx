@@ -1,10 +1,12 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import {
   PageHeader,
   FormCard,
   ActionButtons,
+  HistoryActionBadge,
   StatusBadge,
 } from "@/components/shared";
 import type { Breadcrumb, Action } from "@/components/shared";
@@ -12,6 +14,9 @@ import type { Item } from "../types";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { typography } from "@/components/ui/typography";
+import { formatCurrency } from "@/lib/utils/cn";
+import { useSystemPreferences } from "@/lib/client/use-system-preferences";
+import { getCleanItemName, getDisplayItemCode } from "@/lib/item-display";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -21,6 +26,8 @@ export interface ItemDetailPageProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onBack?: () => void;
+  editHref?: string;
+  backHref?: string;
   loading?: boolean;
 }
 
@@ -154,9 +161,6 @@ const timelineDateStyle: React.CSSProperties = {
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
-const formatCurrency = (val: number) =>
-  `$${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-
 const formatDate = (dateStr: string) => {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", {
@@ -176,24 +180,40 @@ export default function ItemDetailPage({
   onEdit,
   onDelete,
   onBack,
+  editHref,
+  backHref,
   loading,
 }: ItemDetailPageProps) {
+  const router = useRouter();
+  const { currencyCode, currencyLabel } = useSystemPreferences();
+  const displayItemCode = getDisplayItemCode({
+    itemCode: item.itemCode,
+    itemName: item.itemName,
+    itemTypeCode: item.itemType,
+    itemTypeName: item.itemTypeName,
+  });
+  const cleanItemName = getCleanItemName(item.itemName, displayItemCode);
+
   const actions: Action[] = [
     ...(onEdit
       ? [{ label: "Edit", variant: "primary" as const, onClick: onEdit }]
+      : editHref
+        ? [{ label: "Edit", variant: "primary" as const, onClick: () => router.push(editHref) }]
       : []),
     ...(onDelete
       ? [{ label: "Delete", variant: "danger" as const, onClick: onDelete }]
       : []),
     ...(onBack
       ? [{ label: "Back", variant: "secondary" as const, onClick: onBack }]
+      : backHref
+        ? [{ label: "Back", variant: "secondary" as const, onClick: () => router.push(backHref) }]
       : []),
   ];
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Master Data", href: "/master-data" },
     { label: "Items", href: "/master-data/items" },
-    { label: item.itemCode },
+    { label: displayItemCode || item.itemCode },
   ];
 
   const renderField = (label: string, value: React.ReactNode) => (
@@ -227,7 +247,8 @@ export default function ItemDetailPage({
       }}
     >
       <PageHeader
-        title={item.itemName}
+        recordKind="md.item"
+        title={cleanItemName || item.itemName}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}
       />
@@ -235,8 +256,8 @@ export default function ItemDetailPage({
       {/* Profile Header */}
       <div style={headerBannerStyle}>
         <div style={headerInfoStyle}>
-          <span style={headerCodeStyle}>{item.itemCode}</span>
-          <h2 style={headerNameStyle}>{item.itemName}</h2>
+          <span style={headerCodeStyle}>{displayItemCode || item.itemCode}</span>
+          <h2 style={headerNameStyle}>{cleanItemName || item.itemName}</h2>
           <span style={{ ...labelStyle, textTransform: "none" }}>
             SKU: {item.sku || "\u2014"} &middot; Type:{" "}
             {item.itemType || "\u2014"}
@@ -250,8 +271,8 @@ export default function ItemDetailPage({
         <div style={sectionStyle}>
           <h4 style={sectionTitleStyle}>Basic Information</h4>
           <div style={gridStyle3}>
-            {renderField("Item Code", item.itemCode)}
-            {renderField("Item Name", item.itemName)}
+            {renderField("Item Code", displayItemCode || item.itemCode)}
+            {renderField("Item Name", cleanItemName || item.itemName)}
             {renderField("SKU", item.sku || "\u2014")}
             {renderField("Description", item.description || "\u2014")}
             {renderField(
@@ -268,14 +289,24 @@ export default function ItemDetailPage({
       <FormCard title="Item Details" variant="teal-header">
         <div style={sectionStyle}>
           <h4 style={sectionTitleStyle}>Pricing</h4>
+          <p
+            style={{
+              margin: "0 0 12px 0",
+              color: colors.text.secondary,
+              fontFamily: typography.fontFamily,
+              fontSize: typography.sizes.caption.fontSize,
+            }}
+          >
+            Amounts use the system default currency: {currencyCode} ({currencyLabel})
+          </p>
           <div style={gridStyle2}>
             {renderField(
-              "Standard Cost",
-              formatCurrency(item.standardCost ?? 0),
+              `Standard Cost (${currencyCode})`,
+              formatCurrency(item.standardCost ?? 0, currencyCode),
             )}
             {renderField(
-              "Selling Price",
-              formatCurrency(item.sellingPrice ?? 0),
+              `Selling Price (${currencyCode})`,
+              formatCurrency(item.sellingPrice ?? 0, currencyCode),
             )}
             {renderField("Tax Code", item.purchaseTaxCodeName || item.purchaseTaxCodeId || "\u2014")}
           </div>
@@ -284,7 +315,7 @@ export default function ItemDetailPage({
         <div style={sectionStyle}>
           <h4 style={sectionTitleStyle}>Inventory Settings</h4>
           <div style={gridStyle2}>
-            {renderField("Low Stock Alert Level", item.reorderPoint ?? 0)}
+            {renderField("Low Stock Alert", item.reorderPoint ?? 0)}
             {renderField("VAT Applicable", item.vatApplicable ? "Yes" : "No")}
             {renderField(
               "Excise Applicable",
@@ -300,7 +331,7 @@ export default function ItemDetailPage({
           <div style={timelineItemStyle}>
             <div style={timelineDotStyle} />
             <div style={timelineContentStyle}>
-              <span style={timelineTitleStyle}>Item Updated</span>
+              <HistoryActionBadge action="UPDATED" label="Item Updated" />
               <span style={timelineDateStyle}>
                 {formatDate(item.updatedAt)}
               </span>
@@ -309,7 +340,7 @@ export default function ItemDetailPage({
           <div style={timelineItemStyle}>
             <div style={timelineDotStyle} />
             <div style={timelineContentStyle}>
-              <span style={timelineTitleStyle}>Item Created</span>
+              <HistoryActionBadge action="CREATED" label="Item Created" />
               <span style={timelineDateStyle}>
                 {formatDate(item.createdAt)}
               </span>

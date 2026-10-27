@@ -1,13 +1,13 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
+import { useAccess } from "@/lib/auth/use-access";
 
-// ----------------------------------------------------------------------------
-// Types
-// ----------------------------------------------------------------------------
 export type ActionVariant =
   | "primary"
   | "secondary"
@@ -19,18 +19,18 @@ export interface Action {
   label: string;
   icon?: React.ReactNode;
   variant?: ActionVariant;
-  onClick: () => void;
+  onClick?: () => void;
   loading?: boolean;
+  loadingLabel?: string;
   disabled?: boolean;
+  permission?: string | string[];
+  href?: string;
 }
 
 export interface ActionButtonsProps {
   actions: Action[];
 }
 
-// ----------------------------------------------------------------------------
-// Variant style mapping
-// ----------------------------------------------------------------------------
 function getButtonStyle(
   variant: ActionVariant,
   disabled: boolean,
@@ -51,58 +51,90 @@ function getButtonStyle(
   };
 
   const vs = variantStyles[variant];
+  const filled = variant !== "secondary";
   return {
     display: "inline-flex",
     alignItems: "center",
-    gap: "6px",
-    padding: "7px 16px",
-    border: vs.border ? `1px solid ${vs.border}` : "none",
+    justifyContent: "center",
+    flex: "0 0 auto",
+    width: "fit-content",
+    maxWidth: "100%",
+    height: 42,
+    minHeight: 42,
+    gap: "8px",
+    padding: "0 16px",
+    border: filled ? "1px solid transparent" : "1px solid #94a3b8",
     borderRadius: radius.components.button,
     backgroundColor: vs.bg,
     color: vs.color,
     fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.body.fontSize,
-    fontWeight: typography.weights.medium,
+    fontSize: 14,
+    fontWeight: 700,
     cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.6 : 1,
+    opacity: disabled ? 0.55 : 1,
     whiteSpace: "nowrap",
     lineHeight: "20px",
+    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.12)",
+    boxSizing: "border-box",
   };
 }
 
-// ----------------------------------------------------------------------------
-// Component
-// ----------------------------------------------------------------------------
 export default function ActionButtons({ actions }: ActionButtonsProps) {
+  const { ready, pathname, visibleActions } = useAccess();
+  const showWhileSessionLoads = !ready && pathname.includes("/create");
+  const allowed = showWhileSessionLoads ? actions : visibleActions(actions);
+  if (allowed.length === 0) return null;
+
+  const busy = allowed.some((action) => action.loading);
+
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        flexWrap: "wrap",
-      }}
-    >
-      {actions.map((action, index) => (
-        <button
-          key={index}
-          style={getButtonStyle(
-            action.variant ?? "secondary",
-            action.disabled ?? false,
-          )}
-          onClick={action.onClick}
-          disabled={action.disabled || action.loading}
-        >
-          {action.loading ? (
-            <span>Loading...</span>
-          ) : (
-            <>
-              {action.icon}
-              {action.label}
-            </>
-          )}
-        </button>
-      ))}
+    <div className="erp-action-buttons">
+      {allowed.map((action, index) => {
+        const showSpinner = Boolean(action.loading);
+        const disabled = Boolean(action.disabled || busy);
+        const content = showSpinner ? (
+          <>
+            <Loader2 size={16} className="erp-btn-spinner" aria-hidden />
+            <span>{action.loadingLabel ?? "Saving..."}</span>
+          </>
+        ) : (
+          <>
+            {action.icon}
+            {action.label}
+          </>
+        );
+
+        if (action.href) {
+          return (
+            <Link
+              key={`${action.label}-${index}`}
+              href={action.href}
+              style={{
+                ...getButtonStyle(action.variant ?? "secondary", disabled),
+                textDecoration: "none",
+                pointerEvents: disabled ? "none" : "auto",
+              }}
+              aria-disabled={disabled}
+              tabIndex={disabled ? -1 : 0}
+            >
+              {content}
+            </Link>
+          );
+        }
+
+        return (
+          <button
+            key={`${action.label}-${index}`}
+            type="button"
+            style={getButtonStyle(action.variant ?? "secondary", disabled)}
+            onClick={action.onClick}
+            disabled={disabled}
+            aria-busy={showSpinner}
+          >
+            {content}
+          </button>
+        );
+      })}
     </div>
   );
 }

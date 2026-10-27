@@ -1,21 +1,20 @@
-import { ModuleLandingPage } from "@/components/shared";
-import { navigation } from "@/lib/constants/navigation";
+import { getCurrentUser } from "@/lib/auth/auth";
+import { QCDashboardPage } from "@/features/qc/components/QCDashboard";
+import { getQcDashboard } from "@/services/qc/qc-dashboard.service";
 
-const qcItem = navigation.find((item) => item.title === "QC Tests");
+export const dynamic = "force-dynamic";
 
-export default function QCRoutePage() {
+export default async function QCRoutePage() {
+  const user = await getCurrentUser();
+  const data = await getQcDashboard({ accessibleLocationIds: user?.accessibleLocationIds });
   return (
-    <ModuleLandingPage
-      title="QC"
-      subtitle="Quality control and testing"
-      description="Open the water, microbial, preform, handle, and cap inspection screens. QC rejection and quarantine decisions can now be pushed into inventory adjustment flows through the shared integration layer."
-      links={
-        qcItem?.children?.map((child) => ({
-          title: child.title,
-          href: child.href,
-          icon: "CheckCircle2",
-        })) ?? []
-      }
+    <QCDashboardPage
+      kpis={data.kpis}
+      formCounts={data.formCounts}
+      openNonconformities={data.openNonconformities}
+      activeHolds={data.activeHolds}
+      pendingApprovals={data.pendingApprovals}
+      recentFailed={data.recentFailed}
     />
   );
 }

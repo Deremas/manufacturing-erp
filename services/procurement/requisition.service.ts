@@ -1,10 +1,12 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/procurement/routes";
 import {
   approveProcurementApproval,
+  assertCanSubmitProcurementStatus,
   normalizeProcurementStatus,
-  nextProcurementDocumentNumber,
+  resolveProcurementDocumentNumber,
   rejectProcurementApproval,
   syncProcurementApproval,
   type ProcurementStatus,
@@ -24,9 +26,10 @@ export interface PurchaseRequisitionLineInput {
 
 export interface PurchaseRequisitionSummary {
   id: string;
+  publicId: number;
   requisitionNo: string;
   requisitionDate: string;
-  departmentId: string;
+  departmentId: string | null;
   departmentName: string;
   locationId: string;
   locationName: string;
@@ -34,10 +37,12 @@ export interface PurchaseRequisitionSummary {
   requestedByName: string;
   neededByDate: string | null;
   purpose: string;
+  requestType: "INVENTORY_PURCHASE" | "MAINTENANCE_SPARE" | "ASSET_PURCHASE" | "EXTERNAL_SERVICE";
   status: ProcurementStatus;
   itemCount: number;
   estimatedTotal: number;
   remarks: string;
+  canConvert?: boolean;
 }
 
 export interface PurchaseRequisitionDetail extends PurchaseRequisitionSummary {
@@ -54,18 +59,20 @@ export interface PurchaseRequisitionDetail extends PurchaseRequisitionSummary {
     estimatedTotal: number;
     remarks: string;
   }>;
-  relatedPurchaseOrders: Array<{ id: string; poNo: string; status: string; supplierName: string; totalAmount: number }>;
+  relatedPurchaseOrders: Array<{ id: string; publicId: number; poNo: string; status: string; supplierName: string; totalAmount: number }>;
 }
 
 interface PurchaseRequisitionPayload {
   requisitionDate: string;
   requestedById: string;
-  departmentId: string;
+  departmentId?: string | null;
   locationId: string;
   neededByDate?: string | null;
   purpose: string;
+  requestType?: PurchaseRequisitionSummary["requestType"];
   remarks?: string;
   status?: ProcurementStatus;
+  requisitionNo?: string | null;
   approverId?: string | null;
   createdById: string;
   updatedById?: string | null;
@@ -80,7 +87,9 @@ function validateItems(items: PurchaseRequisitionLineInput[]) {
 
   return valid.map((item) => {
     const requestedQty = Number(item.requestedQty ?? 0);
-    const approvedQty = Number(item.approvedQty ?? requestedQty);
+    const rawApprovedQty = Number(item.approvedQty ?? 0);
+    // 0 means "not set yet" for drafts; keep requested qty only when an approved qty was provided.
+    const approvedQty = rawApprovedQty > 0 ? rawApprovedQty : 0;
     const estimatedUnitPrice = Number(item.estimatedUnitPrice ?? 0);
     return {
       ...item,
@@ -90,6 +99,15 @@ function validateItems(items: PurchaseRequisitionLineInput[]) {
       estimatedTotal: requestedQty * estimatedUnitPrice,
     };
   });
+}
+
+function validateHeader(payload: PurchaseRequisitionPayload) {
+  if (!String(payload.requisitionDate ?? "").trim()) {
+    throw new Error("PR date is required");
+  }
+  if (!String(payload.locationId ?? "").trim()) {
+    throw new Error("Receiving location is required");
+  }
 }
 
 async function writeItems(tx: Tx, requisitionId: string, items: ReturnType<typeof validateItems>) {
@@ -118,22 +136,43 @@ export async function listPurchaseRequisitions(): Promise<PurchaseRequisitionSum
     return await sql<Array<PurchaseRequisitionSummary>>`
       SELECT
         pr.id,
+        pr."publicId",
         pr."requisitionNo",
         pr."requisitionDate"::text,
         pr."departmentId",
-        d.name AS "departmentName",
+        COALESCE(d.name, '') AS "departmentName",
         pr."locationId",
         l."locationName" AS "locationName",
         pr."requestedById",
         u.name AS "requestedByName",
         pr."neededByDate"::text AS "neededByDate",
         pr.purpose,
+        pr."requestType",
         pr.status,
         COALESCE(COUNT(pri.id), 0)::int AS "itemCount",
         COALESCE(SUM(pri."estimatedTotal"), 0)::double precision AS "estimatedTotal",
-        COALESCE(pr.remarks, '') AS remarks
+        COALESCE(pr.remarks, '') AS remarks,
+        (
+          pr.status NOT IN ('CANCELLED', 'CLOSED', 'DRAFT', 'SUBMITTED', 'REJECTED')
+          AND EXISTS (
+            SELECT 1
+            FROM "PurchaseRequisitionItem" pri2
+            WHERE pri2."requisitionId" = pr.id
+              AND GREATEST(
+                COALESCE(NULLIF(pri2."approvedQty", 0), pri2."requestedQty")
+                  - COALESCE((
+                    SELECT SUM(poi."orderedQty")
+                    FROM "PurchaseOrderItem" poi
+                    INNER JOIN "PurchaseOrder" po ON po.id = poi."poId"
+                    WHERE poi."prItemId" = pri2.id
+                      AND po.status NOT IN ('CANCELLED', 'REJECTED')
+                  ), 0),
+                0
+              ) > 0
+          )
+        ) AS "canConvert"
       FROM "PurchaseRequisition" pr
-      INNER JOIN "Department" d ON d.id = pr."departmentId"
+      LEFT JOIN "Department" d ON d.id = pr."departmentId"
       INNER JOIN "Location" l ON l.id = pr."locationId"
       INNER JOIN "User" u ON u.id = pr."requestedById"
       LEFT JOIN "PurchaseRequisitionItem" pri ON pri."requisitionId" = pr.id
@@ -145,31 +184,33 @@ export async function listPurchaseRequisitions(): Promise<PurchaseRequisitionSum
   }
 }
 
-export async function getPurchaseRequisitionById(id: string): Promise<PurchaseRequisitionDetail | null> {
+export async function getPurchaseRequisitionById(key: string): Promise<PurchaseRequisitionDetail | null> {
   try {
     const rows = await sql<Array<PurchaseRequisitionSummary>>`
       SELECT
         pr.id,
+        pr."publicId",
         pr."requisitionNo",
         pr."requisitionDate"::text,
         pr."departmentId",
-        d.name AS "departmentName",
+        COALESCE(d.name, '') AS "departmentName",
         pr."locationId",
         l."locationName" AS "locationName",
         pr."requestedById",
         u.name AS "requestedByName",
         pr."neededByDate"::text AS "neededByDate",
         pr.purpose,
+        pr."requestType",
         pr.status,
         COALESCE(COUNT(pri.id), 0)::int AS "itemCount",
         COALESCE(SUM(pri."estimatedTotal"), 0)::double precision AS "estimatedTotal",
         COALESCE(pr.remarks, '') AS remarks
       FROM "PurchaseRequisition" pr
-      INNER JOIN "Department" d ON d.id = pr."departmentId"
+      LEFT JOIN "Department" d ON d.id = pr."departmentId"
       INNER JOIN "Location" l ON l.id = pr."locationId"
       INNER JOIN "User" u ON u.id = pr."requestedById"
       LEFT JOIN "PurchaseRequisitionItem" pri ON pri."requisitionId" = pr.id
-      WHERE pr.id = ${id}
+      WHERE ${isPublicIdParam(key) ? sql`pr."publicId" = ${Number(key)}` : sql`pr.id = ${key}`}
       GROUP BY pr.id, d.name, l."locationName", u.name
       LIMIT 1
     `;
@@ -193,19 +234,20 @@ export async function getPurchaseRequisitionById(id: string): Promise<PurchaseRe
         FROM "PurchaseRequisitionItem" pri
         INNER JOIN "Item" i ON i.id = pri."itemId"
         LEFT JOIN "Unit" u ON u.id = pri."uomId"
-        WHERE pri."requisitionId" = ${id}
+        WHERE pri."requisitionId" = ${header.id}
         ORDER BY i."itemCode" ASC
       `,
       sql<PurchaseRequisitionDetail["relatedPurchaseOrders"]>`
         SELECT
           po.id,
+          po."publicId",
           po."poNo",
           po.status,
           s.name AS "supplierName",
           po."totalAmount"
         FROM "PurchaseOrder" po
         INNER JOIN "Supplier" s ON s.id = po."supplierId"
-        WHERE po."prId" = ${id}
+        WHERE po."prId" = ${header.id}
         ORDER BY po."poDate" DESC
       `,
     ]);
@@ -217,27 +259,36 @@ export async function getPurchaseRequisitionById(id: string): Promise<PurchaseRe
 }
 
 export async function createPurchaseRequisition(payload: PurchaseRequisitionPayload) {
+  validateHeader(payload);
   const items = validateItems(payload.lineItems);
   const status = normalizeProcurementStatus(payload.status);
 
   return sql.begin(async (tx) => {
     const id = randomUUID();
-    const requisitionNo = await nextProcurementDocumentNumber(tx, "PR", "Purchase Requisition");
+    const requisitionNo = await resolveProcurementDocumentNumber(tx, "PR", "Purchase Requisition", payload.requisitionNo, {
+      isTaken: async (documentNo) => {
+        const rows = await tx<Array<{ id: string }>>`
+          SELECT id FROM "PurchaseRequisition" WHERE "requisitionNo" = ${documentNo} LIMIT 1
+        `;
+        return Boolean(rows[0]);
+      },
+    });
 
-    await tx`
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "PurchaseRequisition" (
         id, "requisitionNo", "requisitionDate", "requestedById", "departmentId", "locationId",
-        "neededByDate", purpose, status, remarks, "createdById", "updatedById", "createdAt", "updatedAt"
+        "neededByDate", purpose, "requestType", status, remarks, "createdById", "updatedById", "createdAt", "updatedAt"
       )
       VALUES (
         ${id},
         ${requisitionNo},
         ${new Date(payload.requisitionDate)},
         ${payload.requestedById},
-        ${payload.departmentId},
+        ${String(payload.departmentId ?? "").trim() || null},
         ${payload.locationId},
         ${payload.neededByDate ? new Date(payload.neededByDate) : null},
         ${payload.purpose},
+        ${payload.requestType ?? "INVENTORY_PURCHASE"},
         ${status},
         ${payload.remarks ?? null},
         ${payload.createdById},
@@ -245,6 +296,7 @@ export async function createPurchaseRequisition(payload: PurchaseRequisitionPayl
         NOW(),
         NOW()
       )
+      RETURNING "publicId"
     `;
 
     await writeItems(tx, id, items);
@@ -254,22 +306,23 @@ export async function createPurchaseRequisition(payload: PurchaseRequisitionPayl
       documentType: "requisition",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.pr", "CREATE", id, payload);
     await writeProcurementHistory(tx, "procurement.pr", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, requisitionNo };
+    return { id, requisitionNo, publicId: inserted[0]?.publicId };
   });
 }
 
 export async function updatePurchaseRequisition(id: string, payload: PurchaseRequisitionPayload) {
+  validateHeader(payload);
   const items = validateItems(payload.lineItems);
   const status = normalizeProcurementStatus(payload.status);
 
   return sql.begin(async (tx) => {
-    const currentRows = await tx<Array<{ status: ProcurementStatus }>>`
-      SELECT status
+    const currentRows = await tx<Array<{ status: ProcurementStatus; requisitionNo: string }>>`
+      SELECT status, "requisitionNo"
       FROM "PurchaseRequisition"
       WHERE id = ${id}
       LIMIT 1
@@ -280,15 +333,25 @@ export async function updatePurchaseRequisition(id: string, payload: PurchaseReq
       throw new Error("Converted, cancelled, or closed requisition cannot be edited");
     }
 
+    const nextNo = String(payload.requisitionNo ?? current.requisitionNo).trim() || current.requisitionNo;
+    if (nextNo !== current.requisitionNo) {
+      const clash = await tx<Array<{ id: string }>>`
+        SELECT id FROM "PurchaseRequisition" WHERE "requisitionNo" = ${nextNo} AND id <> ${id} LIMIT 1
+      `;
+      if (clash[0]) throw new Error("PR number already exists");
+    }
+
     await tx`
       UPDATE "PurchaseRequisition"
       SET
+        "requisitionNo" = ${nextNo},
         "requisitionDate" = ${new Date(payload.requisitionDate)},
         "requestedById" = ${payload.requestedById},
-        "departmentId" = ${payload.departmentId},
+        "departmentId" = ${String(payload.departmentId ?? "").trim() || null},
         "locationId" = ${payload.locationId},
         "neededByDate" = ${payload.neededByDate ? new Date(payload.neededByDate) : null},
         purpose = ${payload.purpose},
+        "requestType" = ${payload.requestType ?? "INVENTORY_PURCHASE"},
         status = ${status},
         remarks = ${payload.remarks ?? null},
         "updatedById" = ${payload.updatedById ?? payload.createdById},
@@ -304,7 +367,7 @@ export async function updatePurchaseRequisition(id: string, payload: PurchaseReq
       documentType: "requisition",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.pr", "UPDATE", id, payload);
@@ -313,18 +376,24 @@ export async function updatePurchaseRequisition(id: string, payload: PurchaseReq
   });
 }
 
-export async function approvePurchaseRequisition(id: string, userId: string) {
+export async function approvePurchaseRequisition(id: string, userId: string, comment?: string) {
   const requisition = await getPurchaseRequisitionById(id);
   if (!requisition) throw new Error("Purchase requisition not found");
-  await approveProcurementApproval("procurement.pr", id, userId);
+  await approveProcurementApproval("procurement.pr", id, userId, comment);
   await sql.begin(async (tx) => {
     await tx`
       UPDATE "PurchaseRequisition"
       SET status = 'APPROVED', "approvedById" = ${userId}, "approvedAt" = NOW(), "updatedById" = ${userId}, "updatedAt" = NOW()
       WHERE id = ${id}
     `;
-    await writeProcurementAudit(tx, userId, "procurement.pr", "APPROVE", id, { id });
-    await writeProcurementHistory(tx, "procurement.pr", id, "APPROVE", userId, requisition.requisitionNo);
+    await tx`
+      UPDATE "PurchaseRequisitionItem"
+      SET "approvedQty" = "requestedQty"
+      WHERE "requisitionId" = ${id}
+        AND COALESCE("approvedQty", 0) < "requestedQty"
+    `;
+    await writeProcurementAudit(tx, userId, "procurement.pr", "APPROVE", id, { id, comment });
+    await writeProcurementHistory(tx, "procurement.pr", id, "APPROVE", userId, comment ?? requisition.requisitionNo);
   });
   return { id };
 }
@@ -366,6 +435,35 @@ export async function cancelPurchaseRequisition(id: string, userId: string) {
     });
     await writeProcurementAudit(tx, userId, "procurement.pr", "CANCEL", id, { id });
     await writeProcurementHistory(tx, "procurement.pr", id, "CANCEL", userId, requisition.requisitionNo);
+  });
+  return { id };
+}
+
+export async function submitPurchaseRequisition(
+  id: string,
+  userId: string,
+  input?: { approverId?: string; comment?: string },
+) {
+  const requisition = await getPurchaseRequisitionById(id);
+  if (!requisition) throw new Error("Purchase requisition not found");
+  assertCanSubmitProcurementStatus(requisition.status);
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE "PurchaseRequisition"
+      SET status = 'SUBMITTED', "updatedById" = ${userId}, "updatedAt" = NOW()
+      WHERE id = ${id}
+    `;
+    await syncProcurementApproval(tx, {
+      referenceType: "procurement.pr",
+      referenceId: id,
+      documentType: "requisition",
+      status: "SUBMITTED",
+      requestedById: requisition.requestedById || userId,
+      assignedApproverId: null,
+      comment: input?.comment,
+    });
+    await writeProcurementAudit(tx, userId, "procurement.pr", "SUBMIT", id, { id, ...input });
+    await writeProcurementHistory(tx, "procurement.pr", id, "SUBMIT", userId, input?.comment ?? requisition.requisitionNo);
   });
   return { id };
 }

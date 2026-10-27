@@ -1,10 +1,7 @@
 import type { Column } from "@/components/shared";
 import { AccountsPayableListPage } from "@/features/procurement/ap-pages";
+import { formatMoney } from "@/lib/utils/format-number";
 import { listSupplierPayments } from "@/services/procurement/supplier-payment.service";
-
-function formatMoney(value: string | number) {
-  return Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export default async function SupplierPaymentsPage() {
   const payments = await listSupplierPayments();
@@ -31,9 +28,12 @@ export default async function SupplierPaymentsPage() {
       ]}
       createHref="/procurement/payments/create"
       baseHref="/procurement/payments"
+      apiBasePath="/api/procurement/payments"
+      kind="payment"
       columns={columns}
       rows={payments.map((payment) => ({
         id: payment.id,
+        publicId: payment.publicId,
         paymentNo: payment.paymentNo,
         paymentDate: new Date(payment.paymentDate).toLocaleDateString("en-KE"),
         supplierName: payment.supplierName,

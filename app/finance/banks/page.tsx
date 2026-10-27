@@ -1,18 +1,11 @@
-"use client";
+import BankMovementPage from "@/features/finance/BankMovementPage";
+import { requireAuth } from "@/lib/auth/auth";
+import { getBankMovementReport } from "@/services/accounting/accounting.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function BankAccountsPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Bank Accounts"
-        subtitle="Manage finance bank accounts"
-      />
-      <EmptyState title="Bank Accounts" message="Module coming soon." />
-    </div>
-  );
+export default async function FinanceBanksPage() {
+  await requireAuth();
+  const report = await getBankMovementReport();
+  return <BankMovementPage report={report} />;
 }

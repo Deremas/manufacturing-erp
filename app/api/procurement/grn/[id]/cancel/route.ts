@@ -5,5 +5,5 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return withGoodsReceiptAction(async (userId) => cancelReceipt(id, userId));
+  return withGoodsReceiptAction(async (userId) => cancelReceipt(id, userId), "procurement.grn.cancel");
 }

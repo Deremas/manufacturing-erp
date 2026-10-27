@@ -1,0 +1,1 @@
+export { default } from "@/app/production/cost-reports/daily-summary/page";

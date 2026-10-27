@@ -1,9 +1,11 @@
+import { readProcurementActionBody } from "@/app/api/procurement/helpers";
 import { approveReceipt, withGoodsReceiptAction } from "@/app/api/procurement/grn/helpers";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return withGoodsReceiptAction(async (userId) => approveReceipt(id, userId));
+  const { comment } = await readProcurementActionBody(request);
+  return withGoodsReceiptAction(async (userId) => approveReceipt(id, userId, comment), "procurement.grn.approve");
 }

@@ -161,6 +161,7 @@ export default function ItemTypeDetailPage({
       }}
     >
       <PageHeader
+        recordKind="md.item-type"
         title={itemType.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

@@ -6,5 +6,5 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return withProcurementAction(async (userId) => cancelOrder(id, userId));
+  return withProcurementAction(async (userId) => cancelOrder(id, userId), "procurement.po.cancel");
 }

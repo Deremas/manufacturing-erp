@@ -1,7 +1,5 @@
 import { ModuleLandingPage } from "@/components/shared";
-import { navigation } from "@/lib/constants/navigation";
-
-const procurementItem = navigation.find((item) => item.title === "Procurement");
+import { getModuleReportLinks } from "@/services/reports/report-access.service";
 
 export default function ProcurementRoutePage() {
   return (
@@ -9,13 +7,22 @@ export default function ProcurementRoutePage() {
       title="Procurement"
       subtitle="Purchasing and supplier workflow"
       description="Jump into purchase requisitions, purchase orders, GRN, supplier invoices, payments, performance tracking, and commitment registers. Inventory receipt/return posting hooks are now available for GRN and supplier return workflows."
-      links={
-        procurementItem?.children?.map((child) => ({
-          title: child.title,
-          href: child.href,
-          icon: "ShoppingCart",
-        })) ?? []
-      }
+      links={[]}
+      reportLinks={getModuleReportLinks("procurement")}
+      sections={[
+        {
+          title: "Operations",
+          description: "Daily commercial and supplier documents.",
+          links: [
+            { title: "Purchase Requisitions", href: "/procurement/requisitions", icon: "ShoppingCart" },
+            { title: "Purchase Orders", href: "/procurement/purchase-orders", icon: "ShoppingCart" },
+            { title: "Goods Receipts / GRN", href: "/procurement/grn", icon: "ShoppingCart" },
+            { title: "Supplier Returns", href: "/procurement/supplier-returns", icon: "ShoppingCart" },
+            { title: "Supplier Invoices", href: "/procurement/supplier-invoices", icon: "ShoppingCart" },
+            { title: "Supplier Payments", href: "/procurement/payments", icon: "ShoppingCart" },
+          ],
+        },
+      ]}
     />
   );
 }

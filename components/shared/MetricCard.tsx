@@ -57,6 +57,8 @@ const valueRowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "baseline",
   gap: "8px",
+  flexWrap: "wrap",
+  minWidth: 0,
 };
 
 const valueStyle = (color?: string): React.CSSProperties => ({
@@ -66,6 +68,9 @@ const valueStyle = (color?: string): React.CSSProperties => ({
   fontWeight: typography.weights.bold,
   color: color ?? colors.text.primary,
   margin: 0,
+  maxWidth: "100%",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
 });
 
 const trendStyle = (direction: TrendDirection): React.CSSProperties => ({

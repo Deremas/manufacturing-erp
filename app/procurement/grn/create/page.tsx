@@ -2,10 +2,10 @@ import { getGrnReferenceData } from "@/app/procurement/_lib/grn-reference-data";
 import { GoodsReceiptEditor } from "@/features/procurement/grn/grn-pages";
 
 export default async function CreateGoodsReceiptPage(
-  { searchParams }: { searchParams: Promise<{ poId?: string }> },
+  { searchParams }: { searchParams: Promise<{ poPublicId?: string }> },
 ) {
-  const { poId } = await searchParams;
-  const referenceData = await getGrnReferenceData(poId);
+  const { poPublicId } = await searchParams;
+  const referenceData = await getGrnReferenceData(poPublicId);
 
   return (
     <GoodsReceiptEditor
@@ -49,6 +49,7 @@ export default async function CreateGoodsReceiptPage(
           unitCost: item.unitCost,
           taxAmount: item.taxAmount,
           remarks: "",
+          receiptType: item.receiptType,
         })),
       }}
     />

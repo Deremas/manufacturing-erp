@@ -95,12 +95,13 @@ export async function getShiftDowntimeReport() {
         ss."productionDate"::text AS "productionDate",
         ss."sessionNo",
         ss."shiftCode",
-        pd.machine,
+        CASE WHEN a.id IS NULL THEN NULL ELSE a."assetCode" || ' - ' || a."assetName" END AS machine,
         pd.reason::text AS reason,
         pd."durationMinutes",
         pd.remarks
       FROM "ProductionDowntime" pd
       INNER JOIN "ShiftSession" ss ON ss.id = pd."shiftSessionId"
+      LEFT JOIN "Asset" a ON a.id = pd."assetId"
       ORDER BY ss."productionDate" DESC, pd."createdAt" DESC
     `;
   } catch {

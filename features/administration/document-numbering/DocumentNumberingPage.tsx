@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { publicEditUrl } from "@/lib/routing/urls";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -27,6 +28,7 @@ import { Eye, Pencil, FileDigit } from "lucide-react";
 // ----------------------------------------------------------------------------
 interface DocNumberingConfig {
   id: string;
+  publicId: number;
   module: string;
   documentType: string;
   prefix: string;
@@ -157,14 +159,9 @@ export default function DocumentNumberingPage({
 
   const tableActions: TableAction[] = [
     {
-      label: "View",
-      icon: <Eye size={16} />,
-      onClick: (record) => console.log("View", record.id),
-    },
-    {
       label: "Edit",
       icon: <Pencil size={16} />,
-      onClick: (record) => console.log("Edit", record.id),
+      onClick: (record) => router.push(publicEditUrl("administration.docnum", (record as { publicId: number }).publicId)),
     },
   ];
 
@@ -175,7 +172,7 @@ export default function DocumentNumberingPage({
       message="There are no document numbering configurations. Create one to get started."
       action={{
         label: "Create Configuration",
-        onClick: () => console.log("Create"),
+        onClick: () => router.push("/administration/document-numbering/create"),
       }}
     />
   );
@@ -184,13 +181,12 @@ export default function DocumentNumberingPage({
     {
       label: "Create Configuration",
       variant: "primary",
-      onClick: () => router.push(window.location.pathname + "/create"),
+      onClick: () => router.push("/administration/document-numbering/create"),
     },
   ];
 
-  const handleFilter = (values: Record<string, string>) =>
-    console.log("Filter", values);
-  const handleReset = () => console.log("Reset");
+  const handleFilter = (_values: Record<string, string>) => undefined;
+  const handleReset = () => undefined;
 
   return (
     <div style={pageStyle}>

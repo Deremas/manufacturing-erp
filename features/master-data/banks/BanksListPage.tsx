@@ -15,6 +15,7 @@ import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { Eye, Pencil, Trash2, Landmark } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface BanksListPageProps {
   initialData?: Bank[];
@@ -29,7 +30,7 @@ export default function BanksListPage({ initialData = [] }: BanksListPageProps) 
     { label: "Banks" },
   ];
 
-  const handleCreate = () => router.push(window.location.pathname + "/create");
+  const handleCreate = () => router.push("/master-data/banks/create");
 
   const columns: Column<Bank>[] = [
     { key: "name", label: "Name", sortable: true },
@@ -45,13 +46,13 @@ export default function BanksListPage({ initialData = [] }: BanksListPageProps) 
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(window.location.pathname + "/" + record.id),
+      onClick: (record) => router.push(publicViewUrl("master-data.bank", record.publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
       onClick: (record) =>
-        router.push(window.location.pathname + "/" + record.id + "/edit"),
+        router.push(publicEditUrl("master-data.bank", record.publicId)),
     },
     {
       label: "Delete",

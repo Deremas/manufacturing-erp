@@ -1,6 +1,9 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { allocateNextDocumentNumber } from "@/lib/document-numbering";
+import { formatItemOptionLabel } from "@/lib/server/item-data";
+import { formatUomLabel } from "@/lib/unit-display";
 
 export type Tx = typeof sql;
 
@@ -24,6 +27,7 @@ export interface ItemLookupOption extends SelectOption {
   itemCode: string;
   itemName: string;
   uomId: string | null;
+  uomCode?: string | null;
   uomName: string | null;
   standardCost: number;
   itemTypeCode: string | null;
@@ -86,61 +90,7 @@ export function normalizeHoldStatus(value?: string): HoldWorkflowStatus {
 }
 
 export async function nextProductionDocumentNumber(tx: Tx, prefix: string, description: string) {
-  await tx`
-    INSERT INTO "DocumentNumbering" (
-      id, prefix, description, "prefixFormat", separator,
-      "yearFormat", "monthFormat", "dayFormat", "sequenceLength",
-      "currentSequence", "isActive", "isArchived"
-    )
-    VALUES (
-      ${`docnum-${prefix.toLowerCase()}`},
-      ${prefix},
-      ${description},
-      'PREFIX_YEAR',
-      '-',
-      'YYYY',
-      'MM',
-      'DD',
-      4,
-      0,
-      true,
-      false
-    )
-    ON CONFLICT ("prefix") DO NOTHING
-  `;
-
-  const rows = await tx<Array<{
-    id: string;
-    prefix: string;
-    separator: string;
-    yearFormat: string;
-    sequenceLength: number;
-    currentSequence: number;
-  }>>`
-    SELECT id, prefix, separator, "yearFormat", "sequenceLength", "currentSequence"
-    FROM "DocumentNumbering"
-    WHERE prefix = ${prefix}
-    LIMIT 1
-    FOR UPDATE
-  `;
-
-  const config = rows[0];
-  if (!config) {
-    throw new Error(`Document numbering config missing for ${prefix}`);
-  }
-
-  const nextSequence = Number(config.currentSequence ?? 0) + 1;
-  await tx`
-    UPDATE "DocumentNumbering"
-    SET "currentSequence" = ${nextSequence}
-    WHERE id = ${config.id}
-  `;
-
-  const year = config.yearFormat === "YY"
-    ? new Date().getFullYear().toString().slice(-2)
-    : new Date().getFullYear().toString();
-
-  return `${config.prefix}${config.separator}${year}${config.separator}${String(nextSequence).padStart(config.sequenceLength, "0")}`;
+  return allocateNextDocumentNumber(tx, prefix, description);
 }
 
 export async function writeProductionAudit(
@@ -217,6 +167,24 @@ export async function listStoreLocations() {
   `;
 }
 
+export async function listUnits() {
+  const rows = await sql<Array<{ value: string; code: string | null; name: string; abbreviation: string }>>`
+    SELECT id AS value, code, name, abbreviation
+    FROM "Unit"
+    WHERE "isArchived" = false
+      AND "isActive" = true
+    ORDER BY name ASC
+  `;
+  return rows.map((row) => ({
+    value: row.value,
+    label: formatUomLabel({
+      uomCode: row.code || row.abbreviation,
+      uomName: row.name,
+      abbreviation: row.abbreviation,
+    }),
+  }));
+}
+
 export async function listUsers() {
   return sql<Array<SelectOption>>`
     SELECT id AS value, name AS label
@@ -228,13 +196,14 @@ export async function listUsers() {
 }
 
 export async function listFinishedGoods() {
-  return sql<Array<ItemLookupOption>>`
+  const rows = await sql<Array<ItemLookupOption>>`
     SELECT
       i.id AS value,
       CONCAT(i."itemCode", ' - ', i."itemName") AS label,
       i."itemCode",
       i."itemName",
       i."uomId",
+      u.code AS "uomCode",
       u.name AS "uomName",
       COALESCE(i."standardCost", 0) AS "standardCost",
       it.code AS "itemTypeCode",
@@ -251,16 +220,22 @@ export async function listFinishedGoods() {
       )
     ORDER BY i."itemCode" ASC
   `;
+  return rows.map((row) => ({
+    ...row,
+    label: formatItemOptionLabel(row),
+    uomName: formatUomLabel({ uomCode: row.uomCode, uomName: row.uomName }),
+  }));
 }
 
 export async function listProductionComponents() {
-  return sql<Array<ItemLookupOption>>`
+  const rows = await sql<Array<ItemLookupOption>>`
     SELECT
       i.id AS value,
       CONCAT(i."itemCode", ' - ', i."itemName") AS label,
       i."itemCode",
       i."itemName",
       i."uomId",
+      u.code AS "uomCode",
       u.name AS "uomName",
       COALESCE(i."standardCost", 0) AS "standardCost",
       it.code AS "itemTypeCode",
@@ -271,15 +246,22 @@ export async function listProductionComponents() {
     WHERE i."isArchived" = false
       AND i."isActive" = true
       AND (
-        UPPER(COALESCE(it.code, '')) IN ('RAW', 'PACK', 'CONSUMABLE', 'RM', 'PM')
+        UPPER(COALESCE(it.code, '')) IN ('RAW', 'PACK', 'CONSUMABLE', 'RM', 'PM', 'ING', 'INGREDIENT')
         OR UPPER(COALESCE(it.name, '')) LIKE '%RAW%'
         OR UPPER(COALESCE(it.name, '')) LIKE '%PACK%'
         OR UPPER(COALESCE(it.name, '')) LIKE '%CONSUMABLE%'
+        OR UPPER(COALESCE(it.name, '')) LIKE '%INGREDIENT%'
         OR UPPER(COALESCE(i."itemCode", '')) LIKE 'RAW%'
         OR UPPER(COALESCE(i."itemCode", '')) LIKE 'PACK%'
+        OR UPPER(COALESCE(i."itemCode", '')) LIKE 'ING%'
       )
     ORDER BY i."itemCode" ASC
   `;
+  return rows.map((row) => ({
+    ...row,
+    label: formatItemOptionLabel(row),
+    uomName: formatUomLabel({ uomCode: row.uomCode, uomName: row.uomName }),
+  }));
 }
 
 export async function getItemLookup(itemId: string) {
@@ -290,6 +272,7 @@ export async function getItemLookup(itemId: string) {
       i."itemCode",
       i."itemName",
       i."uomId",
+      u.code AS "uomCode",
       u.name AS "uomName",
       COALESCE(i."standardCost", 0) AS "standardCost",
       it.code AS "itemTypeCode",
@@ -301,7 +284,12 @@ export async function getItemLookup(itemId: string) {
       AND i."isArchived" = false
     LIMIT 1
   `;
-  return rows[0] ?? null;
+  return rows[0]
+    ? {
+        ...rows[0],
+        uomName: formatUomLabel({ uomCode: rows[0].uomCode, uomName: rows[0].uomName }),
+      }
+    : null;
 }
 
 export async function getShiftDefinitions(): Promise<ShiftDefinition[]> {

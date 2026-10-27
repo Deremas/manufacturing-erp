@@ -1,8 +1,6 @@
-// services/audit/auditLog.ts
-// Audit Log Service for NEW ERP
-// Tracks user actions across the system for compliance and traceability.
+import { randomUUID } from "node:crypto";
 
-// ─── Enums ───────────────────────────────────────────────────────────────────
+import { sql } from "@/lib/db";
 
 export enum AuditAction {
   CREATE = "CREATE",
@@ -17,8 +15,6 @@ export enum AuditAction {
   LOGOUT = "LOGOUT",
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 export interface AuditLog {
   id: string;
   userId: string;
@@ -30,7 +26,7 @@ export interface AuditLog {
   newValue?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
-  timestamp: string; // ISO 8601
+  timestamp: string;
 }
 
 export interface CreateAuditLogInput {
@@ -56,102 +52,117 @@ export interface AuditLogQuery {
   offset?: number;
 }
 
-// ─── In-memory store (placeholder) ───────────────────────────────────────────
-// In production this would be persisted to a database.
+type AuditLogRow = {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  module: string;
+  recordId: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  timestamp: Date;
+};
 
-const auditLogs: AuditLog[] = [];
-let idCounter = 0;
-
-function nextId(): string {
-  idCounter += 1;
-  return `audit-${Date.now()}-${idCounter}`;
+function parseJsonRecord(value: string | null) {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
+function mapAuditLogRow(row: AuditLogRow): AuditLog {
+  return {
+    id: row.id,
+    userId: row.userId,
+    userName: row.userName,
+    action: row.action as AuditAction,
+    module: row.module,
+    recordId: row.recordId ?? "",
+    oldValue: parseJsonRecord(row.oldValue),
+    newValue: parseJsonRecord(row.newValue),
+    ipAddress: row.ipAddress ?? undefined,
+    userAgent: row.userAgent ?? undefined,
+    timestamp: row.timestamp.toISOString(),
+  };
+}
 
-/**
- * Create a new audit log entry.
- */
 export async function createAuditLog(
   data: CreateAuditLogInput,
 ): Promise<AuditLog> {
-  const entry: AuditLog = {
-    id: nextId(),
-    userId: data.userId,
+  const rows = await sql<AuditLogRow[]>`
+    INSERT INTO "AuditLog" (
+      id,
+      "userId",
+      action,
+      module,
+      "recordId",
+      "oldValue",
+      "newValue",
+      "ipAddress",
+      "userAgent",
+      "timestamp",
+      "isArchived"
+    )
+    VALUES (
+      ${randomUUID()},
+      ${data.userId},
+      ${data.action},
+      ${data.module},
+      ${data.recordId || null},
+      ${data.oldValue ? JSON.stringify(data.oldValue) : null},
+      ${data.newValue ? JSON.stringify(data.newValue) : null},
+      ${data.ipAddress ?? null},
+      ${data.userAgent ?? null},
+      NOW(),
+      false
+    )
+    RETURNING id, "userId", ''::text AS "userName", action, module, "recordId", "oldValue", "newValue", "ipAddress", "userAgent", "timestamp"
+  `;
+
+  return {
+    ...mapAuditLogRow(rows[0]),
     userName: data.userName,
-    action: data.action,
-    module: data.module,
-    recordId: data.recordId,
-    oldValue: data.oldValue,
-    newValue: data.newValue,
-    ipAddress: data.ipAddress,
-    userAgent: data.userAgent,
-    timestamp: new Date().toISOString(),
   };
-
-  auditLogs.push(entry);
-
-  // TODO: Persist to database
-  // e.g. await db.auditLog.create({ data: entry })
-
-  return entry;
 }
 
-/**
- * Query audit logs with optional filters.
- * Returns logs sorted newest-first.
- */
 export async function getAuditLogs(
   filters?: AuditLogQuery,
 ): Promise<AuditLog[]> {
-  let results = [...auditLogs];
+  const rows = await sql<AuditLogRow[]>`
+    SELECT
+      a.id,
+      a."userId",
+      COALESCE(u.name, u.email, '') AS "userName",
+      a.action,
+      a.module,
+      a."recordId",
+      a."oldValue",
+      a."newValue",
+      a."ipAddress",
+      a."userAgent",
+      a."timestamp"
+    FROM "AuditLog" a
+    LEFT JOIN "User" u ON u.id = a."userId"
+    WHERE a."isArchived" = false
+      AND (${filters?.module ?? null}::text IS NULL OR a.module = ${filters?.module ?? null})
+      AND (${filters?.recordId ?? null}::text IS NULL OR a."recordId" = ${filters?.recordId ?? null})
+      AND (${filters?.userId ?? null}::text IS NULL OR a."userId" = ${filters?.userId ?? null})
+      AND (${filters?.action ?? null}::text IS NULL OR a.action = ${filters?.action ?? null})
+      AND (${filters?.dateFrom ?? null}::timestamptz IS NULL OR a."timestamp" >= ${filters?.dateFrom ?? null})
+      AND (${filters?.dateTo ?? null}::timestamptz IS NULL OR a."timestamp" <= ${filters?.dateTo ?? null})
+    ORDER BY a."timestamp" DESC
+    LIMIT ${filters?.limit ?? 500}
+    OFFSET ${filters?.offset ?? 0}
+  `;
 
-  if (filters?.module) {
-    results = results.filter((l) => l.module === filters.module);
-  }
-
-  if (filters?.recordId) {
-    results = results.filter((l) => l.recordId === filters.recordId);
-  }
-
-  if (filters?.userId) {
-    results = results.filter((l) => l.userId === filters.userId);
-  }
-
-  if (filters?.action) {
-    results = results.filter((l) => l.action === filters.action);
-  }
-
-  if (filters?.dateFrom) {
-    const from = filters.dateFrom.getTime();
-    results = results.filter((l) => new Date(l.timestamp).getTime() >= from);
-  }
-
-  if (filters?.dateTo) {
-    const to = filters.dateTo.getTime();
-    results = results.filter((l) => new Date(l.timestamp).getTime() <= to);
-  }
-
-  // Sort newest-first
-  results.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
-
-  // Pagination
-  if (filters?.offset) {
-    results = results.slice(filters.offset);
-  }
-
-  if (filters?.limit) {
-    results = results.slice(0, filters.limit);
-  }
-
-  return results;
+  return rows.map(mapAuditLogRow);
 }
 
-/**
- * Shorthand to query logs for a specific module and record.
- */
 export async function getAuditLogsForRecord(
   module: string,
   recordId: string,

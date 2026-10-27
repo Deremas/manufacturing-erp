@@ -6,6 +6,7 @@ import {
   getSupplierInvoicePrefill,
   listSupplierInvoices,
   rejectSupplierInvoice,
+  submitSupplierInvoice,
   updateSupplierInvoice,
 } from "@/services/procurement/supplier-invoice.service";
 
@@ -23,6 +24,7 @@ export async function createInvoice(body: Record<string, unknown>, userId: strin
     grnId: body.grnId ? String(body.grnId) : null,
     remarks: String(body.remarks ?? ""),
     status: body.status as never,
+    approverId: body.approverId ? String(body.approverId) : undefined,
     recordedById: userId,
     lineItems: Array.isArray(body.lineItems) ? body.lineItems as never[] : [],
   });
@@ -38,6 +40,7 @@ export async function updateInvoice(id: string, body: Record<string, unknown>, u
     grnId: body.grnId ? String(body.grnId) : null,
     remarks: String(body.remarks ?? ""),
     status: body.status as never,
+    approverId: body.approverId ? String(body.approverId) : undefined,
     recordedById: userId,
     lineItems: Array.isArray(body.lineItems) ? body.lineItems as never[] : [],
   });
@@ -45,4 +48,5 @@ export async function updateInvoice(id: string, body: Record<string, unknown>, u
 
 export const approveInvoice = approveSupplierInvoice;
 export const rejectInvoice = rejectSupplierInvoice;
+export const submitInvoice = submitSupplierInvoice;
 export const cancelInvoice = cancelSupplierInvoice;

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -22,16 +23,7 @@ import type { User } from "../types";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { typography } from "@/components/ui/typography";
-import {
-  Eye,
-  Pencil,
-  Trash2,
-  KeyRound,
-  Users,
-  UserCheck,
-  UserX,
-  Shield,
-} from "lucide-react";
+import { Eye, Pencil, Trash2, Users, UserCheck, UserX, Shield } from "lucide-react";
 
 export interface UsersListPageProps {
   initialData?: User[];
@@ -171,13 +163,13 @@ export default function UsersListPage({
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(`/administration/users/${record.id}`),
+      onClick: (record) => router.push(publicViewUrl("administration.user", (record as { publicId: number }).publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
       onClick: (record) =>
-        router.push(`/administration/users/${record.id}/edit`),
+        router.push(publicEditUrl("administration.user", (record as { publicId: number }).publicId)),
     },
     {
       label: "Delete",
@@ -219,11 +211,6 @@ export default function UsersListPage({
         window.alert(payload?.error ?? "Failed to delete user");
       },
     },
-    {
-      label: "Reset Password",
-      icon: <KeyRound size={16} />,
-      onClick: (record) => console.log("Reset password", record.id),
-    },
   ];
 
   const emptyState = (
@@ -246,13 +233,9 @@ export default function UsersListPage({
     },
   ];
 
-  const handleFilter = (values: Record<string, string>) => {
-    console.log("Filter values", values);
-  };
+  const handleFilter = (_values: Record<string, string>) => undefined;
 
-  const handleReset = () => {
-    console.log("Filters reset");
-  };
+  const handleReset = () => undefined;
 
   return (
     <div style={pageStyle}>

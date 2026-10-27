@@ -162,6 +162,9 @@ export async function approve(
   if (approval.assignedApproverId && approval.assignedApproverId !== userId) {
     throw new Error(`User "${userId}" is not the assigned approver for "${approvalId}"`);
   }
+  if (approval.requestedById === userId) {
+    throw new Error("Segregation of duties: requestor cannot approve their own request");
+  }
 
   await sql`
     UPDATE "Approval"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/layout";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import ToastHost from "@/components/shared/ToastHost";
 
 export const metadata: Metadata = {
   title: "NEW ERP",
@@ -14,10 +15,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <AppShell>{children}</AppShell>
+          <ToastHost />
         </AuthProvider>
       </body>
     </html>

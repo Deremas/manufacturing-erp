@@ -11,6 +11,7 @@ import { spacing } from "@/components/ui/spacing";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
 import { Shield, Save, X } from "lucide-react";
+import { publicViewUrlFromPayload } from "@/lib/routing/urls";
 
 export interface RoleFormPageProps {
   initialData?: Role | null;
@@ -40,7 +41,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -108,6 +109,7 @@ export default function RoleFormPage({
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [status, setStatus] = useState(initialData?.isActive !== false ? "active" : "inactive");
   const [permissions, setPermissions] = useState<string[]>(initialData?.permissions ?? []);
+  const [permissionSearch, setPermissionSearch] = useState("");
   const [saving, setSaving] = useState(false);
 
   const breadcrumbs: Breadcrumb[] = [
@@ -121,6 +123,12 @@ export default function RoleFormPage({
     setPermissions((prev) =>
       prev.includes(perm) ? prev.filter((item) => item !== perm) : [...prev, perm],
     );
+  };
+  const toggleModule = (keys: string[]) => {
+    if (isSystemRole) return;
+    setPermissions((current) => keys.every((key) => current.includes(key))
+      ? current.filter((key) => !keys.includes(key))
+      : Array.from(new Set([...current, ...keys])));
   };
 
   const handleSave = async () => {
@@ -138,7 +146,16 @@ export default function RoleFormPage({
       if (!response.ok) {
         throw new Error("Failed to save role");
       }
-      router.push("/administration/roles");
+      const result = (await response.json().catch(() => null)) as
+        | { publicId?: number }
+        | null;
+      router.push(
+        publicViewUrlFromPayload(
+          "administration.role",
+          { publicId: result?.publicId ?? initialData?.publicId },
+          "/administration/roles",
+        ),
+      );
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -226,9 +243,10 @@ export default function RoleFormPage({
         icon={<Shield size={18} />}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {permissionGroups.map((group) => (
+          <input value={permissionSearch} onChange={(event) => setPermissionSearch(event.target.value)} placeholder="Search module, resource, action, or label" style={inputStyle} />
+          {permissionGroups.map((group) => ({ ...group, permissions: group.permissions.filter((permission) => `${group.label} ${permission.action} ${permission.label}`.toLowerCase().includes(permissionSearch.toLowerCase())) })).filter((group) => group.permissions.length > 0).map((group) => (
             <div key={group.module} style={moduleGroupStyle}>
-              <div style={moduleHeaderStyle}>{group.label}</div>
+              <div style={{ ...moduleHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>{group.label}</span><button type="button" disabled={isSystemRole} onClick={() => toggleModule(group.permissions.map((permission) => `${permission.module}.${permission.action}`))} style={{ border: 0, background: "transparent", color: colors.primary[700], fontWeight: 700 }}>Select / clear module</button></div>
               <div style={moduleBodyStyle}>
                 {group.permissions.map((permission) => {
                   const key = `${permission.module}.${permission.action}`;

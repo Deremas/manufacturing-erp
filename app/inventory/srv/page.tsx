@@ -1,33 +1,26 @@
-import { InventoryDocumentListPage } from "@/features/inventory/live/document-pages";
-import { listRequisitions } from "@/services/inventory/inventory-documents.service";
+export const dynamic = "force-dynamic";
 
-export default async function StoreRequisitionsRoute() {
-  const requisitions = await listRequisitions();
+import { formatItemOptionLabel, getItemRows } from "@/lib/server/item-data";
+import SrvCardPage from "@/features/inventory/srv-card/SrvCardPage";
+
+export default async function SrvCardRoute() {
+  const items = await getItemRows();
 
   return (
-    <InventoryDocumentListPage
-      title="Store Requisitions"
-      subtitle="Approve internal inventory requests before they become posted stock issues."
-      breadcrumbs={[
-        { label: "Inventory", href: "/inventory" },
-        { label: "Store Requisitions" },
-      ]}
-      createHref="/inventory/srv/create"
-      rows={requisitions.map((requisition) => ({
-        id: requisition.id,
-        number: requisition.requisitionNo,
-        date: requisition.requisitionDate,
-        status: requisition.status,
-        itemCount: requisition.itemCount,
-        primaryText: requisition.toDepartmentName ?? requisition.toLocationName ?? "Unassigned",
-        secondaryText: requisition.fromLocationName ?? "-",
-        ownerText: requisition.requestedByName,
-      }))}
-      searchPlaceholder="Search requisition number, destination, requester, or status..."
-      primaryColumnLabel="Destination"
-      secondaryColumnLabel="From Location"
-      ownerColumnLabel="Requested By"
-      baseHref="/inventory/srv"
+    <SrvCardPage
+      items={items
+        .filter((item) => item.isActive !== false)
+        .map((item) => ({
+          value: item.id,
+          label: formatItemOptionLabel(item),
+          group: item.itemTypeName || item.itemType || item.categoryName || "Other",
+        }))
+        .sort((a, b) => {
+          const byGroup = a.group.localeCompare(b.group, undefined, { sensitivity: "base" });
+          return byGroup !== 0
+            ? byGroup
+            : a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+        })}
     />
   );
 }

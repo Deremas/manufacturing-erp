@@ -5,6 +5,7 @@ import {
   postProductionMaterialIssueDocument,
   postProductionMaterialReturnDocument,
 } from "@/services/inventory/module-integration.service";
+import { postStockMovement } from "@/services/inventory/inventory-posting.service";
 import {
   nextProductionDocumentNumber,
   normalizeProductionStatus,
@@ -19,6 +20,10 @@ export interface ProductionIssueItemInput {
   requestedQty?: number;
   issuedQty: number;
   unitCost: number;
+  sourceLotNo?: string;
+  supplierBatchNo?: string;
+  serialNo?: string;
+  expiryDate?: string | null;
   remarks?: string;
 }
 
@@ -105,7 +110,8 @@ async function writeIssueItems(tx: Tx, issueId: string, items: ProductionIssueIt
   for (const item of items) {
     await tx`
       INSERT INTO "ProductionMaterialIssueItem" (
-        id, "issueId", "itemId", "uomId", "requestedQty", "issuedQty", "unitCost", remarks
+        id, "issueId", "itemId", "uomId", "requestedQty", "issuedQty", "unitCost",
+        "sourceLotNo", "supplierBatchNo", "serialNo", "expiryDate", remarks
       )
       VALUES (
         ${randomUUID()},
@@ -115,6 +121,10 @@ async function writeIssueItems(tx: Tx, issueId: string, items: ProductionIssueIt
         ${Number(item.requestedQty ?? item.issuedQty)},
         ${Number(item.issuedQty)},
         ${Number(item.unitCost ?? 0)},
+        ${item.sourceLotNo?.trim() || null},
+        ${item.supplierBatchNo?.trim() || null},
+        ${item.serialNo?.trim() || null},
+        ${item.expiryDate ? new Date(item.expiryDate) : null},
         ${item.remarks ?? null}
       )
     `;
@@ -314,5 +324,156 @@ export async function postProductionMaterialReturn(id: string, userId: string) {
     await writeProductionAudit(tx, userId, "production.material-return", "POST", id, { id });
     await writeProductionHistory(tx, "production.material-return", id, "POST", userId, returnDoc.returnNo);
     return { id };
+  });
+}
+
+const INVENTORY_ISSUE_REMARK = "inventory-issue:";
+
+function inventoryIssueRemark(stockIssueId: string) {
+  return `${INVENTORY_ISSUE_REMARK}${stockIssueId}`;
+}
+
+export async function receiveInventoryIssueOnShift(input: {
+  shiftSessionId: string;
+  stockIssueId: string;
+  userId: string;
+}) {
+  const stockIssueId = input.stockIssueId.trim();
+  if (!stockIssueId) throw new Error("Choose a posted stock issue to receive.");
+
+  return sql.begin(async (tx) => {
+    const headers = await tx<Array<{
+      id: string;
+      issueNo: string;
+      status: string;
+      storeLocationId: string;
+      issuedToType: string;
+      issuedToId: string;
+      purpose: string;
+      remarks: string;
+      departmentName: string | null;
+      shiftStatus: string;
+      factoryLocationId: string;
+      sessionNo: string;
+    }>>`
+      SELECT
+        si.id,
+        si."issueNo",
+        si.status,
+        si."locationId" AS "storeLocationId",
+        si."issuedToType",
+        si."issuedToId",
+        COALESCE(si.purpose, '') AS purpose,
+        COALESCE(si.remarks, '') AS remarks,
+        d.name AS "departmentName",
+        ss.status::text AS "shiftStatus",
+        ss."locationId" AS "factoryLocationId",
+        ss."sessionNo"
+      FROM "StockIssue" si
+      INNER JOIN "ShiftSession" ss ON ss.id = ${input.shiftSessionId}
+      LEFT JOIN "Department" d ON d.id = si."issuedToId"
+      WHERE si.id = ${stockIssueId}
+      LIMIT 1
+      FOR UPDATE OF si
+    `;
+    const issue = headers[0];
+    if (!issue) throw new Error("Stock issue not found.");
+    if (issue.status !== "POSTED") {
+      throw new Error("Post the stock issue in Inventory before receiving it here.");
+    }
+    if (issue.shiftStatus !== "ACTIVE") {
+      throw new Error("This shift is closed, so it cannot receive materials.");
+    }
+
+    const issuedToFactory = issue.issuedToType.toLowerCase() === "location" && issue.issuedToId === issue.factoryLocationId;
+    const issuedToProduction = issue.issuedToType.toLowerCase() === "department" && /production/i.test(issue.departmentName ?? "");
+    const forThisSession = issue.purpose === issue.sessionNo || issue.remarks.includes(issue.sessionNo);
+    if (!issuedToFactory && !issuedToProduction && !forThisSession) {
+      throw new Error("This stock issue is not issued to the factory for this shift.");
+    }
+
+    const already = await tx<Array<{ id: string }>>`
+      SELECT id
+      FROM "ProductionMaterialIssue"
+      WHERE remarks = ${inventoryIssueRemark(issue.id)}
+      LIMIT 1
+    `;
+    if (already[0]) throw new Error(`${issue.issueNo} is already received.`);
+
+    const lines = await tx<Array<{ itemId: string; uomId: string | null; quantity: number; unitCost: number }>>`
+      SELECT
+        sii."itemId",
+        i."uomId",
+        GREATEST(sii.quantity - COALESCE(returned.quantity, 0), 0)::float AS quantity,
+        sii."unitCost"
+      FROM "StockIssueItem" sii
+      INNER JOIN "Item" i ON i.id = sii."itemId"
+      LEFT JOIN LATERAL (
+        SELECT SUM(sri.quantity) AS quantity
+        FROM "StockReturn" sr
+        INNER JOIN "StockReturnItem" sri ON sri."returnId" = sr.id
+        WHERE sr.reason = ${issue.id}
+          AND sri."itemId" = sii."itemId"
+          AND sr.status IN ('SUBMITTED', 'APPROVED', 'POSTED')
+      ) returned ON true
+      WHERE sii."issueId" = ${issue.id}
+        AND GREATEST(sii.quantity - COALESCE(returned.quantity, 0), 0) > 0
+    `;
+    if (lines.length === 0) throw new Error(`${issue.issueNo} has no quantity left to receive.`);
+
+    const id = randomUUID();
+    const issueNo = await nextProductionDocumentNumber(tx, "PMI", "Production Material Issue");
+    const remark = inventoryIssueRemark(issue.id);
+    await tx`
+      INSERT INTO "ProductionMaterialIssue" (
+        id, "issueNo", "shiftSessionId", "storeLocationId", "productionLocationId",
+        status, "postedById", "postedAt", remarks, "createdById", "createdAt"
+      )
+      VALUES (
+        ${id},
+        ${issueNo},
+        ${input.shiftSessionId},
+        ${issue.storeLocationId},
+        ${issue.factoryLocationId},
+        'POSTED',
+        ${input.userId},
+        NOW(),
+        ${remark},
+        ${input.userId},
+        NOW()
+      )
+    `;
+    await writeIssueItems(tx, id, lines.map((line) => ({
+      itemId: line.itemId,
+      uomId: line.uomId,
+      requestedQty: Number(line.quantity),
+      issuedQty: Number(line.quantity),
+      unitCost: Number(line.unitCost ?? 0),
+    })));
+
+    // The inventory stock issue already removed these quantities from the store.
+    // Receiving only brings that quantity into factory WIP.
+    for (const line of lines) {
+      await postStockMovement({
+        itemId: line.itemId,
+        locationId: issue.factoryLocationId,
+        movementType: "TRANSFER_IN",
+        sourceModule: "production.material-receipt",
+        sourceDocumentId: id,
+        qtyIn: Number(line.quantity),
+        qtyOut: 0,
+        unitCost: Number(line.unitCost ?? 0),
+        remarks: `${issue.issueNo} received on ${issue.sessionNo}`,
+        createdById: input.userId,
+      }, { tx });
+    }
+
+    await writeProductionAudit(tx, input.userId, "production.material-receipt", "POST", id, {
+      stockIssueId: issue.id,
+      stockIssueNo: issue.issueNo,
+      issueNo,
+    });
+    await writeProductionHistory(tx, "production.material-receipt", id, "POST", input.userId, `Received ${issue.issueNo} into factory WIP`);
+    return { id, issueNo, stockIssueNo: issue.issueNo };
   });
 }

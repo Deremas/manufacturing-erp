@@ -279,6 +279,7 @@ export default function BankAccountDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="md.bank-account"
         title={currentBankAccount.accountName}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

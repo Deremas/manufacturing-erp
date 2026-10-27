@@ -1,18 +1,16 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { spacing } from "@/components/ui/spacing";
+import { LogOut, Settings, User } from "lucide-react";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { CurrentUser } from "@/lib/auth/current-user";
-
-// ---------------------------------------------------------------------------
-// Inline SVG icons
-// ---------------------------------------------------------------------------
+import { useAccess } from "@/lib/auth/use-access";
+import { PUBLIC_ROUTE_REGISTRY } from "@/lib/routing/registry";
 
 const BellIcon = (
   <svg
@@ -47,15 +45,82 @@ const HamburgerIcon = (
   </svg>
 );
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const ChevronDownIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
 
 function derivePageTitle(pathname: string): string {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return "Dashboard";
-  const last = segments[segments.length - 1];
-  return last.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const formatSegment = (segment: string) =>
+    segment.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const singularize = (segment: string) => {
+    const formatted = formatSegment(segment);
+    if (formatted.endsWith("ies")) {
+      return `${formatted.slice(0, -3)}y`;
+    }
+    if (formatted.endsWith("s")) {
+      return formatted.slice(0, -1);
+    }
+    return formatted;
+  };
+
+  const looksLikeRecordId = (segment: string) =>
+    /^\d+$/.test(segment) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      segment,
+    ) ||
+    /^[a-z]+-[0-9a-f-]{8,}$/i.test(segment);
+
+  const last = segments[segments.length - 1] ?? "";
+  const previous = segments[segments.length - 2] ?? "";
+  const moduleSegment = segments[0] ?? "";
+  const codeSegment = segments[1] ?? "";
+
+  if (
+    (previous === "view" || previous === "edit" || previous === "print") &&
+    looksLikeRecordId(last)
+  ) {
+    const def = Object.values(PUBLIC_ROUTE_REGISTRY).find(
+      (route) => route.module === moduleSegment && route.code === codeSegment,
+    );
+    if (def) {
+      if (previous === "edit") return `Edit ${def.label}`;
+      if (previous === "print") return `Print ${def.label}`;
+      return def.label;
+    }
+  }
+
+  if (last === "create" && previous) {
+    return `Create ${singularize(previous)}`;
+  }
+
+  if (last === "edit") {
+    const target = segments[segments.length - 2] ?? previous;
+    const recordOwner = looksLikeRecordId(target)
+      ? segments[segments.length - 3] ?? ""
+      : target;
+    return recordOwner ? `Edit ${singularize(recordOwner)}` : "Edit Record";
+  }
+
+  if (looksLikeRecordId(last) && previous) {
+    return `${singularize(previous)} Details`;
+  }
+
+  return formatSegment(last);
 }
 
 function getInitials(name: string): string {
@@ -66,187 +131,91 @@ function getInitials(name: string): string {
     .join("");
 }
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface TopbarProps {
   onToggleSidebar: () => void;
-  leftOffset: number;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar, leftOffset }) => {
+const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
   const pathname = usePathname();
+  const router = useRouter();
+  const { canPath } = useAccess();
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getCurrentUser().then((u) => setUser(u));
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setDropdownOpen(false);
+    if (!profileOpen) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!profileWrapRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [profileOpen]);
 
   const pageTitle = derivePageTitle(pathname);
   const initials = user ? getInitials(user.name) : "SA";
   const displayName = user?.name ?? "System Administrator";
-  const displayEmail = user?.email ?? "admin";
+  const displayRole = user?.role ?? "User";
+
+  const closeProfile = () => setProfileOpen(false);
 
   const handleLogout = async () => {
-    setDropdownOpen(false);
+    closeProfile();
     await signOut({ callbackUrl: "/auth/login" });
   };
 
+  const goTo = (href: string) => {
+    closeProfile();
+    router.push(href);
+  };
+
   return (
-    <header
-      style={{
-        position: "fixed",
-        top: 0,
-        left: leftOffset,
-        right: 0,
-        height: spacing.layout.topbarHeight,
-        backgroundColor: colors.surface,
-        borderBottom: `1px solid ${colors.border}`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px 0 16px",
-        zIndex: 40,
-        transition: "left 0.25s ease",
-      }}
-    >
-      <div
+    <>
+      <header
+        className="app-topbar no-print"
         style={{
+          backgroundColor: colors.surface,
+          borderBottom: `1px solid ${colors.border}`,
           display: "flex",
           alignItems: "center",
-          minWidth: 0,
-          flexShrink: 0,
+          gap: 12,
+          padding: "0 12px",
         }}
       >
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          aria-label="Toggle sidebar"
-          style={{
-            width: 38,
-            height: 38,
-            background: "transparent",
-            border: "1px solid transparent",
-            color: colors.text.secondary,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            borderRadius: radius.scale.md,
-            transition: "background 0.15s ease",
-            flexShrink: 0,
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = colors.secondary[50])
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "transparent")
-          }
-        >
-          {HamburgerIcon}
-        </button>
-      </div>
-
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          transform: "translateX(-50%)",
-          textAlign: "center",
-          fontFamily: typography.fontFamily,
-          fontSize: typography.sizes.h5.fontSize,
-          fontWeight: typography.weights.semibold,
-          color: colors.text.primary,
-          pointerEvents: "none",
-          maxWidth: "50%",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {pageTitle}
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          paddingRight: 20,
-        }}
-      >
-        <button
-          aria-label="Notifications"
-          style={{
-            background: "none",
-            border: "none",
-            color: colors.text.secondary,
-            cursor: "pointer",
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 6,
-            borderRadius: radius.scale.sm,
-            transition: "background 0.15s ease",
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = colors.secondary[50])
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "transparent")
-          }
-        >
-          {BellIcon}
-          <span
-            style={{
-              position: "absolute",
-              top: 2,
-              right: 2,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              backgroundColor: colors.danger[500],
-            }}
-          />
-        </button>
-
-        <div ref={dropdownRef} style={{ position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           <button
-            onClick={() => setDropdownOpen((prev) => !prev)}
-            aria-haspopup="true"
-            aria-expanded={dropdownOpen}
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label="Toggle sidebar"
             style={{
+              width: 38,
+              height: 38,
+              background: "transparent",
+              border: "1px solid transparent",
+              color: colors.text.secondary,
+              cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px 8px",
+              justifyContent: "center",
+              padding: 0,
               borderRadius: radius.scale.md,
               transition: "background 0.15s ease",
+              flexShrink: 0,
             }}
             onMouseOver={(e) =>
               (e.currentTarget.style.backgroundColor = colors.secondary[50])
@@ -255,112 +224,124 @@ const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar, leftOffset }) => {
               (e.currentTarget.style.backgroundColor = "transparent")
             }
           >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: radius.components.badge,
-                backgroundColor: colors.primary[600],
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: colors.text.inverse,
-                fontFamily: typography.fontFamily,
-                fontWeight: typography.weights.semibold,
-                fontSize: "13px",
-                flexShrink: 0,
-              }}
-            >
-              {initials}
-            </div>
-            <div style={{ textAlign: "left" }}>
-              <div
-                style={{
-                  fontFamily: typography.fontFamily,
-                  fontSize: typography.sizes.small.fontSize,
-                  fontWeight: typography.weights.medium,
-                  color: colors.text.primary,
-                  lineHeight: 1.2,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {displayName}
-              </div>
-              <div
-                style={{
-                  fontFamily: typography.fontFamily,
-                  fontSize: typography.sizes.caption.fontSize,
-                  color: colors.text.secondary,
-                  lineHeight: 1.2,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {displayEmail}
-              </div>
-            </div>
+            {HamburgerIcon}
           </button>
+        </div>
 
-          {dropdownOpen && (
-            <div
+        <div
+          className="app-topbar-title"
+          title={pageTitle}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            textAlign: "center",
+            fontFamily: typography.fontFamily,
+            fontSize: typography.sizes.h5.fontSize,
+            fontWeight: typography.weights.semibold,
+            color: colors.text.primary,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {pageTitle}
+        </div>
+
+        <div className="app-topbar-right">
+          <button
+            type="button"
+            aria-label="Notifications"
+            style={{
+              background: "none",
+              border: "none",
+              color: colors.text.secondary,
+              cursor: "pointer",
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 6,
+              borderRadius: radius.scale.sm,
+              flexShrink: 0,
+            }}
+          >
+            {BellIcon}
+            <span
               style={{
                 position: "absolute",
-                top: "100%",
-                right: 0,
-                marginTop: 6,
-                minWidth: 180,
-                backgroundColor: colors.surface,
-                border: `1px solid ${colors.border}`,
-                borderRadius: radius.scale.lg,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-                padding: "6px 0",
-                zIndex: 1001,
+                top: 2,
+                right: 2,
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor: colors.danger[500],
               }}
+            />
+          </button>
+
+          <div className="app-topbar-profile-wrap" ref={profileWrapRef}>
+            <button
+              type="button"
+              className="app-topbar-profile"
+              onClick={() => setProfileOpen((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              aria-label="Open profile menu"
+              title={`${displayName} · ${displayRole}`}
             >
-              {["Profile", "Settings", "Logout"].map((item, index) => {
-                const isLogout = item === "Logout";
-                return (
+              <span className="app-topbar-avatar">{initials}</span>
+              <span className="app-topbar-user-text">
+                <span className="app-topbar-user-name">{displayName}</span>
+                <span className="app-topbar-user-role">{displayRole}</span>
+              </span>
+              <span
+                className="app-topbar-profile-caret"
+                style={{ transform: profileOpen ? "rotate(180deg)" : "none" }}
+              >
+                {ChevronDownIcon}
+              </span>
+            </button>
+
+            {profileOpen ? (
+              <div className="app-profile-menu" role="menu" aria-label="Profile">
+                {user?.id ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="app-profile-menu-item"
+                    onClick={() => goTo(`/administration/users/${user.id}`)}
+                  >
+                    <User size={16} />
+                    My Profile
+                  </button>
+                ) : null}
+                {canPath("/administration/settings") ? (
                 <button
-                  key={item}
                   type="button"
-                  onClick={isLogout ? handleLogout : () => setDropdownOpen(false)}
-                  style={{
-                    width: "100%",
-                    display: "block",
-                    padding: "8px 16px",
-                    fontFamily: typography.fontFamily,
-                    fontSize: typography.sizes.small.fontSize,
-                    color:
-                      isLogout
-                        ? colors.danger[600]
-                        : colors.text.primary,
-                    textDecoration: "none",
-                    transition: "background 0.15s ease",
-                    borderBottom:
-                      index < 2 ? `1px solid ${colors.border}` : "none",
-                    background: "transparent",
-                    borderLeft: "none",
-                    borderRight: "none",
-                    borderTop: "none",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                  onMouseOver={(e) =>
-                    (e.currentTarget.style.backgroundColor =
-                      colors.secondary[50])
-                  }
-                  onMouseOut={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
+                  role="menuitem"
+                  className="app-profile-menu-item"
+                  onClick={() => goTo("/administration/settings")}
                 >
-                  {item}
+                  <Settings size={16} />
+                  Settings
                 </button>
-                );
-              })}
-            </div>
-          )}
+                ) : null}
+                <div className="app-profile-menu-divider" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="app-profile-menu-item is-danger"
+                  onClick={handleLogout}
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 };
 

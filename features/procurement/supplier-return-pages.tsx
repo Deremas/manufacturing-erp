@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ActionButtons, FormCard, PageHeader } from "@/components/shared";
+import { ActionButtons, FormCard, FormattedNumberInput, PageHeader, useFormSubmit } from "@/components/shared";
 import type { Action, Breadcrumb } from "@/components/shared";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { spacing } from "@/components/ui/spacing";
 import { typography } from "@/components/ui/typography";
+import { procurementViewUrl } from "@/lib/procurement/routes";
 
 type Option = { value: string; label: string };
 type ItemLine = {
@@ -27,6 +28,7 @@ type ItemLine = {
 
 type SupplierReturnEditorProps = {
   documentId?: string;
+  documentPublicId?: number;
   title: string;
   subtitle: string;
   breadcrumbs: Breadcrumb[];
@@ -37,7 +39,6 @@ type SupplierReturnEditorProps = {
   suppliers: Option[];
   locations: Option[];
   grnOptions: Option[];
-  approvers: Option[];
   initialValue: {
     returnDate: string;
     supplierId: string;
@@ -45,7 +46,6 @@ type SupplierReturnEditorProps = {
     returnLocationId: string;
     reason: string;
     remarks: string;
-    approverId?: string;
     items: ItemLine[];
   };
 };
@@ -71,7 +71,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontSize: typography.sizes.body.fontSize,
@@ -79,8 +79,32 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+const itemGridHeaderStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "8px",
+  alignItems: "center",
+  marginBottom: "10px",
+  padding: "0 4px",
+  color: colors.text.secondary,
+  fontSize: typography.sizes.caption.fontSize,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const itemGridScrollStyle: React.CSSProperties = {
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
+  paddingBottom: "8px",
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+};
+
+
 export function SupplierReturnEditor({
   documentId,
+  documentPublicId,
   title,
   subtitle,
   breadcrumbs,
@@ -91,11 +115,10 @@ export function SupplierReturnEditor({
   suppliers,
   locations,
   grnOptions,
-  approvers,
   initialValue,
 }: SupplierReturnEditorProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { savingKey, isBusy, submitJson } = useFormSubmit();
   const [message, setMessage] = useState("");
   const [header, setHeader] = useState({
     returnDate: initialValue.returnDate,
@@ -104,7 +127,6 @@ export function SupplierReturnEditor({
     returnLocationId: initialValue.returnLocationId,
     reason: initialValue.reason,
     remarks: initialValue.remarks,
-    approverId: initialValue.approverId ?? "",
   });
   const [items, setItems] = useState<ItemLine[]>(initialValue.items);
 
@@ -116,37 +138,35 @@ export function SupplierReturnEditor({
 
   function save(status: string) {
     setMessage("");
-    startTransition(async () => {
-      const response = await fetch(documentId ? `${apiBasePath}/${documentId}` : apiBasePath, {
-        method: documentId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...header,
-          status,
-          lineItems: items.map((item) => ({
-            grnItemId: item.grnItemId,
-            itemId: item.itemId,
-            returnQty: Number(item.returnQty ?? 0),
-            unitCost: Number(item.unitCost ?? 0),
-            reason: item.reason,
-            remarks: item.remarks,
-          })),
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        setMessage(result.error ?? "Unable to save supplier return");
-        return;
-      }
-      router.push(documentId ? `${successHref}/${documentId}` : `${successHref}/${result.id}`);
-      router.refresh();
+    void submitJson(status, {
+      url: documentId ? `${apiBasePath}/${documentId}` : apiBasePath,
+      method: documentId ? "PUT" : "POST",
+      body: {
+        ...header,
+        status,
+        lineItems: items.map((item) => ({
+          grnItemId: item.grnItemId,
+          itemId: item.itemId,
+          returnQty: Number(item.returnQty ?? 0),
+          unitCost: Number(item.unitCost ?? 0),
+          reason: item.reason,
+          remarks: item.remarks,
+        })),
+      },
+      errorFallback: "Unable to save supplier return",
+      successHref: (result) =>
+        procurementViewUrl(
+          "return",
+          Number(result.publicId ?? documentPublicId ?? 0),
+        ),
+      onError: setMessage,
     });
   }
 
   const actions: Action[] = [
-    { label: "Cancel", variant: "secondary", onClick: () => router.push(cancelHref), disabled: isPending },
-    { label: "Save Draft", variant: "secondary", onClick: () => save("DRAFT"), loading: isPending, disabled: !canEdit },
-    { label: "Submit", variant: "primary", onClick: () => save("SUBMITTED"), loading: isPending, disabled: !canEdit },
+    { label: "Cancel", variant: "secondary", onClick: () => router.push(cancelHref), disabled: isBusy },
+    { label: "Save Draft", variant: "secondary", onClick: () => save("DRAFT"), loading: savingKey === "DRAFT", loadingLabel: "Saving...", disabled: !canEdit },
+    { label: "Submit for Approval", variant: "primary", onClick: () => save("SUBMITTED"), loading: savingKey === "SUBMITTED", loadingLabel: "Submitting...", disabled: !canEdit },
   ];
 
   return (
@@ -163,34 +183,27 @@ export function SupplierReturnEditor({
           <div style={fieldStyle}>
             <label style={labelStyle}>Supplier</label>
             <select style={inputStyle} value={header.supplierId} disabled={!canEdit} onChange={(event) => setHeader((current) => ({ ...current, supplierId: event.target.value }))}>
-              <option value="">Select supplier</option>
+              <option value="">Select ...</option>
               {suppliers.map((supplier) => <option key={supplier.value} value={supplier.value}>{supplier.label}</option>)}
             </select>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>GRN Reference</label>
             <select style={inputStyle} value={header.grnId} disabled={!canEdit || Boolean(documentId)} onChange={(event) => setHeader((current) => ({ ...current, grnId: event.target.value }))}>
-              <option value="">Select GRN</option>
+              <option value="">Select ...</option>
               {grnOptions.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
             </select>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>Return Location</label>
             <select style={inputStyle} value={header.returnLocationId} disabled={!canEdit} onChange={(event) => setHeader((current) => ({ ...current, returnLocationId: event.target.value }))}>
-              <option value="">Select location</option>
+              <option value="">Select ...</option>
               {locations.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}
             </select>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>Reason</label>
             <input style={inputStyle} value={header.reason} disabled={!canEdit} onChange={(event) => setHeader((current) => ({ ...current, reason: event.target.value }))} />
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Assigned Approver</label>
-            <select style={inputStyle} value={header.approverId} disabled={!canEdit} onChange={(event) => setHeader((current) => ({ ...current, approverId: event.target.value }))}>
-              <option value="">No explicit approver</option>
-              {approvers.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
-            </select>
           </div>
           <div style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
             <label style={labelStyle}>Remarks</label>
@@ -200,22 +213,28 @@ export function SupplierReturnEditor({
       </FormCard>
 
       <FormCard title="Return Items" variant="teal-header">
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div className="erp-table-scroll" style={itemGridScrollStyle}>
+        <div style={{ ...itemGridHeaderStyle, gridTemplateColumns: "2fr repeat(5, 1fr) 2fr 2fr", minWidth: "1080px" }}>
+          {["Item", "UOM", "Received", "Prev. Returned", "Available", "Return Qty", "Unit Cost", "Reason"].map((label) => (
+            <div key={label}>{label}</div>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "1080px" }}>
           {items.map((item, index) => (
-            <div key={`${item.grnItemId ?? item.itemId}-${index}`} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div key={`${item.grnItemId ?? item.itemId}-${index}`}>
               <div style={{ display: "grid", gridTemplateColumns: "2fr repeat(5, 1fr) 2fr 2fr", gap: "8px", alignItems: "center" }}>
                 <input style={inputStyle} value={item.itemLabel} disabled />
                 <input style={inputStyle} value={item.uomName} disabled />
-                <input style={inputStyle} type="number" value={item.receivedQty} disabled />
-                <input style={inputStyle} type="number" value={item.previouslyReturnedQty} disabled />
-                <input style={inputStyle} type="number" value={item.availableReturnQty} disabled />
-                <input style={inputStyle} type="number" value={item.returnQty} disabled={!canEdit} onChange={(event) => updateItem(index, "returnQty", Number(event.target.value))} />
-                <input style={inputStyle} type="number" value={item.unitCost} disabled={!canEdit} onChange={(event) => updateItem(index, "unitCost", Number(event.target.value))} />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={item.receivedQty} disabled />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={item.previouslyReturnedQty} disabled />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={item.availableReturnQty} disabled />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={item.returnQty} disabled={!canEdit} onChange={(nextValue) => updateItem(index, "returnQty", nextValue)} />
+                <FormattedNumberInput style={inputStyle} decimals={2} value={item.unitCost} disabled={!canEdit} onChange={(nextValue) => updateItem(index, "unitCost", nextValue)} />
                 <input style={inputStyle} value={item.reason} disabled={!canEdit} onChange={(event) => updateItem(index, "reason", event.target.value)} placeholder="Reason" />
               </div>
-              <input style={inputStyle} value={item.remarks} disabled={!canEdit} onChange={(event) => updateItem(index, "remarks", event.target.value)} placeholder="Remarks" />
             </div>
           ))}
+        </div>
         </div>
       </FormCard>
 

@@ -1,10 +1,14 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
+import { useAccess } from "@/lib/auth/use-access";
+import { useSystemPreferences } from "@/lib/client/use-system-preferences";
+import { formatMoney, formatQuantity } from "@/lib/utils/format-number";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -14,13 +18,21 @@ export interface Column<T = any> {
   label: string;
   render?: (value: unknown, record: T, index: number) => any;
   sortable?: boolean;
+  format?: "qty" | "decimal" | "money";
+  width?: number | string;
+  align?: "left" | "center" | "right";
+  wrap?: boolean;
 }
 
 export interface TableAction {
   label: string;
   icon?: React.ReactNode;
-  onClick: (record: any) => void;
+  onClick?: (record: any) => void;
   color?: string;
+  style?: React.CSSProperties;
+  show?: (record: any) => boolean;
+  permission?: string | string[];
+  href?: string | ((record: any) => string);
 }
 
 export interface DataTableProps<T = Record<string, unknown>> {
@@ -44,6 +56,8 @@ const containerStyle: React.CSSProperties = {
   borderRadius: radius.components.card,
   border: `1px solid ${colors.border}`,
   overflow: "hidden",
+  minWidth: 0,
+  maxWidth: "100%",
 };
 
 const tableStyle: React.CSSProperties = {
@@ -65,17 +79,7 @@ const headerCellStyle: React.CSSProperties = {
   color: colors.text.secondary,
   borderBottom: `1px solid ${colors.border}`,
   whiteSpace: "nowrap",
-  userSelect: "none",
-};
-
-const sortableHeaderStyle: React.CSSProperties = {
-  ...headerCellStyle,
-  cursor: "pointer",
-};
-
-const sortIconStyle: React.CSSProperties = {
-  marginLeft: "4px",
-  fontSize: "10px",
+  userSelect: "text",
 };
 
 const cellStyle: React.CSSProperties = {
@@ -90,9 +94,17 @@ const rowHoverStyle: React.CSSProperties = {
 };
 
 const actionsCellStyle: React.CSSProperties = {
-  ...cellStyle,
+  width: "168px",
+  padding: "10px 8px 10px 0",
   textAlign: "right",
   whiteSpace: "nowrap",
+};
+
+const actionsHeaderStyle: React.CSSProperties = {
+  ...headerCellStyle,
+  width: "168px",
+  textAlign: "right",
+  padding: "10px 8px 10px 0",
 };
 
 const iconButtonStyle = (color?: string): React.CSSProperties => ({
@@ -166,15 +178,19 @@ export default function DataTable<T = Record<string, unknown>>({
   page,
   pageSize,
 }: DataTableProps<T>) {
-  const [sortKey, setSortKey] = React.useState<string | null>(null);
-  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
-
-  const handleSort = (key: string) => {
-    const newDir = sortKey === key && sortDir === "asc" ? "desc" : "asc";
-    setSortKey(key);
-    setSortDir(newDir);
-    onSort?.(key, newDir);
-  };
+  const { visibleActions } = useAccess();
+  const { currencyCode } = useSystemPreferences();
+  const allowedActions = visibleActions(actions ?? []);
+  const hasExplicitWidths = columns.some((column) => column.width != null);
+  const tableMinWidth = hasExplicitWidths
+    ? Math.max(
+        columns.reduce(
+          (sum, column) => sum + (typeof column.width === "number" ? column.width : 140),
+          0,
+        ),
+        720,
+      )
+    : Math.max(columns.length * 140, 720);
 
   if (loading) {
     return (
@@ -199,38 +215,37 @@ export default function DataTable<T = Record<string, unknown>>({
 
   return (
     <div style={containerStyle}>
-      <div style={{ overflowX: "auto" }}>
-        <table style={tableStyle}>
+      <div className="erp-table-scroll" style={{ overflowX: "auto", minWidth: 0, maxWidth: "100%", width: "100%" }}>
+        <table
+          style={{
+            ...tableStyle,
+            tableLayout: hasExplicitWidths ? "fixed" : "auto",
+            minWidth: tableMinWidth,
+          }}
+        >
           <thead>
             <tr style={headerRowStyle}>
               {columns.map((col) => {
-                const isSortable = col.sortable ?? false;
-                const isActive = sortKey === col.key;
+                const columnStyle = col.width
+                  ? {
+                      width: col.width,
+                      maxWidth: col.width,
+                    }
+                  : {};
+                const alignStyle = {
+                  textAlign: col.align ?? "left",
+                };
                 return (
                   <th
                     key={col.key}
-                    style={
-                      isSortable
-                        ? { ...sortableHeaderStyle, cursor: "pointer" }
-                        : headerCellStyle
-                    }
-                    onClick={() => isSortable && handleSort(col.key)}
+                    style={{ ...headerCellStyle, ...columnStyle, ...alignStyle }}
                   >
                     {col.label}
-                    {isSortable && (
-                      <span style={sortIconStyle}>
-                        {isActive
-                          ? sortDir === "asc"
-                            ? "\u25B2"
-                            : "\u25BC"
-                          : "\u25B4\u25BE"}
-                      </span>
-                    )}
                   </th>
                 );
               })}
-              {actions && actions.length > 0 && (
-                <th key="__actions" style={headerCellStyle}>
+              {allowedActions.length > 0 && (
+                <th key="__actions" style={actionsHeaderStyle}>
                   Actions
                 </th>
               )}
@@ -251,42 +266,94 @@ export default function DataTable<T = Record<string, unknown>>({
                   (e.currentTarget as HTMLElement).style.backgroundColor = "";
                 }}
               >
-                {columns.map((col) => (
-                  <td key={col.key} style={cellStyle}>
-                    {col.render
-                      ? col.render(
-                          (record as Record<string, unknown>)[col.key],
-                          record,
-                          rowIndex,
-                        )
-                      : String(
-                          (record as Record<string, unknown>)[col.key] ?? "",
-                        )}
+                {columns.map((col) => {
+                  const rawValue = (record as Record<string, unknown>)[col.key];
+                  const cellContent = col.render
+                    ? col.render(rawValue, record, rowIndex)
+                    : col.format === "qty"
+                      ? formatQuantity(rawValue)
+                      : col.format === "money"
+                        ? formatMoney(rawValue, currencyCode)
+                        : col.format === "decimal"
+                          ? formatMoney(rawValue)
+                          : String(rawValue ?? "");
+
+                  const cellStyleWithWidth = col.width
+                    ? {
+                        ...cellStyle,
+                        width: col.width,
+                        maxWidth: col.width,
+                        overflow: col.wrap ? "visible" : "hidden",
+                        textOverflow: col.wrap ? "clip" : "ellipsis",
+                        whiteSpace: col.wrap ? "normal" : "nowrap",
+                        wordBreak: col.wrap ? "break-word" : "normal",
+                      }
+                    : cellStyle;
+                  const cellStyleWithAlign = {
+                    ...cellStyleWithWidth,
+                    textAlign: col.align ?? "left",
+                  };
+
+                  return (
+                  <td key={col.key} style={cellStyleWithAlign}>
+                    {cellContent}
                   </td>
-                ))}
-                {actions && actions.length > 0 && (
+                  );
+                })}
+                {allowedActions.length > 0 && (
                   <td key="__actions" style={actionsCellStyle}>
-                    {actions.map((action, actIdx) => (
-                      <button
-                        key={actIdx}
-                        title={action.label}
-                        style={iconButtonStyle(action.color)}
-                        onClick={() =>
-                          action.onClick(record as Record<string, unknown>)
-                        }
-                        onMouseEnter={(e) => {
-                          (
-                            e.currentTarget as HTMLElement
-                          ).style.backgroundColor = colors.secondary[100];
-                        }}
-                        onMouseLeave={(e) => {
-                          (
-                            e.currentTarget as HTMLElement
-                          ).style.backgroundColor = "transparent";
-                        }}
-                      >
-                        {action.icon}
-                      </button>
+                    {allowedActions
+                      .filter((action) => action.show?.(record) !== false)
+                      .map((action, actIdx) => (
+                      action.href ? (
+                        <Link
+                          key={actIdx}
+                          href={
+                            typeof action.href === "function"
+                              ? action.href(record)
+                              : action.href
+                          }
+                          title={action.label}
+                          aria-label={action.label}
+                          style={{ ...iconButtonStyle(action.color), ...action.style, textDecoration: "none" }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.backgroundColor = colors.secondary[100];
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                          }}
+                        >
+                          {action.icon ?? (
+                            <span style={{ fontSize: 11, fontWeight: 600 }}>
+                              {action.label}
+                            </span>
+                          )}
+                        </Link>
+                      ) : (
+                        <button
+                          key={actIdx}
+                          title={action.label}
+                          aria-label={action.label}
+                          style={{ ...iconButtonStyle(action.color), ...action.style }}
+                          onClick={() => action.onClick?.(record as Record<string, unknown>)}
+                          onMouseEnter={(e) => {
+                            (
+                              e.currentTarget as HTMLElement
+                            ).style.backgroundColor = colors.secondary[100];
+                          }}
+                          onMouseLeave={(e) => {
+                            (
+                              e.currentTarget as HTMLElement
+                            ).style.backgroundColor = "transparent";
+                          }}
+                        >
+                          {action.icon ?? (
+                            <span style={{ fontSize: 11, fontWeight: 600 }}>
+                              {action.label}
+                            </span>
+                          )}
+                        </button>
+                      )
                     ))}
                   </td>
                 )}

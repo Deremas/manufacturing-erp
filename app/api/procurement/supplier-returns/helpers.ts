@@ -7,6 +7,7 @@ import {
   listSupplierReturns,
   postSupplierReturn,
   rejectSupplierReturn,
+  submitSupplierReturn,
   updateSupplierReturn,
 } from "@/services/procurement/supplier-return.service";
 
@@ -53,12 +54,16 @@ export async function updateReturn(id: string, body: Record<string, unknown>, us
   });
 }
 
-export async function approveReturn(id: string, userId: string) {
-  return approveSupplierReturn(id, userId);
+export async function approveReturn(id: string, userId: string, comment?: string) {
+  return approveSupplierReturn(id, userId, comment);
 }
 
-export async function rejectReturn(id: string, userId: string) {
-  return rejectSupplierReturn(id, userId);
+export async function rejectReturn(id: string, userId: string, comment?: string) {
+  return rejectSupplierReturn(id, userId, comment);
+}
+
+export async function submitReturn(id: string, userId: string, input?: { approverId?: string; comment?: string }) {
+  return submitSupplierReturn(id, userId, input);
 }
 
 export async function cancelReturn(id: string, userId: string) {

@@ -36,7 +36,17 @@ export async function recalculateProductionCost(batchId: string, options?: { tx?
   `;
   const materialCost = Number(materialRows[0]?.materialCost ?? 0);
   const unitMaterialCost = Number(batch.producedQty ?? 0) > 0 ? materialCost / Number(batch.producedQty) : 0;
-  const wastageCost = Number(batch.wastageQty ?? 0) * unitMaterialCost;
+  const qcScrapRows = await db<Array<{ scrapCost: number }>>`
+    SELECT COALESCE(SUM("totalCost"), 0)::double precision AS "scrapCost"
+    FROM "QCDisposition" disposition
+    INNER JOIN "QCHoldRelease" hold ON hold.id = disposition."holdReleaseId"
+    WHERE disposition."productionBatchId" = ${batchId}
+      AND disposition."dispositionType" = 'SCRAP'
+      AND disposition.status = 'POSTED'
+      AND hold."holdCategory" <> 'WASTAGE'
+  `;
+  const wastageCost = (Number(batch.wastageQty ?? 0) * unitMaterialCost)
+    + Number(qcScrapRows[0]?.scrapCost ?? 0);
 
   const overheadRows = await db<Array<{ fixedPerShift: number; perUnit: number; perHour: number }>>`
     SELECT

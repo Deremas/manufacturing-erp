@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { Eye } from "lucide-react";
 
 import {
   DataTable,
@@ -11,13 +13,8 @@ import {
 } from "@/components/shared";
 import type { Breadcrumb, Column } from "@/components/shared";
 import { spacing } from "@/components/ui/spacing";
-
-function formatMoney(value: number) {
-  return Number(value ?? 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoney } from "@/lib/utils/format-number";
+import { publicViewUrl } from "@/lib/routing";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -143,6 +140,7 @@ export function JournalEntriesLivePage({ rows }: { rows: JournalEntryRow[] }) {
     { key: "lineCount", label: "Lines" },
     { key: "totalDebit", label: "Debit", render: (value) => formatMoney(Number(value ?? 0)) },
     { key: "totalCredit", label: "Credit", render: (value) => formatMoney(Number(value ?? 0)) },
+    { key: "actions", label: "Actions", render: (_value, record) => <Link href={publicViewUrl("accounting.journal", Number((record as { publicId: number }).publicId))} title="View journal detail" aria-label="View journal detail"><Eye size={16} /></Link> },
   ];
 
   const totalDebit = filtered.reduce((sum, row) => sum + Number(row.totalDebit ?? 0), 0);
@@ -176,8 +174,8 @@ export function JournalEntriesLivePage({ rows }: { rows: JournalEntryRow[] }) {
   );
 }
 
-export function GeneralLedgerLivePage({ rows }: { rows: GeneralLedgerRow[] }) {
-  const [search, setSearch] = useState("");
+export function GeneralLedgerLivePage({ rows, initialSearch = "" }: { rows: GeneralLedgerRow[]; initialSearch?: string }) {
+  const [search, setSearch] = useState(initialSearch);
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return rows;

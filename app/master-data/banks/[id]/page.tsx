@@ -1,38 +1,10 @@
-import { notFound } from "next/navigation";
-import { PageHeader } from "@/components/shared";
-import { BankDetail } from "@/features/master-data/components";
-import { getBankById } from "@/lib/master-data-db";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-interface BankDetailRouteProps {
-  params: { id: string };
-}
-
-export default async function BankDetailRoute({ params }: BankDetailRouteProps) {
-  const { id } = params;
-  const bank = await getBankById(id);
-
-  if (!bank) {
-    notFound();
-  }
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "24px",
-        padding: "24px",
-      }}
-    >
-      <PageHeader
-        title={bank.name}
-        breadcrumbs={[
-          { label: "Master Data", href: "/master-data" },
-          { label: "Banks", href: "/master-data/banks" },
-          { label: bank.shortName },
-        ]}
-      />
-      <BankDetail bank={bank} />
-    </div>
-  );
+export default async function LegacyRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  await redirectLegacyToPublicUrl("master-data.bank", id, "view");
 }

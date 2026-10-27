@@ -1,0 +1,2 @@
+ALTER TABLE "StoreRequisition" ADD COLUMN IF NOT EXISTS "shiftCode" TEXT;
+ALTER TABLE "StoreRequisition" ADD COLUMN IF NOT EXISTS "neededByDate" TIMESTAMP(3);

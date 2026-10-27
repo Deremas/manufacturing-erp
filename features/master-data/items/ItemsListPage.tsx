@@ -24,6 +24,8 @@ import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
+import { getCleanItemName, getDisplayItemCode } from "@/lib/item-display";
 import * as itemService from "@/services/master-data/itemService";
 import * as categoryService from "@/services/master-data/categoryService";
 import * as itemTypeService from "@/services/master-data/itemTypeService";
@@ -75,7 +77,7 @@ export default function ItemsListPage() {
     value: itemType.code,
   }));
   const unitOptions = units.map((unit) => ({
-    label: `${unit.name} (${unit.abbreviation})`,
+    label: `${unit.code || unit.abbreviation?.toUpperCase() || "UOM"} - ${unit.name}`,
     value: unit.id,
   }));
 
@@ -120,8 +122,29 @@ export default function ItemsListPage() {
   ];
 
   const columns: Column<Item>[] = [
-    { key: "itemCode", label: "Item Code", sortable: true },
-    { key: "itemName", label: "Name", sortable: true },
+    {
+      key: "itemCode",
+      label: "Item Code",
+      sortable: true,
+      render: (_value, row) => getDisplayItemCode({
+        itemCode: row.itemCode,
+        itemType: row.itemType,
+        itemTypeName: row.itemTypeName,
+      }),
+    },
+    {
+      key: "itemName",
+      label: "Name",
+      sortable: true,
+      render: (_value, row) => {
+        const displayCode = getDisplayItemCode({
+          itemCode: row.itemCode,
+          itemType: row.itemType,
+          itemTypeName: row.itemTypeName,
+        });
+        return getCleanItemName(row.itemName, displayCode);
+      },
+    },
     {
       key: "categoryName",
       label: "Category",
@@ -187,12 +210,12 @@ export default function ItemsListPage() {
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(`/master-data/items/${record.id}`),
+      onClick: (record) => router.push(publicViewUrl("master-data.item", record.publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
-      onClick: (record) => router.push(`/master-data/items/${record.id}/edit`),
+      onClick: (record) => router.push(publicEditUrl("master-data.item", record.publicId)),
     },
     {
       label: "Delete",
@@ -211,11 +234,6 @@ export default function ItemsListPage() {
   ];
 
   const pageActions: Action[] = [
-    {
-      label: "Export",
-      variant: "secondary",
-      onClick: () => console.log("Export"),
-    },
     {
       label: "Create Item",
       variant: "primary",

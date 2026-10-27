@@ -11,8 +11,11 @@ export interface User {
   isSystem?: boolean;
   avatar?: string;
   permissions: string[];
+  salesAllowPermissions?: string[];
+  salesDenyPermissions?: string[];
   defaultLocationId?: string | null;
   accessibleLocationIds?: string[];
+  accessibleDepartmentIds?: string[];
   activeLocationId?: string | null;
 }
 

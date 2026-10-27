@@ -9,22 +9,15 @@ import type { NavItem } from "@/lib/constants/navigation";
 import { spacing } from "@/components/ui/spacing";
 import { colors } from "@/components/ui/colors";
 import { typography } from "@/components/ui/typography";
+import { useAccess } from "@/lib/auth/use-access";
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 interface SidebarProps {
-  open: boolean;
   onClose: () => void;
-  isDesktop: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const SIDEBAR_WIDTH = spacing.layout.sidebarWidth;
 
 // ---------------------------------------------------------------------------
 // Icon resolver
@@ -67,11 +60,21 @@ interface ChildLinkProps {
   onChildClick?: () => void;
 }
 
-const ChildLink: React.FC<ChildLinkProps> = ({
+function isChildRouteActive(pathname: string, child: { href: string; matchPrefixes?: string[]; exact?: boolean }) {
+  const prefixMatch = Boolean(child.matchPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/")));
+  if (child.exact) return pathname === child.href || prefixMatch;
+  return pathname === child.href
+    || pathname.startsWith(child.href + "/")
+    || prefixMatch;
+}
+
+const ChildLink: React.FC<ChildLinkProps & { compact?: boolean; factory?: boolean }> = ({
   title,
   href,
   isActive,
   onChildClick,
+  compact = false,
+  factory = false,
 }) => (
   <Link
     href={href}
@@ -80,24 +83,27 @@ const ChildLink: React.FC<ChildLinkProps> = ({
     style={{
       display: "flex",
       alignItems: "center",
-      minHeight: 38,
-      paddingLeft: 54,
-      paddingRight: 18,
+      minHeight: factory ? 44 : compact ? 36 : 40,
+      marginLeft: factory ? 0 : compact ? 18 : 26,
+      marginRight: factory ? 8 : compact ? 10 : 14,
+      paddingLeft: factory ? 52 : compact ? 14 : 16,
+      paddingRight: factory ? 12 : compact ? 14 : 16,
       textDecoration: "none",
       color: isActive ? colors.primary[700] : colors.text.primary,
-      backgroundColor: isActive ? colors.primary[50] : "transparent",
-      borderStyle: "solid",
-      borderWidth: "0 0 0 4px",
-      borderColor: `transparent transparent transparent ${
-        isActive ? colors.primary[600] : "transparent"
-      }`,
-      fontSize: 14,
-      fontWeight: isActive ? 600 : 400,
-      transition: "all 0.15s ease",
+      backgroundColor: isActive ? (factory ? colors.primary[50] : colors.surface) : "transparent",
+      border: factory ? "1px solid transparent" : isActive ? `1px solid ${colors.primary[100]}` : "1px solid transparent",
+      borderLeft: factory && isActive ? `2px solid ${colors.primary[600]}` : undefined,
+      fontSize: factory ? 14 : compact ? 12 : 13,
+      fontWeight: isActive ? (factory ? 500 : 600) : 400,
+      transition: "background-color 180ms ease, color 180ms ease",
       whiteSpace: "nowrap",
-      width: "100%",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      width: factory ? "calc(100% - 8px)" : compact ? "calc(100% - 28px)" : "calc(100% - 40px)",
       boxSizing: "border-box",
-      borderRadius: 0,
+      borderRadius: factory ? 8 : 12,
+      boxShadow: !factory && isActive ? "0 8px 18px rgba(15, 23, 42, 0.05)" : "none",
+      position: "relative",
     }}
     onMouseEnter={(e) => {
       if (!isActive) e.currentTarget.style.backgroundColor = colors.secondary[50];
@@ -106,36 +112,103 @@ const ChildLink: React.FC<ChildLinkProps> = ({
       if (!isActive) e.currentTarget.style.backgroundColor = "transparent";
     }}
   >
+    {isActive && !factory ? (
+      <span
+        style={{
+          position: "absolute",
+          left: 8,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: 6,
+          height: 6,
+          borderRadius: "999px",
+          backgroundColor: colors.primary[600],
+        }}
+      />
+    ) : null}
     {title}
   </Link>
 );
+
+function NavCountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  const label = count > 99 ? "99+" : String(count);
+  return (
+    <span
+      style={{
+        marginLeft: "auto",
+        minWidth: 22,
+        height: 22,
+        padding: "0 7px",
+        borderRadius: 999,
+        backgroundColor: colors.danger[500],
+        color: colors.text.inverse,
+        fontSize: 11,
+        fontWeight: 700,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        lineHeight: 1,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Sidebar component
 // ---------------------------------------------------------------------------
 
-const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const pathname = usePathname();
+  const { visibleNavigation, ready } = useAccess();
+  const navItems = visibleNavigation(navigation);
+  const [compact, setCompact] = useState(false);
   const [openModules, setOpenModules] = useState<string[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const [approvalInboxCount, setApprovalInboxCount] = useState(0);
 
   React.useEffect(() => {
-    if (!initialized) {
-      const activeModules = navigation
-        .filter((item) =>
-          item.children?.some(
-            (child) =>
-              child.href &&
-              (pathname === child.href || pathname.startsWith(child.href + "/")),
-          ),
-        )
-        .map((item) => item.title);
-      if (activeModules.length > 0) {
-        setOpenModules(activeModules);
-      }
-      setInitialized(true);
+    const media = window.matchMedia("(max-width: 1199px)");
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  React.useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+
+    fetch("/api/approval-inbox")
+      .then((response) => (response.ok ? response.json() : { count: 0 }))
+      .then((data: { count?: number }) => {
+        if (!cancelled) setApprovalInboxCount(Number(data.count ?? 0));
+      })
+      .catch(() => {
+        if (!cancelled) setApprovalInboxCount(0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, pathname]);
+
+  React.useEffect(() => {
+    if (!ready) return;
+    const activeModules = navItems
+      .filter((item) =>
+        (item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)))
+        || item.children?.some(
+          (child) =>
+            child.href && isChildRouteActive(pathname, child),
+        ),
+      )
+      .map((item) => item.title);
+    if (activeModules.length > 0) {
+      setOpenModules((prev) => Array.from(new Set([...prev, ...activeModules])));
     }
-  }, [pathname, initialized]);
+  }, [pathname, ready]);
 
   const toggleModule = (title: string) => {
     setOpenModules((prev) =>
@@ -146,69 +219,51 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
   };
 
   const hasActiveChild = (item: NavItem): boolean => {
+    if (item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`))) {
+      return true;
+    }
     if (!item.children) return false;
     return item.children.some(
       (child) =>
-        child.href &&
-        (pathname === child.href || pathname.startsWith(child.href + "/")),
+        child.href && isChildRouteActive(pathname, child),
     );
   };
 
   const handleChildClick = () => {
-    if (!isDesktop) {
+    if (typeof window !== "undefined" && !window.matchMedia("(min-width: 1024px)").matches) {
       onClose();
     }
   };
 
-  const sidebarTransform = open ? "translateX(0)" : "translateX(-100%)";
-
   return (
     <>
-      {!isDesktop && open && (
-        <div
-          onClick={onClose}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 40,
-            backgroundColor: "rgba(0,0,0,0.45)",
-          }}
-        />
-      )}
+      <div className="app-sidebar-backdrop" onClick={onClose} />
 
       <aside
+        className="app-sidebar"
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          zIndex: 50,
-          width: SIDEBAR_WIDTH,
-          height: "100vh",
-          transform: sidebarTransform,
-          transition: "transform 0.25s ease",
           backgroundColor: colors.surface,
           borderRight: `1px solid ${colors.border}`,
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
-          willChange: "transform",
+          boxSizing: "border-box",
         }}
       >
         <div
           style={{
-            height: spacing.layout.topbarHeight,
+            height: compact ? 68 : spacing.layout.topbarHeight,
             display: "flex",
             alignItems: "center",
-            gap: 12,
-            padding: "0 24px",
+            gap: compact ? 10 : 12,
+            padding: compact ? "0 18px" : "0 24px",
             borderBottom: `1px solid ${colors.border}`,
             flexShrink: 0,
           }}
         >
           <div
             style={{
-              width: 34,
-              height: 34,
+              width: compact ? 32 : 34,
+              height: compact ? 32 : 34,
               borderRadius: 10,
               backgroundColor: colors.primary[600],
               display: "flex",
@@ -224,7 +279,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
           <div
             style={{
               fontFamily: typography.fontFamily,
-              fontSize: 16,
+              fontSize: compact ? 15 : 16,
               fontWeight: 800,
               letterSpacing: "-0.03em",
               color: colors.text.primary,
@@ -253,12 +308,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
         `}</style>
 
         <nav
-          className="sidebar-scroll"
+          className="sidebar-scroll app-sidebar-scroll"
           style={{
             flex: 1,
             overflowY: "auto",
             overflowX: "hidden",
-            paddingBottom: 16,
+            paddingBottom: compact ? 12 : 16,
             scrollbarWidth: "thin",
             scrollbarColor: "#cbd5e1 transparent",
             overscrollBehavior: "contain",
@@ -267,7 +322,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
           {(() => {
             let currentSection: string | undefined;
 
-            return navigation.map((item, index) => {
+            return navItems.map((item, index) => {
               const isNewSection = item.section !== currentSection;
               const showSectionLabel = !!item.section && isNewSection;
               const marginTop = index > 0 ? (isNewSection ? 16 : 4) : 0;
@@ -281,33 +336,47 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
                   ? pathname === item.href || pathname.startsWith(item.href + "/")
                   : false;
               const isActive = isParentActive || isLinkActive;
+              const isFactoryGroup = item.title === "Production";
               const isExpanded = openModules.includes(item.title);
+              const isParentOpenState = hasChildren && (isExpanded || isParentActive);
 
-              const iconColor = isActive ? colors.primary[600] : colors.text.secondary;
-              const textColor = isActive ? colors.primary[700] : colors.text.primary;
-              const bgColor = isActive ? colors.primary[50] : "transparent";
+              const iconColor = isParentActive || isLinkActive ? colors.primary[700] : colors.text.secondary;
+              const textColor = isParentActive || isLinkActive ? colors.primary[800] : colors.text.primary;
+              const bgColor = isLinkActive
+                ? colors.primary[50]
+                : isParentActive
+                  ? colors.primary[100]
+                  : isExpanded
+                    ? colors.secondary[50]
+                  : "transparent";
 
               const itemStyle: React.CSSProperties = {
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
-                minHeight: 46,
-                paddingInline: 18,
+                gap: compact ? 10 : 12,
+                minHeight: isFactoryGroup ? 56 : compact ? 42 : 46,
+                paddingInline: compact ? 16 : 18,
                 textDecoration: "none",
                 color: textColor,
                 backgroundColor: bgColor,
-                borderStyle: "solid",
-                borderWidth: `0 0 0 ${isActive ? 4 : 0}px`,
-                borderColor: `transparent transparent transparent ${isActive ? colors.primary[600] : "transparent"}`,
-                fontSize: 14,
-                fontWeight: isActive ? 600 : 400,
+                border: isParentActive
+                  ? `1px solid ${colors.primary[200]}`
+                  : isExpanded
+                    ? `1px solid ${colors.secondary[100]}`
+                  : "1px solid transparent",
+                fontSize: compact ? 13 : 14,
+                fontWeight: isParentActive || isLinkActive ? 700 : isExpanded ? 600 : 400,
                 transition: "all 0.15s ease",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
-                width: "100%",
+                width: compact ? "calc(100% - 20px)" : "calc(100% - 24px)",
                 outline: "none",
                 boxSizing: "border-box",
-                borderRadius: 0,
+                borderRadius: 14,
+                marginInline: compact ? 10 : 12,
+                boxShadow: isParentActive
+                  ? "0 10px 24px rgba(0, 137, 123, 0.08)"
+                  : "none",
               };
 
               return (
@@ -315,10 +384,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
                   {showSectionLabel && (
                     <div
                       style={{
-                        paddingInline: 18,
-                        marginTop: 18,
-                        marginBottom: 8,
-                        fontSize: 11,
+                        paddingInline: compact ? 16 : 18,
+                        marginTop: compact ? 14 : 18,
+                        marginBottom: compact ? 6 : 8,
+                        fontSize: compact ? 10 : 11,
                         fontWeight: 700,
                         color: colors.text.secondary,
                         textTransform: "uppercase",
@@ -352,7 +421,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
                             color: iconColor,
                           }}
                         >
-                          {resolveIcon(item.icon, 22)}
+                          {resolveIcon(item.icon, isFactoryGroup ? 20 : compact ? 20 : 22)}
                         </span>
                         <span style={{ flex: 1, textAlign: "left" }}>{item.title}</span>
                         <span
@@ -363,7 +432,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
                             color: colors.text.secondary,
                             marginLeft: "auto",
                             transition: "transform 0.2s ease",
-                            transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                            transform: isParentOpenState ? "rotate(90deg)" : "rotate(0deg)",
                           }}
                         >
                           <svg
@@ -381,12 +450,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
                         </span>
                       </button>
 
-                      {isExpanded && (
-                        <div>
+                      {isParentOpenState && (
+                        <div style={{ paddingTop: 6, paddingBottom: 4 }}>
                           {item.children!.map((child) => {
-                            const isChildActive =
-                              pathname === child.href ||
-                              pathname.startsWith(child.href + "/");
+                            const isChildActive = isChildRouteActive(pathname, child);
                             return (
                               <ChildLink
                                 key={child.title}
@@ -394,6 +461,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
                                 href={child.href}
                                 isActive={isChildActive}
                                 onChildClick={handleChildClick}
+                                compact={compact}
+                                factory={isFactoryGroup}
                               />
                             );
                           })}
@@ -424,7 +493,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, isDesktop }) => {
                       >
                         {resolveIcon(item.icon, 22)}
                       </span>
-                      <span>{item.title}</span>
+                      <span style={{ flex: 1 }}>{item.title}</span>
+                      {item.href === "/approval-inbox" ? <NavCountBadge count={approvalInboxCount} /> : null}
                     </Link>
                   )}
                 </div>

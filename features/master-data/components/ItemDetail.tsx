@@ -6,6 +6,8 @@ import type { Action } from "@/components/shared";
 import type { Item } from "../types";
 import { colors } from "@/components/ui/colors";
 import { typography } from "@/components/ui/typography";
+import { formatCurrency } from "@/lib/utils/cn";
+import { useSystemPreferences } from "@/lib/client/use-system-preferences";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -106,6 +108,7 @@ export default function ItemDetail({
   onDelete,
   onBack,
 }: ItemDetailProps) {
+  const { currencyCode } = useSystemPreferences();
   const actions: Action[] = [
     ...(onEdit
       ? [
@@ -158,9 +161,6 @@ export default function ItemDetail({
     </div>
   );
 
-  const formatCurrency = (val: number) =>
-    `$${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-
   return (
     <FormCard
       title="Item Information"
@@ -188,8 +188,14 @@ export default function ItemDetail({
         <h4 style={sectionTitleStyle}>UOM & Pricing</h4>
         <div style={gridStyle}>
           {renderField("UOM", item.uomName || item.uomId || "\u2014")}
-          {renderField("Standard Cost", formatCurrency(item.standardCost ?? 0))}
-          {renderField("Selling Price", formatCurrency(item.sellingPrice ?? 0))}
+          {renderField(
+            `Standard Cost (${currencyCode})`,
+            formatCurrency(item.standardCost ?? 0, currencyCode),
+          )}
+          {renderField(
+            `Selling Price (${currencyCode})`,
+            formatCurrency(item.sellingPrice ?? 0, currencyCode),
+          )}
         </div>
       </div>
 
@@ -197,7 +203,7 @@ export default function ItemDetail({
       <div style={sectionStyle}>
         <h4 style={sectionTitleStyle}>Status & Settings</h4>
         <div style={gridStyle}>
-          {renderField("Low Stock Alert Level", item.reorderPoint ?? 0)}
+          {renderField("Low Stock Alert", item.reorderPoint ?? 0)}
           {renderField(
             "VAT Applicable",
             <span style={toggleValueStyle(item.vatApplicable)}>

@@ -1,18 +1,9 @@
-"use client";
+import { AssetsListPage } from "@/features/maintenance/MaintenancePages";
+import { getAssets, getPreventiveMaintenanceDuePlans } from "@/services/maintenance/maintenance.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function AssetRegisterPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Asset Register"
-        subtitle="Manage maintenance asset register"
-      />
-      <EmptyState title="Asset Register" message="Module coming soon." />
-    </div>
-  );
+export default async function MaintenanceAssetsPage() {
+  const [assets, duePlans] = await Promise.all([getAssets(), getPreventiveMaintenanceDuePlans()]);
+  return <AssetsListPage assets={assets} pmDueCount={duePlans.length} />;
 }

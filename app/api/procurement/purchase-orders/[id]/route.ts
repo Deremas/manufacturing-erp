@@ -14,7 +14,7 @@ export async function GET(
       return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
     }
     return order;
-  });
+  }, "procurement.po.view");
 }
 
 export async function PUT(
@@ -25,5 +25,5 @@ export async function PUT(
   return withProcurementAction(async (userId) => {
     const body = await request.json();
     return updateOrder(id, body as Record<string, unknown>, userId);
-  });
+  }, "procurement.po.update");
 }

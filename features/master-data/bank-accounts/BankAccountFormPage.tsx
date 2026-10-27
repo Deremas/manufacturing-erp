@@ -54,7 +54,7 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   height: "48px",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: "10px",
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -254,7 +254,7 @@ export default function BankAccountFormPage({
                 onChange={(e) => setBankId(e.target.value)}
                 style={selectStyle}
               >
-                <option value="">Select a bank...</option>
+                <option value="">Select ...</option>
                 {bankOptions.map((bank) => (
                   <option key={bank.id} value={bank.id}>
                     {bank.name}

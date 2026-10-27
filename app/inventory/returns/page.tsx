@@ -1,4 +1,5 @@
 import { InventoryDocumentListPage } from "@/features/inventory/live/document-pages";
+import { formatStockReturnNumber } from "@/app/inventory/_lib/requisition-number";
 import { listReturns } from "@/services/inventory/inventory-documents.service";
 
 export default async function ReturnsRoute() {
@@ -6,8 +7,8 @@ export default async function ReturnsRoute() {
 
   return (
     <InventoryDocumentListPage
-      title="Stock Returns"
-      subtitle="Bring unused issued stock back into store through posted return documents."
+      title="Return Vouchers"
+      subtitle="Process material returns from production and departments."
       breadcrumbs={[
         { label: "Inventory", href: "/inventory" },
         { label: "Returns" },
@@ -15,19 +16,21 @@ export default async function ReturnsRoute() {
       createHref="/inventory/returns/create"
       rows={returns.map((entry) => ({
         id: entry.id,
-        number: entry.returnNo,
+        publicId: entry.publicId,
+        number: formatStockReturnNumber(entry.returnNo),
         date: entry.returnDate,
         status: entry.status,
         itemCount: entry.itemCount,
         primaryText: entry.returnedFromName,
         secondaryText: entry.locationName,
         ownerText: entry.createdByName,
+        returnedFromType: entry.returnedFromType,
       }))}
-      searchPlaceholder="Search return number, source, location, or status..."
+      searchPlaceholder="Search return voucher, returned from, location, or status..."
       primaryColumnLabel="Returned From"
       secondaryColumnLabel="Location"
       ownerColumnLabel="Created By"
-      baseHref="/inventory/returns"
+      routeKey="inventory.return"
     />
   );
 }

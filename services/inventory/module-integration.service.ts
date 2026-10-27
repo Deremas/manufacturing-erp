@@ -26,14 +26,16 @@ export interface InventoryModuleLineInput {
   remarks?: string;
 }
 
-async function postLineBatch<T extends InventoryModuleLineInput>(
+async function postLineBatch<T extends InventoryModuleLineInput, TResult>(
   tx: Tx,
   lines: T[],
-  handler: (line: T, tx: Tx) => Promise<unknown>,
+  handler: (line: T, tx: Tx) => Promise<TResult>,
 ) {
+  const results: TResult[] = [];
   for (const line of lines) {
-    await handler(line, tx);
+    results.push(await handler(line, tx));
   }
+  return results;
 }
 
 export async function postProcurementReceiptDocument(input: {
@@ -44,7 +46,7 @@ export async function postProcurementReceiptDocument(input: {
   lines: InventoryModuleLineInput[];
 }, options: IntegrationOptions = {}) {
   const execute = async (tx: Tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       receivePurchase({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -81,7 +83,7 @@ export async function inventoryFromProcurementGRN(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }).then((results) => results?.[0]);
 }
 
 export async function postSupplierReturnDocument(input: {
@@ -92,7 +94,7 @@ export async function postSupplierReturnDocument(input: {
   lines: InventoryModuleLineInput[];
 }, options: IntegrationOptions = {}) {
   const execute = async (tx: Tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       returnPurchase({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -129,7 +131,7 @@ export async function inventoryFromSupplierReturn(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }).then((results) => results?.[0]);
 }
 
 export async function postProductionMaterialIssueDocument(input: {
@@ -140,7 +142,7 @@ export async function postProductionMaterialIssueDocument(input: {
   lines: InventoryModuleLineInput[];
 }, options: IntegrationOptions = {}) {
   const execute = async (tx: Tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       issueToProduction({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -177,7 +179,7 @@ export async function inventoryIssueToProduction(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }).then((results) => results?.[0]);
 }
 
 export async function postProductionOutputDocument(input: {
@@ -188,7 +190,7 @@ export async function postProductionOutputDocument(input: {
   lines: InventoryModuleLineInput[];
 }, options: IntegrationOptions = {}) {
   const execute = async (tx: Tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       receiveProductionOutput({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -225,7 +227,7 @@ export async function inventoryReceiveProduction(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }).then((results) => results?.[0]);
 }
 
 export async function postProductionMaterialReturnDocument(input: {
@@ -236,7 +238,7 @@ export async function postProductionMaterialReturnDocument(input: {
   lines: InventoryModuleLineInput[];
 }, options: IntegrationOptions = {}) {
   const execute = async (tx: Tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       postStockReturn({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -266,7 +268,7 @@ export async function postSalesInvoiceDocument(input: {
   lines: InventoryModuleLineInput[];
 }) {
   return sql.begin(async (tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       issueForSales({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -297,7 +299,7 @@ export async function inventoryIssueForSales(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }).then((results) => results?.[0]);
 }
 
 export async function postSalesReturnDocument(input: {
@@ -308,7 +310,7 @@ export async function postSalesReturnDocument(input: {
   lines: InventoryModuleLineInput[];
 }) {
   return sql.begin(async (tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       receiveSalesReturn({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -339,7 +341,7 @@ export async function inventorySalesReturn(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }).then((results) => results?.[0]);
 }
 
 export async function postMaintenanceOrFleetIssueDocument(input: {
@@ -349,9 +351,9 @@ export async function postMaintenanceOrFleetIssueDocument(input: {
   createdById: string;
   remarks?: string;
   lines: InventoryModuleLineInput[];
-}) {
-  return sql.begin(async (tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+}, options: IntegrationOptions = {}) {
+  const execute = async (tx: Tx) => {
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       postStockIssue({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -364,7 +366,13 @@ export async function postMaintenanceOrFleetIssueDocument(input: {
         createdById: input.createdById,
       }, { tx: transaction }),
     );
-  });
+  };
+
+  if (options.tx) {
+    return execute(options.tx);
+  }
+
+  return sql.begin(execute);
 }
 
 export async function inventoryIssueToMaintenanceOrFleet(input: {
@@ -376,7 +384,7 @@ export async function inventoryIssueToMaintenanceOrFleet(input: {
   sourceDocumentId: string;
   createdById: string;
   remarks?: string;
-}) {
+}, options: IntegrationOptions = {}) {
   return postMaintenanceOrFleetIssueDocument({
     sourceModule: input.sourceModule,
     sourceDocumentId: input.sourceDocumentId,
@@ -384,7 +392,7 @@ export async function inventoryIssueToMaintenanceOrFleet(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }, options).then((results) => results?.[0]);
 }
 
 export async function postMaintenanceOrFleetReturnDocument(input: {
@@ -394,9 +402,9 @@ export async function postMaintenanceOrFleetReturnDocument(input: {
   createdById: string;
   remarks?: string;
   lines: InventoryModuleLineInput[];
-}) {
-  return sql.begin(async (tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+}, options: IntegrationOptions = {}) {
+  const execute = async (tx: Tx) => {
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       postStockReturn({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -409,7 +417,13 @@ export async function postMaintenanceOrFleetReturnDocument(input: {
         createdById: input.createdById,
       }, { tx: transaction }),
     );
-  });
+  };
+
+  if (options.tx) {
+    return execute(options.tx);
+  }
+
+  return sql.begin(execute);
 }
 
 export async function inventoryReturnFromMaintenanceOrFleet(input: {
@@ -421,7 +435,7 @@ export async function inventoryReturnFromMaintenanceOrFleet(input: {
   sourceDocumentId: string;
   createdById: string;
   remarks?: string;
-}) {
+}, options: IntegrationOptions = {}) {
   return postMaintenanceOrFleetReturnDocument({
     sourceModule: input.sourceModule,
     sourceDocumentId: input.sourceDocumentId,
@@ -429,7 +443,7 @@ export async function inventoryReturnFromMaintenanceOrFleet(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, quantity: input.quantity, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }, options).then((results) => results?.[0]);
 }
 
 export async function postQCAdjustmentDocument(input: {
@@ -440,7 +454,7 @@ export async function postQCAdjustmentDocument(input: {
   lines: InventoryModuleLineInput[];
 }) {
   return sql.begin(async (tx) => {
-    await postLineBatch(tx, input.lines, (line, transaction) =>
+    return postLineBatch(tx, input.lines, (line, transaction) =>
       postAdjustment({
         itemId: line.itemId,
         locationId: input.locationId,
@@ -469,7 +483,7 @@ export async function inventoryAdjustmentFromQC(input: {
     createdById: input.createdById,
     remarks: input.remarks,
     lines: [{ itemId: input.itemId, differenceQty: input.differenceQty, unitCost: input.unitCost, remarks: input.remarks }],
-  });
+  }).then((results) => results?.[0]);
 }
 
 export async function inventoryTransferRejectedQCToQuarantine(input: {
@@ -502,7 +516,7 @@ export async function inventoryScrapRejectedQCStock(input: {
   qcDocumentId: string;
   createdById: string;
   remarks?: string;
-}) {
+}, options: IntegrationOptions = {}) {
   return postStockMovement({
     itemId: input.itemId,
     locationId: input.locationId,
@@ -514,5 +528,5 @@ export async function inventoryScrapRejectedQCStock(input: {
     unitCost: input.unitCost,
     remarks: input.remarks,
     createdById: input.createdById,
-  });
+  }, options);
 }

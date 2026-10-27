@@ -15,6 +15,7 @@ export default async function AdjustmentsRoute() {
       createHref="/inventory/adjustments/create"
       rows={adjustments.map((adjustment) => ({
         id: adjustment.id,
+        publicId: adjustment.publicId,
         number: adjustment.adjustmentNo,
         date: adjustment.adjustmentDate,
         status: adjustment.status,
@@ -27,7 +28,7 @@ export default async function AdjustmentsRoute() {
       primaryColumnLabel="Location"
       secondaryColumnLabel="Reason"
       ownerColumnLabel="Created By"
-      baseHref="/inventory/adjustments"
+      routeKey="inventory.adjustment"
     />
   );
 }

@@ -14,11 +14,14 @@ export default async function SupplierReturnsPage() {
       ]}
       createHref="/procurement/supplier-returns/create"
       baseHref="/procurement/supplier-returns"
+      apiBasePath="/api/procurement/supplier-returns"
+      kind="return"
       primaryLabel="Supplier"
       secondaryLabel="Return Location"
       ownerLabel="GRN Reference"
       rows={returns.map((row) => ({
         id: row.id,
+        publicId: row.publicId,
         number: row.returnNo,
         date: row.returnDate,
         status: row.status,

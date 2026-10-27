@@ -23,6 +23,7 @@ import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { Eye, Pencil, Trash2, Truck, UserCheck, UserX } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface SuppliersListPageProps {
   initialData?: Supplier[];
@@ -33,6 +34,7 @@ export default function SuppliersListPage({
 }: SuppliersListPageProps) {
   const router = useRouter();
   const [data] = useState<Supplier[]>(initialData);
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Master Data", href: "/master-data" },
@@ -47,6 +49,28 @@ export default function SuppliersListPage({
       })),
     [data],
   );
+
+  const filteredData = useMemo(() => {
+    const search = filters.search?.trim().toLowerCase() ?? "";
+    const paymentTerms = filters.paymentTerms?.trim() ?? "";
+    const status = filters.status?.trim() ?? "";
+
+    return data.filter((supplier) => {
+      if (paymentTerms && supplier.paymentTerms !== paymentTerms) return false;
+      if (status && String(supplier.isActive) !== status) return false;
+      if (!search) return true;
+
+      return [
+        supplier.name,
+        supplier.supplierCode,
+        supplier.contactPerson,
+        supplier.email,
+        supplier.phone,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+  }, [data, filters]);
 
   const filterFields: FilterField[] = [
     {
@@ -95,13 +119,13 @@ export default function SuppliersListPage({
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(`/master-data/suppliers/${record.id}`),
+      onClick: (record) => router.push(publicViewUrl("master-data.supplier", record.publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
       onClick: (record) =>
-        router.push(`/master-data/suppliers/${record.id}/edit`),
+        router.push(publicEditUrl("master-data.supplier", record.publicId)),
     },
     {
       label: "Delete",
@@ -131,7 +155,7 @@ export default function SuppliersListPage({
       message="There are no suppliers to display. Create your first supplier to get started."
       action={{
         label: "Create Supplier",
-        onClick: () => router.push(window.location.pathname + "/create"),
+        onClick: () => router.push("/master-data/suppliers/create"),
       }}
     />
   );
@@ -140,7 +164,7 @@ export default function SuppliersListPage({
     {
       label: "Create Supplier",
       variant: "primary",
-      onClick: () => router.push(window.location.pathname + "/create"),
+      onClick: () => router.push("/master-data/suppliers/create"),
     },
   ];
 
@@ -163,14 +187,14 @@ export default function SuppliersListPage({
         <MetricCard label="Inactive Suppliers" value={inactiveSuppliers} icon={<UserX size={20} />} color={colors.danger[600]} borderColor={colors.danger[500]} />
       </div>
 
-      <FilterCard title="Filter Suppliers" fields={filterFields} onFilter={(values) => console.log("Filter values", values)} onReset={() => undefined} />
+      <FilterCard title="Filter Suppliers" fields={filterFields} onFilter={setFilters} onReset={() => setFilters({})} />
 
       <DataTable
         columns={columns}
-        data={data}
+        data={filteredData}
         actions={tableActions}
         emptyState={emptyState}
-        recordCount={data.length}
+        recordCount={filteredData.length}
       />
     </div>
   );

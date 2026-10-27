@@ -1,18 +1,12 @@
-"use client";
+import { requireAuth } from "@/lib/auth/auth";
+import LeaveRequestsListPage from "@/features/hr/LeaveRequestsListPage";
+import { listLeaveRequests } from "@/services/hr/leave.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export default async function HrLeaveRoute() {
+  const user = await requireAuth();
+  const rows = await listLeaveRequests({
+    accessibleLocationIds: user.accessibleLocationIds,
+  });
 
-export default function LeaveManagementPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Leave Management"
-        subtitle="Manage employee leave requests"
-      />
-      <EmptyState title="Leave Management" message="Module coming soon." />
-    </div>
-  );
+  return <LeaveRequestsListPage rows={rows} />;
 }

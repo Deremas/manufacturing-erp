@@ -1,6 +1,10 @@
-"use client";
-import { LocationFormPage } from "@/features/administration/locations";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-export default function EditLocationPage() {
-  return <LocationFormPage />;
+export default async function LegacyRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  await redirectLegacyToPublicUrl("administration.location", id, "edit");
 }

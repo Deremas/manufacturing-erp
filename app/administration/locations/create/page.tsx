@@ -1,6 +1,6 @@
 "use client";
-import { LocationFormPage } from "@/features/administration/locations";
+import { LocationCreateClient } from "@/features/administration/locations/LocationCreateClient";
 
 export default function CreateLocationPage() {
-  return <LocationFormPage />;
+  return <LocationCreateClient />;
 }

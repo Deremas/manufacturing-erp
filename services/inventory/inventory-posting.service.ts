@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { allocateNextDocumentNumber } from "@/lib/document-numbering";
 
 export type StockMovementType =
   | "OPENING"
@@ -47,115 +48,8 @@ interface PostStockMovementOptions {
   tx?: Tx;
 }
 
-type DocumentNumberingLike = {
-  id: string;
-  prefix: string;
-  prefixFormat: string;
-  separator: string;
-  yearFormat: string;
-  monthFormat: string;
-  dayFormat: string;
-  sequenceLength: number;
-  currentSequence: number;
-};
-
-function formatDatePart(format: string, date: Date): string {
-  switch (format) {
-    case "YY":
-      return date.getFullYear().toString().slice(-2);
-    case "YYYY":
-    default:
-      return date.getFullYear().toString();
-  }
-}
-
-function buildDocumentNumber(config: DocumentNumberingLike, sequence: number): string {
-  const date = new Date();
-  const sep = config.separator ?? "";
-  const year = formatDatePart(config.yearFormat, date);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const seq = String(sequence).padStart(config.sequenceLength, "0");
-
-  let prefix = config.prefix;
-  switch (config.prefixFormat) {
-    case "PREFIX_YEAR":
-      prefix = `${config.prefix}${sep}${year}`;
-      break;
-    case "PREFIX_YEAR_MONTH":
-      prefix = `${config.prefix}${sep}${year}${sep}${month}`;
-      break;
-    case "PREFIX_YEAR_MONTH_DAY":
-      prefix = `${config.prefix}${sep}${year}${sep}${month}${sep}${day}`;
-      break;
-    default:
-      prefix = config.prefix;
-  }
-
-  return `${prefix}${sep}${seq}`;
-}
-
 async function nextDocumentNumber(tx: Tx, prefix: string): Promise<string> {
-  await tx`
-    INSERT INTO "DocumentNumbering" (
-      id,
-      prefix,
-      description,
-      "prefixFormat",
-      separator,
-      "yearFormat",
-      "monthFormat",
-      "dayFormat",
-      "sequenceLength",
-      "currentSequence",
-      "isActive",
-      "isArchived"
-    )
-    VALUES (
-      ${`docnum-${prefix.toLowerCase()}`},
-      ${prefix},
-      ${`Auto-generated sequence for ${prefix}`},
-      'PREFIX_YEAR',
-      '-',
-      'YYYY',
-      'MM',
-      'DD',
-      4,
-      0,
-      true,
-      false
-    )
-    ON CONFLICT (prefix) DO NOTHING
-  `;
-
-  const rows = await tx<Array<DocumentNumberingLike>>`
-    SELECT
-      id,
-      prefix,
-      "prefixFormat",
-      separator,
-      "yearFormat",
-      "monthFormat",
-      "dayFormat",
-      "sequenceLength",
-      "currentSequence"
-    FROM "DocumentNumbering"
-    WHERE prefix = ${prefix}
-    LIMIT 1
-    FOR UPDATE
-  `;
-
-  const config = rows[0];
-  if (!config) throw new Error(`Document numbering config missing for prefix ${prefix}`);
-
-  const nextSequence = config.currentSequence + 1;
-  await tx`
-    UPDATE "DocumentNumbering"
-    SET "currentSequence" = ${nextSequence}
-    WHERE id = ${config.id}
-  `;
-
-  return buildDocumentNumber(config, nextSequence);
+  return allocateNextDocumentNumber(tx, prefix, `Auto-generated sequence for ${prefix}`);
 }
 
 async function writeAuditLog(

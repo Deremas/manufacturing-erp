@@ -4,6 +4,7 @@
 
 export interface User {
   id: string;
+  publicId: number;
   name: string;
   email: string;
   username?: string;
@@ -11,18 +12,23 @@ export interface User {
   phone: string;
   avatar?: string;
   isActive: boolean;
+  isQcHoldLocation?: boolean;
   isSystem?: boolean;
   lastLogin?: string;
   roleId?: string;
   defaultLocationId?: string;
-  accessibleLocationIds?: string[];
+    accessibleLocationIds?: string[];
+    accessibleDepartmentIds?: string[];
   permissions: string[];
+  salesAllowPermissions?: string[];
+  salesDenyPermissions?: string[];
   locations: string[];
   createdAt: string;
 }
 
 export interface Role {
   id: string;
+  publicId: number;
   name: string;
   description: string;
   isSystem?: boolean;
@@ -35,11 +41,13 @@ export interface Role {
 
 export interface Location {
   id: string;
+  publicId: number;
   locationCode: string;
   locationName: string;
   locationType?: string;
   address?: string;
   isActive: boolean;
+  isQcHoldLocation?: boolean;
 }
 
 // `${module}.${action}` pattern

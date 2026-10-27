@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import { PageHeader, FormCard, ActionButtons } from "@/components/shared";
+import { useRouter } from "next/navigation";
+import { publicEditUrl } from "@/lib/routing/urls";
+import { PageHeader, FormCard, ActionButtons, HistoryActionBadge } from "@/components/shared";
 import type { Breadcrumb, Action } from "@/components/shared";
 import type { User as UserType } from "../types";
 import { colors } from "@/components/ui/colors";
@@ -14,23 +16,23 @@ import {
   ArrowLeft,
   Mail,
   Phone,
-  UserIcon,
   MapPin,
   Shield,
   Activity,
   Clock,
+  CheckCircle2,
 } from "lucide-react";
 
-// ----------------------------------------------------------------------------
-// Types
-// ----------------------------------------------------------------------------
 export interface UserDetailPageProps {
   user?: UserType;
+  auditEntries?: Array<{
+    id: string;
+    action: string;
+    userName: string;
+    timestamp: string;
+  }>;
 }
 
-// ----------------------------------------------------------------------------
-// Styles
-// ----------------------------------------------------------------------------
 const pageStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -122,10 +124,12 @@ const timelineItemStyle: React.CSSProperties = {
   paddingBottom: "12px",
 };
 
-// ----------------------------------------------------------------------------
-// Page Component
-// ----------------------------------------------------------------------------
-export default function UserDetailPage({ user }: UserDetailPageProps) {
+export default function UserDetailPage({
+  user,
+  auditEntries = [],
+}: UserDetailPageProps) {
+  const router = useRouter();
+
   if (!user) {
     return (
       <div style={pageStyle}>
@@ -140,65 +144,63 @@ export default function UserDetailPage({ user }: UserDetailPageProps) {
     { label: user.name },
   ];
 
-  const handleEdit = () => console.log("Edit user", user.id);
-  const handleDeactivate = () => console.log("Deactivate user", user.id);
-  const handleBack = () => console.log("Back to users");
-
   const pageActions: Action[] = [
     {
       label: "Back",
       variant: "secondary",
       icon: <ArrowLeft size={16} />,
-      onClick: handleBack,
+      onClick: () => router.push("/administration/users"),
     },
     {
       label: "Edit",
       variant: "primary",
       icon: <Pencil size={16} />,
-      onClick: handleEdit,
+      onClick: () => router.push(publicEditUrl("administration.user", user.publicId)),
     },
     {
-      label: "Deactivate",
+      label: user.isActive ? "Deactivate" : "Activate",
       variant: "danger",
       icon: <XCircle size={16} />,
-      onClick: handleDeactivate,
+      onClick: async () => {
+        const confirmed = window.confirm(
+          `${user.isActive ? "Deactivate" : "Activate"} user "${user.name}"?`,
+        );
+        if (!confirmed) return;
+
+        const response = await fetch(`/api/administration/users/${user.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isActive: !user.isActive }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          window.alert(payload?.error ?? "Failed to update user status.");
+          return;
+        }
+
+        router.refresh();
+      },
     },
   ];
 
   const initials = user.name
     .split(" ")
-    .map((n) => n[0])
+    .map((name) => name[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
 
-  const recentActivities = [
-    { action: "Logged in", date: "2026-06-18 08:30 AM" },
-    { action: "Updated user profile", date: "2026-06-17 02:15 PM" },
-    { action: "Created purchase order PO-001", date: "2026-06-16 11:00 AM" },
-    { action: "Approved inventory adjustment", date: "2026-06-15 09:45 AM" },
-  ];
-
-  const auditHistory = [
-    {
-      field: "Role",
-      oldValue: "Warehouse Operator",
-      newValue: "Administrator",
-      changedBy: "Admin",
-      date: "2026-06-10",
-    },
-    {
-      field: "Status",
-      oldValue: "Inactive",
-      newValue: "Active",
-      changedBy: "Admin",
-      date: "2026-06-01",
-    },
-  ];
+  const salesPermissions = user.permissions.filter((permission) => permission.startsWith("sales."));
+  const allowedOverrides = user.salesAllowPermissions ?? [];
+  const deniedOverrides = user.salesDenyPermissions ?? [];
 
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="admin.user"
         title={user.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={pageActions} />}
@@ -229,7 +231,7 @@ export default function UserDetailPage({ user }: UserDetailPageProps) {
           </div>
           <div style={infoRowStyle}>
             <Phone size={14} />
-            <span>{user.phone}</span>
+            <span>{user.phone || "No phone number"}</span>
           </div>
         </div>
       </div>
@@ -241,7 +243,7 @@ export default function UserDetailPage({ user }: UserDetailPageProps) {
           <div style={infoGridStyle}>
             <div style={infoItemStyle}>
               <span style={infoLabelStyle}>Role</span>
-              <span style={infoValueStyle}>{user.role}</span>
+              <span style={infoValueStyle}>{user.role || "Not assigned"}</span>
             </div>
             <div style={infoItemStyle}>
               <span style={infoLabelStyle}>Status</span>
@@ -259,97 +261,170 @@ export default function UserDetailPage({ user }: UserDetailPageProps) {
                   marginTop: "4px",
                 }}
               >
-                {user.permissions.map((perm) => (
-                  <span key={perm} style={badgeStyle}>
-                    {perm}
-                  </span>
-                ))}
+                {user.permissions.length === 0 ? (
+                  <span style={infoValueStyle}>No explicit permissions</span>
+                ) : (
+                  user.permissions.map((permission) => (
+                    <span key={permission} style={badgeStyle}>
+                      {permission}
+                    </span>
+                  ))
+                )}
               </div>
             </div>
           </div>
         </FormCard>
 
         <FormCard title="Accessible Locations" icon={<MapPin size={18} />}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {user.locations.map((loc) => (
-              <span key={loc} style={badgeStyle}>
-                <MapPin size={12} style={{ marginRight: "4px" }} />
-                {loc}
-              </span>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ color: colors.text.secondary, fontSize: typography.sizes.small.fontSize }}>
+              Sales access is location-scoped. These assigned locations determine where the user can sell and which sales records they can view.
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {user.locations.length === 0 ? (
+              <span style={infoValueStyle}>No assigned locations</span>
+            ) : (
+              user.locations.map((location) => (
+                <span key={location} style={badgeStyle}>
+                  <MapPin size={12} style={{ marginRight: "4px" }} />
+                  {location}
+                </span>
+              ))
+            )}
+            </div>
           </div>
         </FormCard>
       </div>
+
+      <FormCard title="Sales Access Summary" icon={<Shield size={18} />}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ color: colors.text.secondary, fontSize: typography.sizes.small.fontSize }}>
+            Sales access is a combination of assigned locations and role permissions like factory, branch, truck, agent, and loading actions.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {salesPermissions.length === 0 ? (
+              <span style={infoValueStyle}>No sales-specific permission flags assigned. Access falls back to general role behavior.</span>
+            ) : (
+              salesPermissions.map((permission) => (
+                <span key={permission} style={badgeStyle}>
+                  {permission}
+                </span>
+              ))
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "6px" }}>
+            <div>
+              <div style={infoLabelStyle}>User Allow Overrides</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                {allowedOverrides.length === 0 ? (
+                  <span style={infoValueStyle}>No explicit allow overrides</span>
+                ) : (
+                  allowedOverrides.map((permission) => (
+                    <span key={permission} style={badgeStyle}>
+                      {permission}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+            <div>
+              <div style={infoLabelStyle}>User Deny Overrides</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                {deniedOverrides.length === 0 ? (
+                  <span style={infoValueStyle}>No explicit deny overrides</span>
+                ) : (
+                  deniedOverrides.map((permission) => (
+                    <span
+                      key={permission}
+                      style={{
+                        ...badgeStyle,
+                        backgroundColor: "#fef3f2",
+                        color: colors.danger[700],
+                        border: `1px solid ${colors.danger[200]}`,
+                      }}
+                    >
+                      {permission}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </FormCard>
 
       <div
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}
       >
         <FormCard title="Recent Activity" icon={<Activity size={18} />}>
           <div style={timelineStyle}>
-            {recentActivities.map((act, i) => (
-              <div key={i} style={timelineItemStyle}>
-                <div>
-                  <div
-                    style={{
-                      fontSize: typography.sizes.body.fontSize,
-                      color: colors.text.primary,
-                    }}
-                  >
-                    {act.action}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: typography.sizes.caption.fontSize,
-                      color: colors.text.muted,
-                      marginTop: "2px",
-                    }}
-                  >
-                    <Clock
-                      size={12}
-                      style={{ marginRight: "4px", verticalAlign: "middle" }}
-                    />
-                    {act.date}
+            {auditEntries.length === 0 ? (
+              <div style={{ color: colors.text.secondary, fontSize: typography.sizes.small.fontSize }}>
+                No audit activity recorded for this user yet.
+              </div>
+            ) : (
+              auditEntries.slice(0, 5).map((entry) => (
+                <div key={entry.id} style={timelineItemStyle}>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: typography.sizes.body.fontSize,
+                        color: colors.text.primary,
+                      }}
+                    >
+                      <HistoryActionBadge action={entry.action} />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: typography.sizes.caption.fontSize,
+                        color: colors.text.muted,
+                        marginTop: "2px",
+                      }}
+                    >
+                      <Clock
+                        size={12}
+                        style={{ marginRight: "4px", verticalAlign: "middle" }}
+                      />
+                      {new Date(entry.timestamp).toLocaleString("en-KE")}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </FormCard>
 
-        <FormCard title="Audit History" icon={<Activity size={18} />}>
+        <FormCard title="Audit History" icon={<CheckCircle2 size={18} />}>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {auditHistory.map((audit, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: "8px 12px",
-                  backgroundColor: "#f9fafb",
-                  borderRadius: radius.scale.sm,
-                  fontSize: typography.sizes.small.fontSize,
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: typography.weights.semibold,
-                    color: colors.text.primary,
-                  }}
-                >
-                  {audit.field}
-                </div>
-                <div style={{ color: colors.text.secondary, marginTop: "2px" }}>
-                  {audit.oldValue} → {audit.newValue}
-                </div>
-                <div
-                  style={{
-                    color: colors.text.muted,
-                    fontSize: typography.sizes.caption.fontSize,
-                    marginTop: "2px",
-                  }}
-                >
-                  Changed by {audit.changedBy} on {audit.date}
-                </div>
+            {auditEntries.length === 0 ? (
+              <div style={{ color: colors.text.secondary, fontSize: typography.sizes.small.fontSize }}>
+                No audit history recorded for this user yet.
               </div>
-            ))}
+            ) : (
+              auditEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  style={{
+                    padding: "8px 12px",
+                    backgroundColor: "#f9fafb",
+                    borderRadius: radius.scale.sm,
+                    fontSize: typography.sizes.small.fontSize,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: typography.weights.semibold,
+                      color: colors.text.primary,
+                    }}
+                  >
+                    <HistoryActionBadge action={entry.action} />
+                  </div>
+                  <div style={{ color: colors.text.secondary, marginTop: "2px" }}>
+                    By {entry.userName} on {new Date(entry.timestamp).toLocaleString("en-KE")}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </FormCard>
       </div>

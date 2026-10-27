@@ -7,7 +7,9 @@ import {
   getSuppliers,
   getTaxCodes,
 } from "@/lib/master-data-db";
-import { getItemRows } from "@/lib/server/item-data";
+import { formatItemOptionLabel, formatUomLabel, getItemRows } from "@/lib/server/item-data";
+import { isPlaceholderItem } from "@/lib/item-display";
+import { isPurchasableItem } from "@/lib/item-class";
 
 export async function getProcurementReferenceData() {
   const [items, suppliers, locations, departments, taxCodes, bankAccounts, users, currentUser] = await Promise.all([
@@ -23,15 +25,17 @@ export async function getProcurementReferenceData() {
 
   return {
     currentUser,
-    items: items.map((item) => ({
-      value: item.id,
-      label: `${item.itemCode} - ${item.itemName}`,
-      itemCode: item.itemCode,
-      itemName: item.itemName,
-      uomId: item.uomId ?? "",
-      uomName: item.uomName ?? "",
-      unitCost: item.standardCost ?? 0,
-    })),
+    items: items
+      .filter((item) => item.isActive && !isPlaceholderItem(item.itemName, item.itemCode) && isPurchasableItem(item))
+      .map((item) => ({
+        value: item.id,
+        label: formatItemOptionLabel(item),
+        itemCode: item.itemCode,
+        itemName: item.itemName,
+        uomId: item.uomId ?? "",
+        uomName: formatUomLabel({ uomCode: item.uomCode, uomName: item.uomName }),
+        unitCost: item.standardCost ?? 0,
+      })),
     suppliers: suppliers.map((supplier) => ({
       value: supplier.id,
       label: `${supplier.supplierCode} - ${supplier.name}`,

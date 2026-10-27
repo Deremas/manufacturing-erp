@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/routing/public-id";
 
 export async function GET(
   _request: Request,
@@ -20,7 +21,7 @@ export async function GET(
     >`
       SELECT id, code, name, abbreviation, type, "decimalPrecision", "isActive"
       FROM "Unit"
-      WHERE id = ${id} AND "isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`"publicId" = ${Number(id)}` : sql`id = ${id}`} AND "isArchived" = false
       LIMIT 1
     `;
 
@@ -52,7 +53,8 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     const name = String(body.name ?? "").trim();
-    const abbreviation = String(body.abbreviation ?? "").trim();
+    const code = String(body.code ?? "").trim().toUpperCase();
+    const abbreviation = String(body.abbreviation ?? "").trim().toUpperCase();
     if (!name || !abbreviation) {
       return NextResponse.json(
         { error: "Unit name and abbreviation are required" },
@@ -60,17 +62,35 @@ export async function PUT(
       );
     }
 
+    if (code) {
+      const duplicate = await sql<Array<{ id: string }>>`
+        SELECT id
+        FROM "Unit"
+        WHERE UPPER(COALESCE(code, '')) = ${code}
+          AND id <> ${id}
+          AND "isArchived" = false
+        LIMIT 1
+      `;
+
+      if (duplicate[0]) {
+        return NextResponse.json(
+          { error: `Unit code ${code} already exists` },
+          { status: 400 },
+        );
+      }
+    }
+
     const rows = await sql<Array<{ id: string }>>`
       UPDATE "Unit"
       SET
-        code = ${body.code?.trim() || null},
+        code = ${code || null},
         name = ${name},
         abbreviation = ${abbreviation},
         type = ${body.type?.trim() || null},
         "decimalPrecision" = ${Number(body.decimalPrecision ?? 0)},
         "isActive" = ${body.isActive ?? true},
         "updatedAt" = NOW()
-      WHERE id = ${id} AND "isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`"publicId" = ${Number(id)}` : sql`id = ${id}`} AND "isArchived" = false
       RETURNING id
     `;
 

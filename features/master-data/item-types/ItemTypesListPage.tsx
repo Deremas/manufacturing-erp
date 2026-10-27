@@ -20,6 +20,7 @@ import { colors } from "@/components/ui/colors";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { spacing } from "@/components/ui/spacing";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface ItemTypesListPageProps {
   initialData?: ItemType[];
@@ -55,13 +56,13 @@ export default function ItemTypesListPage({
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(`/master-data/item-types/${record.id}`),
+      onClick: (record) => router.push(publicViewUrl("master-data.item-type", record.publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
       onClick: (record) =>
-        router.push(`/master-data/item-types/${record.id}/edit`),
+        router.push(publicEditUrl("master-data.item-type", record.publicId)),
     },
     {
       label: "Delete",
@@ -90,7 +91,7 @@ export default function ItemTypesListPage({
       message="There are no item types to display. Create your first item type to get started."
       action={{
         label: "Create Item Type",
-        onClick: () => router.push(window.location.pathname + "/create"),
+        onClick: () => router.push("/master-data/item-types/create"),
       }}
     />
   );
@@ -99,7 +100,7 @@ export default function ItemTypesListPage({
     {
       label: "Create Item Type",
       variant: "primary",
-      onClick: () => router.push(window.location.pathname + "/create"),
+      onClick: () => router.push("/master-data/item-types/create"),
     },
   ];
 

@@ -2,17 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, ActionButtons } from "@/components/shared";
+import { PageHeader, ActionButtons, SectionHeading } from "@/components/shared";
 import type { Breadcrumb, Action } from "@/components/shared";
 import type { Item, Category, ItemType, Unit, TaxCode } from "../types";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
-import { typography } from "@/components/ui/typography";
-import { Package } from "lucide-react";
 import * as categoryService from "@/services/master-data/categoryService";
 import * as itemTypeService from "@/services/master-data/itemTypeService";
 import * as unitService from "@/services/master-data/unitService";
 import * as taxCodeService from "@/services/master-data/taxCodeService";
+import { useSystemPreferences } from "@/lib/client/use-system-preferences";
+import { itemTypeUsageHint } from "@/lib/item-class";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -22,6 +22,8 @@ export interface ItemFormPageProps {
   onSubmit?: (data: Partial<Item>) => Promise<void>;
   loading?: boolean;
   isEdit?: boolean;
+  submitEndpoint?: string;
+  successHref?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -29,6 +31,34 @@ export interface ItemFormPageProps {
 // ----------------------------------------------------------------------------
 const COST_ITEM_TYPES = ["RAW", "PACK", "CONS", "SPARE"];
 const SELLING_PRICE_ITEM_TYPE = "FG";
+
+function getItemCodePlaceholder(itemTypeCode: string) {
+  switch (itemTypeCode) {
+    case "RAW":
+    case "RM":
+      return "Auto-generated, for example RM-01";
+    case "PACK":
+    case "PK":
+    case "PM":
+      return "Auto-generated, for example PK-01";
+    case "FG":
+      return "Auto-generated, for example FG-01";
+    case "CONS":
+    case "CN":
+      return "Auto-generated, for example CN-01";
+    case "SPARE":
+    case "SP":
+      return "Auto-generated, for example SP-01";
+    case "ASSET":
+    case "AS":
+      return "Auto-generated, for example AS-01";
+    case "SERVICE":
+    case "SV":
+      return "Auto-generated, for example SV-01";
+    default:
+      return "Auto-generated if you leave blank";
+  }
+}
 
 function normalizeItemTypeCode(value: string, itemTypes: ItemType[]): string {
   const trimmed = value.trim();
@@ -63,15 +93,6 @@ const cardStyle: React.CSSProperties = {
   padding: 24,
 };
 
-const cardTitle: React.CSSProperties = {
-  fontSize: 16,
-  fontWeight: 600,
-  color: "#111827",
-  margin: "0 0 20px 0",
-  paddingBottom: 12,
-  borderBottom: "1px solid #f3f4f6",
-};
-
 const fieldStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -88,7 +109,7 @@ const inputStyle: React.CSSProperties = {
   height: 48,
   padding: "0 14px",
   borderRadius: 10,
-  border: "1px solid #d1d5db",
+  border: "1px solid #94a3b8",
   fontSize: "14px",
   outline: "none",
   width: "100%",
@@ -182,8 +203,11 @@ export default function ItemFormPage({
   onSubmit,
   loading,
   isEdit,
+  submitEndpoint,
+  successHref = "/master-data/items",
 }: ItemFormPageProps) {
   const router = useRouter();
+  const { currencyCode, currencyLabel } = useSystemPreferences();
 
   // Basic Information
   const [itemCode, setItemCode] = useState(initialData?.itemCode || "");
@@ -291,26 +315,44 @@ export default function ItemFormPage({
 
     setSaving(true);
     try {
-      if (onSubmit)
+      const payload = {
+        itemCode,
+        itemName,
+        sku,
+        categoryId,
+        itemType,
+        uomId,
+        description,
+        reorderPoint,
+        batchTracking,
+        expiryTracking,
+        serialTracking,
+        vatApplicable,
+        exciseApplicable,
+        purchaseTaxCodeId: taxCodeId,
+        isActive,
+        ...(showStandardCost ? { standardCost } : { standardCost: 0 }),
+        ...(showSellingPrice ? { sellingPrice } : { sellingPrice: 0 }),
+      };
+
+      if (onSubmit) {
         await onSubmit({
-          itemCode,
-          itemName,
-          sku,
-          categoryId,
-          itemType,
-          uomId,
-          description,
-          reorderPoint,
-          batchTracking,
-          expiryTracking,
-          serialTracking,
-          vatApplicable,
-          exciseApplicable,
-          purchaseTaxCodeId: taxCodeId,
-          isActive,
-          ...(showStandardCost ? { standardCost } : { standardCost: 0 }),
-          ...(showSellingPrice ? { sellingPrice } : { sellingPrice: 0 }),
+          ...payload,
         });
+      } else if (submitEndpoint) {
+        const response = await fetch(submitEndpoint, {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          throw new Error(result?.error || "Failed to save item");
+        }
+
+        router.push(successHref);
+      }
     } finally {
       setSaving(false);
     }
@@ -365,14 +407,14 @@ export default function ItemFormPage({
 
       {/* Card 1: Basic Information */}
       <div style={cardStyle}>
-        <h3 style={cardTitle}>Basic Information</h3>
+        <SectionHeading title="Basic Information" />
         <div style={grid2}>
           <div style={fieldStyle}>
             <Label>Item Code</Label>
             <Input
               value={itemCode}
               onChange={(e) => setItemCode(e.target.value)}
-              placeholder="Auto-generated if you leave blank"
+              placeholder={getItemCodePlaceholder(normalizedItemType)}
             />
           </div>
           <div style={fieldStyle}>
@@ -402,7 +444,7 @@ export default function ItemFormPage({
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
             >
-              <option value="">Select category...</option>
+              <option value="">Select ...</option>
               {categories
                 .filter((c) => c.isActive)
                 .map((c) => (
@@ -416,14 +458,28 @@ export default function ItemFormPage({
                 {errors.categoryId}
               </span>
             )}
+            <span style={{ color: "#6b7280", fontSize: 12 }}>
+              Category groups items. Item Type decides Purchase vs Sales vs Production.
+            </span>
           </div>
           <div style={fieldStyle}>
             <Label required>Item Type</Label>
             <Select
               value={itemType}
-              onChange={(e) => setItemType(e.target.value)}
+              onChange={(e) => {
+                const nextType = e.target.value;
+                setItemType(nextType);
+                const matchingCategory = categories.find(
+                  (category) =>
+                    category.isActive &&
+                    String(category.code ?? "").toUpperCase() === nextType.toUpperCase(),
+                );
+                if (matchingCategory) {
+                  setCategoryId(matchingCategory.id);
+                }
+              }}
             >
-              <option value="">Select type...</option>
+              <option value="">Select ...</option>
               {itemTypes
                 .filter((t) => t.isActive)
                 .map((t) => (
@@ -432,6 +488,11 @@ export default function ItemFormPage({
                   </option>
                 ))}
             </Select>
+            <span style={{ color: "#6b7280", fontSize: 12 }}>
+              {itemType
+                ? itemTypeUsageHint(normalizedItemType)
+                : "Raw Material, Packaging, Consumable and Spare Part are used in Purchase. Finished Good is used in Sales and Production."}
+            </span>
             {errors.itemType && (
               <span style={{ color: "#ef4444", fontSize: 12 }}>
                 {errors.itemType}
@@ -441,12 +502,12 @@ export default function ItemFormPage({
           <div style={fieldStyle}>
             <Label required>UOM</Label>
             <Select value={uomId} onChange={(e) => setUomId(e.target.value)}>
-              <option value="">Select unit...</option>
+              <option value="">Select ...</option>
               {units
                 .filter((u) => u.isActive)
                 .map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name} ({u.abbreviation})
+                    {(u.code || u.abbreviation?.toUpperCase() || "UOM")} - {u.name}
                   </option>
                 ))}
             </Select>
@@ -469,10 +530,10 @@ export default function ItemFormPage({
 
       {/* Card 2: Inventory Settings */}
       <div style={cardStyle}>
-        <h3 style={cardTitle}>Inventory Settings</h3>
+        <SectionHeading title="Inventory Settings" />
         <div style={grid2}>
           <div style={fieldStyle}>
-            <Label>Low Stock Alert Level</Label>
+            <Label>Low Stock Alert</Label>
             <Input
               type="number"
               value={reorderPoint}
@@ -485,11 +546,20 @@ export default function ItemFormPage({
 
       {/* Card 3: Pricing */}
       <div style={cardStyle}>
-        <h3 style={cardTitle}>Pricing</h3>
+        <SectionHeading title="Pricing" />
+        <p
+          style={{
+            margin: "0 0 16px 0",
+            color: "#6b7280",
+            fontSize: "13px",
+          }}
+        >
+          Prices are entered in the system default currency: {currencyCode} ({currencyLabel})
+        </p>
         <div style={grid2}>
           {showStandardCost && (
             <div style={fieldStyle}>
-              <Label>Standard Cost</Label>
+              <Label>{`Standard Cost (${currencyCode})`}</Label>
               <Input
                 type="number"
                 value={standardCost}
@@ -501,7 +571,7 @@ export default function ItemFormPage({
           )}
           {showSellingPrice && (
             <div style={fieldStyle}>
-              <Label>Selling Price</Label>
+              <Label>{`Selling Price (${currencyCode})`}</Label>
               <Input
                 type="number"
                 value={sellingPrice}
@@ -516,7 +586,7 @@ export default function ItemFormPage({
 
       {/* Card 4: Tracking */}
       <div style={cardStyle}>
-        <h3 style={cardTitle}>Tracking</h3>
+        <SectionHeading title="Tracking" />
         <div>
           <Checkbox
             label="Track by Batch"
@@ -538,7 +608,7 @@ export default function ItemFormPage({
 
       {/* Card 5: Tax & Status */}
       <div style={cardStyle}>
-        <h3 style={cardTitle}>Tax & Status</h3>
+        <SectionHeading title="Tax & Status" />
         <div style={grid2}>
           <div>
             <Checkbox
@@ -558,7 +628,7 @@ export default function ItemFormPage({
               value={taxCodeId}
               onChange={(e) => setTaxCodeId(e.target.value)}
             >
-              <option value="">Select tax code...</option>
+              <option value="">Select ...</option>
               {taxCodes
                 .filter((t) => t.isActive)
                 .map((t) => (

@@ -4,21 +4,12 @@ import { PageHeader } from "@/components/shared";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { spacing } from "@/components/ui/spacing";
-import { getPendingApprovals } from "@/services/approval/approvalService";
+import { listApprovalInboxItems } from "@/services/approval/approval-inbox.service";
 
-function resolveHref(referenceType: string, referenceId: string) {
-  const map: Record<string, string> = {
-    "inventory.transfer": `/inventory/transfers/${referenceId}`,
-    "inventory.adjustment": `/inventory/adjustments/${referenceId}`,
-    "inventory.issue": `/inventory/issues/${referenceId}`,
-    "inventory.return": `/inventory/returns/${referenceId}`,
-    "inventory.requisition": `/inventory/srv/${referenceId}`,
-  };
-  return map[referenceType] ?? "#";
-}
+export const dynamic = "force-dynamic";
 
 export default async function ApprovalQueuePage() {
-  const approvals = await getPendingApprovals();
+  const approvals = await listApprovalInboxItems(["*"], "");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: `${spacing.page.gap}px`, padding: `${spacing.page.padding}px` }}>
@@ -39,7 +30,7 @@ export default async function ApprovalQueuePage() {
         ) : approvals.map((approval) => (
           <Link
             key={approval.id}
-            href={resolveHref(approval.referenceType, approval.referenceId)}
+            href={approval.href}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -52,8 +43,8 @@ export default async function ApprovalQueuePage() {
               backgroundColor: colors.surface,
             }}
           >
-            <strong>{approval.referenceType}</strong>
-            <span>Reference: {approval.referenceId}</span>
+            <strong>{approval.documentLabel}</strong>
+            <span>Reference: {approval.documentNo}</span>
             <span>Requested By: {approval.requestedByName}</span>
             <span>Assigned Approver: {approval.assignedApproverName ?? "Unassigned"}</span>
             <span>Created: {new Date(approval.createdAt).toLocaleString("en-KE")}</span>

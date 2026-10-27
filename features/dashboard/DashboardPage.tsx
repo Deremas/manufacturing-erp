@@ -14,6 +14,8 @@ import {
   getPendingApprovals,
 } from "@/services/dashboard/dashboard.service";
 import { getCurrentUser } from "@/lib/auth/auth";
+import { hasRouteAccess } from "@/lib/auth/route-access";
+import { canApproveReference, canViewModuleActivity } from "@/lib/permissions/ui-access";
 interface Activity {
   id: string;
   action: string;
@@ -176,19 +178,37 @@ const CheckCircleIcon = (
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  const permissions = user?.permissions ?? [];
   const [metrics, activities, pendingApprovals] = await Promise.all([
     getDashboardMetrics(),
     getRecentActivities(),
     getPendingApprovals(user?.id),
   ]);
 
-  const allZero =
-    metrics &&
-    metrics.totalItems === 0 &&
-    metrics.activeSuppliers === 0 &&
-    metrics.openPOs === 0 &&
-    metrics.lowStockItems === 0 &&
-    metrics.pendingApprovals === 0;
+  const showItems = hasRouteAccess(permissions, "/master-data/items", "GET");
+  const showSuppliers = hasRouteAccess(permissions, "/master-data/suppliers", "GET");
+  const showPOs = hasRouteAccess(permissions, "/procurement/purchase-orders", "GET");
+  const showLowStock = hasRouteAccess(permissions, "/inventory/low-stock", "GET");
+  const visibleApprovals = pendingApprovals.filter((approval) =>
+    canApproveReference(permissions, approval.type),
+  );
+  const showApprovals =
+    permissions.includes("*") ||
+    permissions.some((permission) => permission.split(".").at(-1) === "approve");
+  const visibleActivities = activities.filter((activity) =>
+    canViewModuleActivity(permissions, activity.module),
+  );
+
+  const visibleMetrics = [
+    showItems ? metrics.totalItems : null,
+    showSuppliers ? metrics.activeSuppliers : null,
+    showPOs ? metrics.openPOs : null,
+    showLowStock ? metrics.lowStockItems : null,
+    showApprovals ? visibleApprovals.length : null,
+  ].filter((value) => value !== null);
+
+  const noMetricAccess = visibleMetrics.length === 0;
+  const allZero = !noMetricAccess && visibleMetrics.every((value) => value === 0);
 
   return (
     <div
@@ -204,7 +224,7 @@ export default async function DashboardPage() {
         icon={DashboardIcon}
       />
 
-      {allZero ? (
+      {noMetricAccess ? null : allZero ? (
         <EmptyState
           icon={CheckCircleIcon}
           title="No data yet"
@@ -212,36 +232,46 @@ export default async function DashboardPage() {
         />
       ) : (
         <div style={metricGridStyle}>
+          {showItems ? (
           <MetricCard
             label="Total Items"
             value={metrics.totalItems}
             icon={PackageIcon}
             borderColor={colors.primary[500]}
           />
+          ) : null}
+          {showSuppliers ? (
           <MetricCard
             label="Active Suppliers"
             value={metrics.activeSuppliers}
             icon={UsersIcon}
             borderColor={colors.success[500]}
           />
+          ) : null}
+          {showPOs ? (
           <MetricCard
             label="Open Purchase Orders"
             value={metrics.openPOs}
             icon={ShoppingCartIcon}
             borderColor={colors.warning[500]}
           />
+          ) : null}
+          {showLowStock ? (
           <MetricCard
             label="Low Stock Items"
             value={metrics.lowStockItems}
             icon={AlertTriangleIcon}
             borderColor={colors.danger[500]}
           />
+          ) : null}
+          {showApprovals ? (
           <MetricCard
             label="Pending Approvals"
-            value={metrics.pendingApprovals}
+            value={visibleApprovals.length}
             icon={ClockIcon}
             borderColor={colors.secondary[500]}
           />
+          ) : null}
         </div>
       )}
 
@@ -251,7 +281,7 @@ export default async function DashboardPage() {
         </div>
         <DataTable
           columns={activityColumns}
-          data={activities}
+          data={visibleActivities}
           emptyState={
             <EmptyState
               title="No recent activities"
@@ -261,11 +291,12 @@ export default async function DashboardPage() {
         />
       </div>
 
+      {showApprovals ? (
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h3 style={sectionTitleStyle}>Pending Approvals</h3>
         </div>
-        {pendingApprovals.length === 0 ? (
+        {visibleApprovals.length === 0 ? (
           <EmptyState
             title="No pending approvals"
             message="All approvals are up to date."
@@ -278,7 +309,7 @@ export default async function DashboardPage() {
               { key: "requestedBy", label: "Requested By" },
               { key: "date", label: "Date" },
             ]}
-            data={pendingApprovals}
+            data={visibleApprovals}
             emptyState={
               <EmptyState
                 title="No pending approvals"
@@ -288,6 +319,7 @@ export default async function DashboardPage() {
           />
         )}
       </div>
+      ) : null}
     </div>
   );
 }

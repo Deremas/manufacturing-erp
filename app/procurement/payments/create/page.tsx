@@ -2,10 +2,10 @@ import { getAccountsPayableReferenceData } from "@/app/procurement/_lib/ap-refer
 import { SupplierPaymentEditor } from "@/features/procurement/ap-pages";
 
 export default async function CreateSupplierPaymentPage(
-  { searchParams }: { searchParams: Promise<{ invoiceId?: string }> },
+  { searchParams }: { searchParams: Promise<{ invoicePublicId?: string }> },
 ) {
-  const { invoiceId } = await searchParams;
-  const referenceData = await getAccountsPayableReferenceData({ invoiceId });
+  const { invoicePublicId } = await searchParams;
+  const referenceData = await getAccountsPayableReferenceData({ invoicePublicId });
 
   return (
     <SupplierPaymentEditor
@@ -25,7 +25,7 @@ export default async function CreateSupplierPaymentPage(
       initialValue={{
         paymentDate: new Date().toISOString().slice(0, 10),
         supplierId: referenceData.selectedInvoice?.supplierId ?? "",
-        invoiceId: invoiceId ?? "",
+        invoiceId: referenceData.selectedInvoice?.id ?? "",
         paymentMethod: "BANK",
         bankAccountId: "",
         referenceNo: "",

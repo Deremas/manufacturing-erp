@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { UnitForm } from "@/features/master-data/components";
+import { publicViewUrlFromPayload } from "@/lib/routing/urls";
 
 export default function CreateUnitPage() {
   const router = useRouter();
@@ -14,12 +15,13 @@ export default function CreateUnitPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    const payload = (await response.json()) as { error?: string; publicId?: number };
 
     if (!response.ok) {
-      throw new Error("Failed to create unit");
+      throw new Error(payload.error ?? "Failed to create unit");
     }
 
-    router.push("/master-data/units");
+    router.push(publicViewUrlFromPayload("master-data.unit", payload, "/master-data/units"));
   };
 
   return (

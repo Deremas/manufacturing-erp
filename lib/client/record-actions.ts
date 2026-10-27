@@ -3,11 +3,11 @@
 export async function deleteRecord(
   endpoint: string,
   label: string,
-): Promise<void> {
+): Promise<boolean> {
   const confirmed = window.confirm(
     `Delete this ${label}? This action cannot be undone.`,
   );
-  if (!confirmed) return;
+  if (!confirmed) return false;
 
   const response = await fetch(endpoint, {
     method: "DELETE",
@@ -23,4 +23,6 @@ export async function deleteRecord(
   if (!response.ok) {
     throw new Error(payload.error ?? `Failed to delete ${label}`);
   }
+
+  return true;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader, FormCard, ActionButtons } from "@/components/shared";
 import type { Breadcrumb, Action } from "@/components/shared";
 import type { User as UserType } from "../types";
@@ -9,6 +10,7 @@ import { spacing } from "@/components/ui/spacing";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
 import { Eye, EyeOff, UserIcon, ShieldCheck, Save, X } from "lucide-react";
+import { publicViewUrlFromPayload } from "@/lib/routing/urls";
 
 export interface OptionItem {
   label: string;
@@ -20,6 +22,9 @@ export interface UserFormPageProps {
   isCreating?: boolean;
   roles?: OptionItem[];
   locations?: OptionItem[];
+  departments?: OptionItem[];
+  submitEndpoint?: string;
+  successHref?: string;
 }
 
 const pageStyle: React.CSSProperties = {
@@ -44,7 +49,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -65,7 +70,7 @@ const selectStyle: React.CSSProperties = {
 
 const rowStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: "16px",
 };
 
@@ -98,12 +103,26 @@ const passwordToggleStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
+const salesPermissionOptions = [
+  { key: "sales.factory.use", label: "Factory Sales" },
+  { key: "sales.branch.use", label: "Branch Sales" },
+  { key: "sales.truck.use", label: "Truck Sales" },
+  { key: "sales.agent.use", label: "Agent Sales" },
+  { key: "sales.loading.create", label: "Create Loading" },
+  { key: "sales.loading.confirm", label: "Confirm Loading" },
+  { key: "sales.loading.cancel", label: "Cancel Loading" },
+] as const;
+
 export default function UserFormPage({
   initialData,
   isCreating = true,
   roles = [],
   locations = [],
+  departments = [],
+  submitEndpoint,
+  successHref = "/administration/users",
 }: UserFormPageProps) {
+  const router = useRouter();
   const [fullName, setFullName] = useState(initialData?.name ?? "");
   const [username, setUsername] = useState(initialData?.username ?? "");
   const [email, setEmail] = useState(initialData?.email ?? "");
@@ -122,6 +141,15 @@ export default function UserFormPage({
   const [accessibleLocationIds, setAccessibleLocationIds] = useState<string[]>(
     initialData?.accessibleLocationIds ?? [],
   );
+  const [accessibleDepartmentIds, setAccessibleDepartmentIds] = useState<string[]>(initialData?.accessibleDepartmentIds ?? []);
+  const [salesAllowPermissions, setSalesAllowPermissions] = useState<string[]>(
+    initialData?.salesAllowPermissions ?? [],
+  );
+  const [salesDenyPermissions, setSalesDenyPermissions] = useState<string[]>(
+    initialData?.salesDenyPermissions ?? [],
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Administration", href: "/administration" },
@@ -129,22 +157,75 @@ export default function UserFormPage({
     { label: isCreating ? "Create User" : "Edit User" },
   ];
 
-  const handleSave = () => {
-    console.log("Save user", {
-      fullName,
-      username,
-      email,
-      phone,
-      password: password.trim() ? password : undefined,
-      roleId,
-      defaultLocationId,
-      accessibleLocationIds,
-      status,
-    });
-  };
+  const handleSave = async () => {
+    setError("");
 
-  const handleCancel = () => {
-    console.log("Cancel");
+    if (!fullName.trim() || !email.trim() || !roleId) {
+      setError("Full name, email, and role are required.");
+      return;
+    }
+
+    if (isCreating && !password.trim()) {
+      setError("Password is required for a new user.");
+      return;
+    }
+
+    if ((password || confirmPassword) && password !== confirmPassword) {
+      setError("Password and confirm password must match.");
+      return;
+    }
+
+    if (defaultLocationId && !accessibleLocationIds.includes(defaultLocationId)) {
+      setAccessibleLocationIds((current) =>
+        current.includes(defaultLocationId)
+          ? current
+          : [...current, defaultLocationId],
+      );
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(submitEndpoint ?? "/api/administration/users", {
+        method: isCreating ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fullName.trim(),
+          username: username.trim() || null,
+          email: email.trim(),
+          phone: phone.trim() || null,
+          password: password.trim() || undefined,
+          roleId,
+          defaultLocationId: defaultLocationId || null,
+          accessibleLocationIds: defaultLocationId
+            ? Array.from(new Set([...accessibleLocationIds, defaultLocationId]))
+            : accessibleLocationIds,
+          accessibleDepartmentIds,
+          salesAllowPermissions,
+          salesDenyPermissions,
+          isActive: status === "active",
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; publicId?: number }
+        | null;
+
+      if (!response.ok) {
+        setError(payload?.error ?? "Failed to save user.");
+        return;
+      }
+
+      router.push(
+        publicViewUrlFromPayload(
+          "administration.user",
+          payload,
+          successHref ?? "/administration/users",
+        ),
+      );
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const footerActions: Action[] = [
@@ -152,13 +233,15 @@ export default function UserFormPage({
       label: "Cancel",
       variant: "secondary",
       icon: <X size={16} />,
-      onClick: handleCancel,
+      onClick: () => router.push("/administration/users"),
+      disabled: saving,
     },
     {
       label: "Save",
       variant: "primary",
       icon: <Save size={16} />,
       onClick: handleSave,
+      loading: saving,
     },
   ];
 
@@ -168,6 +251,20 @@ export default function UserFormPage({
         title={isCreating ? "Create User" : "Edit User"}
         breadcrumbs={breadcrumbs}
       />
+
+      {error ? (
+        <div
+          style={{
+            color: colors.danger[700],
+            backgroundColor: colors.danger[50],
+            border: `1px solid ${colors.danger[200]}`,
+            borderRadius: radius.components.card,
+            padding: "12px 14px",
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
 
       <FormCard title="Basic Information" icon={<UserIcon size={18} />}>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -309,7 +406,7 @@ export default function UserFormPage({
                 onChange={(e) => setRoleId(e.target.value)}
                 style={selectStyle}
               >
-                <option value="">Select Role</option>
+                <option value="">Select ...</option>
                 {roles.map((role) => (
                   <option key={role.value} value={role.value}>
                     {role.label}
@@ -324,7 +421,7 @@ export default function UserFormPage({
                 onChange={(e) => setDefaultLocationId(e.target.value)}
                 style={selectStyle}
               >
-                <option value="">Select Location</option>
+                <option value="">Select ...</option>
                 {locations.map((location) => (
                   <option key={location.value} value={location.value}>
                     {location.label}
@@ -351,6 +448,85 @@ export default function UserFormPage({
                 </option>
               ))}
             </select>
+            <div
+              style={{
+                fontFamily: typography.fontFamily,
+                fontSize: typography.sizes.caption.fontSize,
+                color: colors.text.secondary,
+                lineHeight: 1.5,
+              }}
+            >
+              Assigned locations control where this user can open POS, Branch Sales, Truck Sales, and which sales history records they can see.
+            </div>
+          </div>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>Accessible Departments</label>
+            <select multiple style={{ ...selectStyle, height: "100px", appearance: "listbox" }} value={accessibleDepartmentIds}
+              onChange={(event) => setAccessibleDepartmentIds(Array.from(event.target.selectedOptions).map((option) => option.value))}>
+              {departments.map((department) => <option key={department.value} value={department.value}>{department.label}</option>)}
+            </select>
+            <div style={{ fontSize: typography.sizes.caption.fontSize, color: colors.text.secondary }}>Department scope is enforced together with action permission and location scope.</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div
+              style={{
+                fontFamily: typography.fontFamily,
+                fontSize: typography.sizes.caption.fontSize,
+                color: colors.text.secondary,
+                lineHeight: 1.5,
+              }}
+            >
+              User sales policy overrides are applied on top of the selected role. Use `Allow` to grant a sales action for this user even if the role does not grant it. Use `Deny` to block it for this user even if the role grants it.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px" }}>
+              {salesPermissionOptions.map((permission) => {
+                const mode = salesDenyPermissions.includes(permission.key)
+                  ? "deny"
+                  : salesAllowPermissions.includes(permission.key)
+                    ? "allow"
+                    : "inherit";
+
+                return (
+                  <div
+                    key={permission.key}
+                    style={{
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: radius.components.card,
+                      padding: "12px 14px",
+                      backgroundColor: colors.surface,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    <div style={{ fontWeight: typography.weights.semibold, color: colors.text.primary }}>
+                      {permission.label}
+                    </div>
+                    <select
+                      value={mode}
+                      onChange={(event) => {
+                        const nextMode = event.target.value;
+                        setSalesAllowPermissions((current) =>
+                          nextMode === "allow"
+                            ? Array.from(new Set([...current, permission.key]))
+                            : current.filter((entry) => entry !== permission.key),
+                        );
+                        setSalesDenyPermissions((current) =>
+                          nextMode === "deny"
+                            ? Array.from(new Set([...current, permission.key]))
+                            : current.filter((entry) => entry !== permission.key),
+                        );
+                      }}
+                      style={selectStyle}
+                    >
+                      <option value="inherit">Inherit Role Default</option>
+                      <option value="allow">Allow for This User</option>
+                      <option value="deny">Deny for This User</option>
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </FormCard>

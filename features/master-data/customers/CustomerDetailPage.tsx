@@ -193,6 +193,7 @@ export default function CustomerDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="md.customer"
         title={customer.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={pageActions} />}

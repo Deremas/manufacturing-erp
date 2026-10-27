@@ -15,13 +15,7 @@ import type {
   AccountsPayableAgingRow,
   ProcurementFinanceRegisterRow,
 } from "@/services/procurement/accounts-payable-report.service";
-
-function formatMoney(value: number) {
-  return Number(value ?? 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoney } from "@/lib/utils/format-number";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",

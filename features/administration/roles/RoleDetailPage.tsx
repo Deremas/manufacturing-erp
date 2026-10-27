@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
+import { publicEditUrl } from "@/lib/routing/urls";
 import { PageHeader, FormCard, ActionButtons, StatusBadge } from "@/components/shared";
 import type { Breadcrumb, Action } from "@/components/shared";
 import type { Role } from "../types";
@@ -46,6 +48,8 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 
 export default function RoleDetailPage({ role }: RoleDetailPageProps) {
+  const router = useRouter();
+
   if (!role) {
     return (
       <div style={pageStyle}>
@@ -65,13 +69,13 @@ export default function RoleDetailPage({ role }: RoleDetailPageProps) {
       label: "Back",
       variant: "secondary",
       icon: <ArrowLeft size={16} />,
-      onClick: () => window.history.back(),
+      onClick: () => router.push("/administration/roles"),
     },
     {
       label: "Edit",
       variant: "primary",
       icon: <Pencil size={16} />,
-      onClick: () => window.location.assign(`/administration/roles/${role.id}/edit`),
+      onClick: () => router.push(publicEditUrl("administration.role", role.publicId)),
     },
   ];
 
@@ -83,10 +87,12 @@ export default function RoleDetailPage({ role }: RoleDetailPageProps) {
     acc[module].push(perm);
     return acc;
   }, {});
+  const salesPermissions = (role.permissions ?? []).filter((permission) => permission.startsWith("sales."));
 
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="admin.role"
         title={role.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={pageActions} />}
@@ -213,6 +219,25 @@ export default function RoleDetailPage({ role }: RoleDetailPageProps) {
               </div>
             </div>
           ))}
+        </div>
+      </FormCard>
+
+      <FormCard title="Sales Policy Summary" icon={<Shield size={18} />}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ color: colors.text.secondary, fontSize: typography.sizes.small.fontSize }}>
+            These sales flags drive whether the role can use factory, branch, truck, and agent sales channels plus loading actions.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {salesPermissions.length === 0 ? (
+              <span style={{ color: colors.text.muted }}>No sales-specific flags assigned.</span>
+            ) : (
+              salesPermissions.map((permission) => (
+                <span key={permission} style={badgeStyle}>
+                  {permission}
+                </span>
+              ))
+            )}
+          </div>
         </div>
       </FormCard>
     </div>

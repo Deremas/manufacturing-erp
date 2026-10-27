@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const rows = await sql<Array<{ id: string }>>`
+    const rows = await sql<Array<{ id: string; publicId: number }>>`
       INSERT INTO "ItemType" (
         code,
         name,
@@ -64,10 +64,10 @@ export async function POST(request: Request) {
         NOW(),
         NOW()
       )
-      RETURNING id
+      RETURNING id, "publicId"
     `;
 
-    return NextResponse.json({ success: true, id: rows[0]?.id });
+    return NextResponse.json({ success: true, id: rows[0]?.id, publicId: rows[0]?.publicId });
   } catch (error) {
     console.error("Failed to create item type", error);
     return NextResponse.json({ error: "Failed to create item type" }, { status: 500 });

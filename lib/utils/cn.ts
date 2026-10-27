@@ -1,4 +1,3 @@
-// lib/utils/cn.ts
 // General-purpose utility helpers for NEW ERP
 
 // ─── cn — classname merger ───────────────────────────────────────────────────
@@ -26,10 +25,12 @@ export function formatCurrency(
   return new Intl.NumberFormat("en-KE", {
     style: "currency",
     currency,
-    minimumFractionDigits: 2,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
 }
+
+export { formatDecimal, formatMoney, formatQuantity, parseFormattedNumber, formatNumberDraft } from "@/lib/utils/format-number";
 
 // ─── formatDate ──────────────────────────────────────────────────────────────
 

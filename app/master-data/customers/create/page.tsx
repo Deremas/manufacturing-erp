@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { CustomerForm } from "@/features/master-data/components";
+import { publicViewUrlFromPayload } from "@/lib/routing/urls";
 
 export default function CreateCustomerPage() {
   const router = useRouter();
@@ -14,12 +15,15 @@ export default function CreateCustomerPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string; publicId?: number }
+      | null;
 
     if (!response.ok) {
-      throw new Error("Failed to create customer");
+      throw new Error(payload?.error ?? "Failed to create customer");
     }
 
-    router.push("/master-data/customers");
+    router.push(publicViewUrlFromPayload("master-data.customer", payload, "/master-data/customers"));
   };
 
   return (

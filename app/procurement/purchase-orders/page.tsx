@@ -1,11 +1,15 @@
-import { ProcurementListPage } from "@/features/procurement/document-pages";
+import { PurchaseOrderListPage } from "@/features/procurement/purchase-order-pages";
+import { getProcurementReferenceData } from "@/app/procurement/_lib/reference-data";
 import { listPurchaseOrders } from "@/services/procurement/purchase-order.service";
 
 export default async function PurchaseOrdersPage() {
-  const orders = await listPurchaseOrders();
+  const [orders, referenceData] = await Promise.all([
+    listPurchaseOrders(),
+    getProcurementReferenceData(),
+  ]);
 
   return (
-    <ProcurementListPage
+    <PurchaseOrderListPage
       title="Purchase Orders"
       subtitle="Manage supplier-facing orders, sourced from approved requisitions or created directly from live master data."
       breadcrumbs={[
@@ -13,19 +17,20 @@ export default async function PurchaseOrdersPage() {
         { label: "Purchase Orders" },
       ]}
       createHref="/procurement/purchase-orders/create"
-      baseHref="/procurement/purchase-orders"
-      primaryLabel="Supplier"
-      secondaryLabel="Delivery Location"
-      ownerLabel="PR Reference"
+      suppliers={referenceData.suppliers}
       rows={orders.map((row) => ({
         id: row.id,
+        publicId: row.publicId,
         number: row.poNo,
         date: row.poDate,
         status: row.status,
+        supplierId: row.supplierId,
         primary: row.supplierName,
         secondary: row.deliveryLocationName,
         owner: row.requisitionNo ?? "-",
         itemCount: row.itemCount,
+        subtotal: row.subtotal,
+        taxAmount: row.taxAmount,
         amount: row.totalAmount,
       }))}
     />

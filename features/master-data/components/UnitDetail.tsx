@@ -109,9 +109,11 @@ export default function UnitDetail({
       footer={{ actions: <ActionButtons actions={actions} /> }}
     >
       <div style={gridStyle}>
+        {renderField("Code", unit.code || unit.abbreviation?.toUpperCase() || "\u2014")}
         {renderField("Unit Name", unit.name)}
-        {renderField("Abbreviation", unit.abbreviation)}
+        {renderField("Abbreviation", unit.abbreviation ? unit.abbreviation.toUpperCase() : "\u2014")}
         {renderField("Type", unit.type || "\u2014")}
+        {renderField("Decimal Precision", unit.decimalPrecision ?? 0)}
         {renderField("Status", statusBadge)}
       </div>
     </FormCard>

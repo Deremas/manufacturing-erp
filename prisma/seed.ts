@@ -33,7 +33,7 @@ const permissionActions = [
 const locations = [
   {
     locationCode: "FACTORY-001",
-    locationName: "Main Factory",
+    locationName: "Factory",
     locationType: "Factory",
     address: "Industrial Area, Nairobi",
     isStockLocation: true,
@@ -100,15 +100,25 @@ const categories = [
     description: "Input materials used in production",
   },
   {
+    code: "ING",
+    name: "Ingredients & Additives",
+    description: "Ingredients and additives used in production",
+  },
+  {
+    code: "WIP",
+    name: "Work-in-Progress / Semi-Finished Products",
+    description: "Items in process between raw material and finished goods",
+  },
+  {
     code: "PACK",
     name: "Packaging Materials",
     description: "Packaging and wrapping materials",
   },
-  { code: "FG", name: "Finished Goods", description: "Items ready for sale" },
+  { code: "FG", name: "Finished Products", description: "Items ready for sale" },
   {
     code: "CONS",
-    name: "Consumables",
-    description: "Low-value consumable stock",
+    name: "Production Consumables",
+    description: "Consumable production support stock",
   },
   {
     code: "SPARE",
@@ -120,6 +130,7 @@ const categories = [
 const units = [
   { code: "PCS", name: "Piece", abbreviation: "pcs", type: "QUANTITY" },
   { code: "KG", name: "Kilogram", abbreviation: "kg", type: "WEIGHT" },
+  { code: "L", name: "Liter", abbreviation: "l", type: "VOLUME" },
   { code: "LTR", name: "Liter", abbreviation: "ltr", type: "VOLUME" },
   { code: "BOX", name: "Box", abbreviation: "box", type: "QUANTITY" },
   { code: "MTR", name: "Meter", abbreviation: "m", type: "LENGTH" },
@@ -131,6 +142,16 @@ const itemTypes = [
     code: "RAW",
     name: "Raw Material",
     description: "Purchasable stock used in production",
+  },
+  {
+    code: "ING",
+    name: "Ingredient",
+    description: "Ingredient or additive stock used in production",
+  },
+  {
+    code: "WIP",
+    name: "WIP",
+    description: "Work-in-progress or semi-finished stock",
   },
   {
     code: "PACK",
@@ -159,6 +180,34 @@ const itemTypes = [
   },
 ];
 
+const assetTypes = [
+  {
+    code: "VEH",
+    name: "Vehicle",
+    description: "Fleet vehicle asset",
+  },
+  {
+    code: "MACH",
+    name: "Machine",
+    description: "Production or plant machine asset",
+  },
+  {
+    code: "UTIL",
+    name: "Utility Equipment",
+    description: "Generators, compressors, boilers, and utility equipment",
+  },
+  {
+    code: "BLDG",
+    name: "Building / Facility",
+    description: "Facilities and infrastructure assets",
+  },
+  {
+    code: "TOOL",
+    name: "Tool / Instrument",
+    description: "Maintenance tools and measurement instruments",
+  },
+];
+
 const taxCodes = [
   {
     code: "VAT15",
@@ -173,6 +222,20 @@ const taxCodes = [
     taxName: "VAT 0%",
     taxType: "VAT",
     rate: 0,
+    appliesTo: "BOTH",
+  },
+  {
+    code: "VAT5",
+    taxName: "VAT 5%",
+    taxType: "VAT",
+    rate: 5,
+    appliesTo: "BOTH",
+  },
+  {
+    code: "VAT7",
+    taxName: "VAT 7%",
+    taxType: "VAT",
+    rate: 7,
     appliesTo: "BOTH",
   },
   {
@@ -203,6 +266,41 @@ const banks = [
   { id: "ECB", name: "Ethiopia Commercial Bank", shortName: "KCB" },
   { id: "EQUITY", name: "Equity Bank", shortName: "Equity" },
   { id: "COOP", name: "Co-operative Bank", shortName: "Co-op" },
+];
+
+const leaveTypes = [
+  {
+    code: "AL",
+    name: "Annual Leave",
+    paid: true,
+    entitlementDays: 21,
+    requiresAttachment: false,
+    approvalLevel: 2,
+  },
+  {
+    code: "SL",
+    name: "Sick Leave",
+    paid: true,
+    entitlementDays: 14,
+    requiresAttachment: true,
+    approvalLevel: 2,
+  },
+  {
+    code: "ML",
+    name: "Maternity Leave",
+    paid: true,
+    entitlementDays: 90,
+    requiresAttachment: true,
+    approvalLevel: 3,
+  },
+  {
+    code: "UL",
+    name: "Unpaid Leave",
+    paid: false,
+    entitlementDays: 30,
+    requiresAttachment: false,
+    approvalLevel: 2,
+  },
 ];
 
 const customers = [
@@ -248,42 +346,56 @@ const suppliers = [
 ];
 
 const items = [
-  {
-    itemCode: "RM-001",
-    itemName: "Corn Flour - Grade A",
-    sku: "CF-GA-001",
-    categoryCode: "RAW",
-    itemTypeCode: "RAW",
-    uomCode: "KG",
-    reorderPoint: 25,
-    standardCost: 45,
-    vatApplicable: true,
-    exciseApplicable: false,
-  },
-  {
-    itemCode: "FG-001",
-    itemName: "Maize Flour - 2kg Pack",
-    sku: "MF-2KG-001",
-    categoryCode: "FG",
-    itemTypeCode: "FG",
-    uomCode: "PCS",
-    reorderPoint: 50,
-    sellingPrice: 145,
-    vatApplicable: true,
-    exciseApplicable: false,
-  },
-  {
-    itemCode: "PACK-001",
-    itemName: "Plastic Bag - 2kg",
-    sku: "PB-2KG-001",
-    categoryCode: "PACK",
-    itemTypeCode: "PACK",
-    uomCode: "PCS",
-    reorderPoint: 100,
-    standardCost: 5,
-    vatApplicable: true,
-    exciseApplicable: false,
-  },
+  { itemCode: "RM-001", itemName: "Raw Groundnuts (Peanuts)", sku: "RM-001", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-002", itemName: "Raw Sesame Seeds", sku: "RM-002", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-003", itemName: "Raw Soybeans", sku: "RM-003", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-004", itemName: "Raw Sunflower Seeds", sku: "RM-004", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-005", itemName: "Raw Maize (Corn)", sku: "RM-005", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-006", itemName: "Raw Wheat Grain", sku: "RM-006", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-007", itemName: "Raw Sorghum", sku: "RM-007", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-008", itemName: "Raw Barley", sku: "RM-008", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-009", itemName: "Raw Teff Grain", sku: "RM-009", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-010", itemName: "Raw Chickpeas", sku: "RM-010", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-011", itemName: "Raw Red Kidney Beans", sku: "RM-011", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-012", itemName: "Raw White Beans", sku: "RM-012", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-013", itemName: "Raw Green Mung Beans", sku: "RM-013", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-014", itemName: "Raw Niger Seeds (Nug)", sku: "RM-014", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "RM-015", itemName: "Raw Flaxseeds", sku: "RM-015", categoryCode: "RAW", itemTypeCode: "RAW", uomCode: "KG", reorderPoint: 100, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-001", itemName: "White Granulated Sugar", sku: "ING-001", categoryCode: "ING", itemTypeCode: "ING", uomCode: "KG", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-002", itemName: "Natural Honey", sku: "ING-002", categoryCode: "ING", itemTypeCode: "ING", uomCode: "KG", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-003", itemName: "Iodized Salt", sku: "ING-003", categoryCode: "ING", itemTypeCode: "ING", uomCode: "KG", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-004", itemName: "Refined Sunflower Oil", sku: "ING-004", categoryCode: "ING", itemTypeCode: "ING", uomCode: "L", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-005", itemName: "Vegetable Oil", sku: "ING-005", categoryCode: "ING", itemTypeCode: "ING", uomCode: "L", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-006", itemName: "Cocoa Powder", sku: "ING-006", categoryCode: "ING", itemTypeCode: "ING", uomCode: "KG", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-007", itemName: "Food-Grade Citric Acid", sku: "ING-007", categoryCode: "ING", itemTypeCode: "ING", uomCode: "KG", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "ING-008", itemName: "Vanilla Flavoring", sku: "ING-008", categoryCode: "ING", itemTypeCode: "ING", uomCode: "L", reorderPoint: 50, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "WIP-001", itemName: "Cleaned Groundnuts", sku: "WIP-001", categoryCode: "WIP", itemTypeCode: "WIP", uomCode: "KG", reorderPoint: 40, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "WIP-002", itemName: "Roasted Groundnuts", sku: "WIP-002", categoryCode: "WIP", itemTypeCode: "WIP", uomCode: "KG", reorderPoint: 40, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "WIP-003", itemName: "Ground Peanut Paste", sku: "WIP-003", categoryCode: "WIP", itemTypeCode: "WIP", uomCode: "KG", reorderPoint: 40, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "WIP-004", itemName: "Bulk Peanut Butter", sku: "WIP-004", categoryCode: "WIP", itemTypeCode: "WIP", uomCode: "KG", reorderPoint: 40, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "WIP-005", itemName: "Cleaned Sesame Seeds", sku: "WIP-005", categoryCode: "WIP", itemTypeCode: "WIP", uomCode: "KG", reorderPoint: 40, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "WIP-006", itemName: "Roasted Sesame Seeds", sku: "WIP-006", categoryCode: "WIP", itemTypeCode: "WIP", uomCode: "KG", reorderPoint: 40, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "WIP-007", itemName: "Ground Sesame Paste (Tahini)", sku: "WIP-007", categoryCode: "WIP", itemTypeCode: "WIP", uomCode: "KG", reorderPoint: 40, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-001", itemName: "Creamy Peanut Butter 500 g", sku: "FG-001", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-002", itemName: "Creamy Peanut Butter 1 kg", sku: "FG-002", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-003", itemName: "Creamy Peanut Butter 4 kg", sku: "FG-003", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-004", itemName: "Crunchy Peanut Butter 500 g", sku: "FG-004", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-005", itemName: "Crunchy Peanut Butter 1 kg", sku: "FG-005", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-006", itemName: "Natural Peanut Butter 1 kg", sku: "FG-006", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-007", itemName: "Sesame Tahini 500 g", sku: "FG-007", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-008", itemName: "Sesame Tahini 1 kg", sku: "FG-008", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-009", itemName: "Roasted Salted Peanuts 250 g", sku: "FG-009", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "FG-010", itemName: "Roasted Salted Peanuts 500 g", sku: "FG-010", categoryCode: "FG", itemTypeCode: "FG", uomCode: "PCS", reorderPoint: 100, sellingPrice: 0, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-001", itemName: "Plastic Jar 500 g", sku: "PKG-001", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-002", itemName: "Plastic Jar 1 kg", sku: "PKG-002", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-003", itemName: "Plastic Jar 4 kg", sku: "PKG-003", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-004", itemName: "Plastic Jar Lid", sku: "PKG-004", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-005", itemName: "Induction Sealing Foil", sku: "PKG-005", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-006", itemName: "Peanut Butter Product Label", sku: "PKG-006", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-007", itemName: "Corrugated Packaging Carton", sku: "PKG-007", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "PKG-008", itemName: "Food-Grade Packaging Pouch 250 g", sku: "PKG-008", categoryCode: "PACK", itemTypeCode: "PACK", uomCode: "PCS", reorderPoint: 200, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "CON-001", itemName: "Food-Grade Cleaning Detergent", sku: "CON-001", categoryCode: "CONS", itemTypeCode: "CONS", uomCode: "L", reorderPoint: 20, vatApplicable: true, exciseApplicable: false },
+  { itemCode: "CON-002", itemName: "Disposable Food Handling Gloves", sku: "CON-002", categoryCode: "CONS", itemTypeCode: "CONS", uomCode: "BOX", reorderPoint: 20, vatApplicable: true, exciseApplicable: false },
 ];
 
 const priceLists = [
@@ -320,6 +432,114 @@ function makeSeedId(prefix: string, value: string): string {
 
 async function seedPermissions() {
   const permissions: Array<{ id: string; module: string; action: string }> = [];
+  const extraPermissions = [
+    { module: "sales", action: "factory.use", label: "Sales Factory Use" },
+    { module: "sales", action: "branch.use", label: "Sales Branch Use" },
+    { module: "sales", action: "truck.use", label: "Sales Truck Use" },
+    { module: "sales", action: "agent.use", label: "Sales Agent Use" },
+    {
+      module: "sales",
+      action: "loading.create",
+      label: "Sales Loading Create",
+    },
+    {
+      module: "sales",
+      action: "loading.confirm",
+      label: "Sales Loading Confirm",
+    },
+    {
+      module: "sales",
+      action: "loading.cancel",
+      label: "Sales Loading Cancel",
+    },
+    { module: "qc", action: "setup.view", label: "QC Setup View" },
+    { module: "qc", action: "setup.manage", label: "QC Setup Manage" },
+    { module: "qc", action: "task.view", label: "QC Task View" },
+    { module: "qc", action: "task.assign", label: "QC Task Assign" },
+    { module: "qc", action: "task.start", label: "QC Task Start" },
+    { module: "qc", action: "test.create", label: "QC Test Create" },
+    { module: "qc", action: "test.check", label: "QC Test Check" },
+    { module: "qc", action: "test.approve", label: "QC Test Approve" },
+    { module: "qc", action: "hold.create", label: "QC Hold Create" },
+    { module: "qc", action: "release.approve", label: "QC Release Approve" },
+    { module: "qc", action: "reject.approve", label: "QC Reject Approve" },
+    { module: "qc", action: "rework.approve", label: "QC Rework Approve" },
+    { module: "qc", action: "scrap.approve", label: "QC Scrap Approve" },
+    { module: "qc", action: "nc.manage", label: "QC Nonconformity Manage" },
+    { module: "qc", action: "dashboard.view", label: "QC Dashboard View" },
+    { module: "qc", action: "daily.view", label: "QC Daily Records View" },
+    { module: "qc", action: "daily.export", label: "QC Daily Records Export" },
+    { module: "qc", action: "setup.create", label: "QC Master Data Create" },
+    { module: "qc", action: "setup.update", label: "QC Master Data Update" },
+    { module: "qc", action: "record.backdate", label: "QC Backdate Records" },
+    { module: "qc", action: "water.view", label: "QC Water View" },
+    { module: "qc", action: "water.create", label: "QC Water Create" },
+    { module: "qc", action: "water.update", label: "QC Water Update" },
+    { module: "qc", action: "water.submit", label: "QC Water Submit" },
+    { module: "qc", action: "water.approve", label: "QC Water Approve" },
+    { module: "qc", action: "chlorine.view", label: "QC Chlorine View" },
+    { module: "qc", action: "chlorine.create", label: "QC Chlorine Create" },
+    { module: "qc", action: "chlorine.update", label: "QC Chlorine Update" },
+    { module: "qc", action: "chlorine.submit", label: "QC Chlorine Submit" },
+    { module: "qc", action: "chlorine.approve", label: "QC Chlorine Approve" },
+    { module: "qc", action: "treatment.view", label: "QC Treatment View" },
+    { module: "qc", action: "treatment.create", label: "QC Treatment Create" },
+    { module: "qc", action: "physicochemical.view", label: "QC Physico-Chemical View" },
+    { module: "qc", action: "physicochemical.create", label: "QC Physico-Chemical Create" },
+    { module: "qc", action: "microbial.view", label: "QC Microbial View" },
+    { module: "qc", action: "microbial.create", label: "QC Microbial Create" },
+    { module: "qc", action: "preform.view", label: "QC Preform View" },
+    { module: "qc", action: "preform.create", label: "QC Preform Create" },
+    { module: "qc", action: "handle.view", label: "QC Handle View" },
+    { module: "qc", action: "handle.create", label: "QC Handle Create" },
+    { module: "qc", action: "cap.view", label: "QC Cap View" },
+    { module: "qc", action: "cap.create", label: "QC Cap Create" },
+    { module: "qc", action: "packaging.view", label: "QC Packaging View" },
+    { module: "qc", action: "packaging.create", label: "QC Packaging Create" },
+    { module: "qc", action: "cip.view", label: "QC CIP View" },
+    { module: "qc", action: "cip.create", label: "QC CIP Create" },
+    { module: "qc", action: "retention.view", label: "QC Retention View" },
+    { module: "qc", action: "retention.create", label: "QC Retention Create" },
+    { module: "qc", action: "hold.view", label: "QC Hold Decision View" },
+    { module: "qc", action: "hold.update", label: "QC Hold Decision Update" },
+    { module: "qc", action: "nc.view", label: "QC Nonconformity View" },
+    { module: "qc", action: "nc.create", label: "QC Nonconformity Create" },
+    { module: "qc", action: "review.view", label: "QC Management Review View" },
+    { module: "qc", action: "review.create", label: "QC Management Review Create" },
+    { module: "qc", action: "audit.view", label: "QC Internal Audit View" },
+    { module: "qc", action: "audit.create", label: "QC Internal Audit Create" },
+    { module: "qc", action: "capa.view", label: "QC Corrective Action View" },
+    { module: "qc", action: "capa.create", label: "QC Corrective Action Create" },
+    {
+      module: "production",
+      action: "stage.manage",
+      label: "Production Stage Manage",
+    },
+    { module: "maintenance", action: "pm.view", label: "Preventive Maintenance View" },
+    { module: "maintenance", action: "pm.create", label: "Preventive Maintenance Create" },
+    { module: "maintenance", action: "pm.update", label: "Preventive Maintenance Update" },
+    { module: "maintenance", action: "pm.generateWorkOrder", label: "Generate Preventive Maintenance Work Order" },
+    { module: "maintenance", action: "pm.recordChecklist", label: "Record Preventive Maintenance Checklist" },
+    { module: "maintenance", action: "pm.reschedule", label: "Request Preventive Maintenance Reschedule" },
+    { module: "maintenance", action: "pm.checkReschedule", label: "Check Preventive Maintenance Reschedule" },
+    { module: "maintenance", action: "pm.approveReschedule", label: "Approve Preventive Maintenance Reschedule" },
+    { module: "maintenance", action: "pm.rejectReschedule", label: "Reject Preventive Maintenance Reschedule" },
+    { module: "maintenance", action: "pm.complete", label: "Complete Preventive Maintenance" },
+    { module: "maintenance", action: "pm.print", label: "Print Preventive Maintenance" },
+    { module: "maintenance", action: "pm.export", label: "Export Preventive Maintenance" },
+    { module: "maintenance", action: "ticket.convertWorkOrder", label: "Convert Maintenance Ticket to Work Order" },
+    { module: "maintenance", action: "ticket.print", label: "Print Maintenance Tickets" },
+    { module: "maintenance", action: "ticket.export", label: "Export Maintenance Tickets" },
+    { module: "asset", action: "lifecycle.reactivate", label: "Reactivate Retired Assets" },
+    { module: "production", action: "downtime.cancel", label: "Cancel Production Downtime" },
+    { module: "procurement", action: "invoice.approve", label: "Approve supplier invoices" },
+    { module: "procurement", action: "invoice.reject", label: "Reject supplier invoices" },
+    { module: "procurement", action: "payment.approve", label: "Approve supplier payments" },
+    { module: "procurement", action: "payment.reject", label: "Reject supplier payments" },
+    { module: "procurement", action: "supplierReturn.approve", label: "Approve supplier returns" },
+    { module: "procurement", action: "supplierReturn.reject", label: "Reject supplier returns" },
+    { module: "reports", action: "maintenance.pmCompliance", label: "Preventive Maintenance Compliance Report" },
+  ] as const;
 
   for (const module of permissionModules) {
     for (const action of permissionActions) {
@@ -335,6 +555,24 @@ async function seedPermissions() {
       `;
       permissions.push({ id, module, action });
     }
+  }
+
+  for (const permission of extraPermissions) {
+    const id = `${permission.module}.${permission.action}`;
+    await sql`
+      INSERT INTO "Permission" ("id", "module", "action", "label", "isArchived")
+      VALUES (${id}, ${permission.module}, ${permission.action}, ${permission.label}, false)
+      ON CONFLICT ("id") DO UPDATE SET
+        "module" = EXCLUDED."module",
+        "action" = EXCLUDED."action",
+        "label" = EXCLUDED."label",
+        "isArchived" = false
+    `;
+    permissions.push({
+      id,
+      module: permission.module,
+      action: permission.action,
+    });
   }
 
   return permissions;
@@ -486,6 +724,35 @@ async function seedUserRecord(
   },
   password: string,
 ) {
+  const syncSeededPassword = process.env.SYNC_SEEDED_PASSWORDS === "true";
+  const matches = await sql<Array<{ id: string; email: string; username: string | null; phone: string | null }>>`
+    SELECT id, email, username, phone
+    FROM "User"
+    WHERE email = ${user.email}
+       OR username = ${user.username}
+       OR phone = ${user.phone}
+    FOR UPDATE
+  `;
+  const matchedIds = [...new Set(matches.map((entry) => entry.id))];
+  if (matchedIds.length > 1) {
+    throw new Error(
+      `Cannot seed ${user.username}: email, username, or phone belong to different existing users. Resolve the duplicate identities first.`,
+    );
+  }
+  if (matchedIds[0]) {
+    const existingId = matchedIds[0];
+    await sql`
+      UPDATE "User"
+      SET "name" = ${user.name}, "email" = ${user.email}, "username" = ${user.username},
+        "password" = CASE WHEN ${syncSeededPassword} THEN ${password} ELSE "password" END,
+        "language" = 'en', "dateFormat" = 'DD/MM/YYYY',
+        "itemsPerPage" = 25, "role" = ${user.role}, "phone" = ${user.phone},
+        "isActive" = true, "isArchived" = false, "roleId" = ${user.roleId}, "updatedAt" = NOW()
+      WHERE id = ${existingId}
+    `;
+    return existingId;
+  }
+
   const rows = await sql<Array<{ id: string }>>`
     INSERT INTO "User" (
       "id",
@@ -526,16 +793,15 @@ async function seedUserRecord(
     ON CONFLICT ("email") DO UPDATE SET
       "name" = EXCLUDED."name",
       "username" = EXCLUDED."username",
-      "password" = EXCLUDED."password",
       "language" = EXCLUDED."language",
       "dateFormat" = EXCLUDED."dateFormat",
       "itemsPerPage" = EXCLUDED."itemsPerPage",
-      "lastLogin" = EXCLUDED."lastLogin",
       "role" = EXCLUDED."role",
       "phone" = EXCLUDED."phone",
       "isActive" = true,
       "isArchived" = false,
       "roleId" = EXCLUDED."roleId",
+      "password" = CASE WHEN ${syncSeededPassword} THEN EXCLUDED."password" ELSE "User"."password" END,
       "updatedAt" = NOW()
     RETURNING "id"
   `;
@@ -682,6 +948,46 @@ async function seedMasterData() {
       ON CONFLICT ("id") DO UPDATE SET
         "name" = EXCLUDED."name",
         "shortName" = EXCLUDED."shortName",
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
+  }
+
+  for (const leaveType of leaveTypes) {
+    await sql`
+      INSERT INTO "LeaveType" (
+        "id",
+        "code",
+        "name",
+        "paid",
+        "entitlementDays",
+        "requiresAttachment",
+        "approvalLevel",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("leave-type", leaveType.code)},
+        ${leaveType.code},
+        ${leaveType.name},
+        ${leaveType.paid},
+        ${leaveType.entitlementDays},
+        ${leaveType.requiresAttachment},
+        ${leaveType.approvalLevel},
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("code") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "paid" = EXCLUDED."paid",
+        "entitlementDays" = EXCLUDED."entitlementDays",
+        "requiresAttachment" = EXCLUDED."requiresAttachment",
+        "approvalLevel" = EXCLUDED."approvalLevel",
         "isActive" = true,
         "isArchived" = false,
         "updatedAt" = NOW()
@@ -861,6 +1167,69 @@ async function seedMasterData() {
     `;
   }
 
+  const activeItemRows = await sql<
+    Array<{ id: string; itemCode: string }>
+  >`SELECT id, "itemCode" FROM "Item" WHERE "isArchived" = false`;
+  const desiredItemCodes = new Set(items.map((item) => item.itemCode));
+  const legacyItemIds = activeItemRows
+    .filter((row) => !desiredItemCodes.has(row.itemCode))
+    .map((row) => row.id);
+
+  if (legacyItemIds.length > 0) {
+    await sql`
+      UPDATE "Item"
+      SET "isArchived" = true,
+          "isActive" = false,
+          "updatedAt" = NOW()
+      WHERE id = ANY(${legacyItemIds})
+    `;
+  }
+
+  await sql`
+    UPDATE "Item"
+    SET "isArchived" = true, "isActive" = false, "updatedAt" = NOW()
+    WHERE "isArchived" = false
+      AND (
+        "itemName" ILIKE '%Test%'
+        OR "itemName" ILIKE 'Finished Good FG-%'
+        OR "itemName" ILIKE 'Raw Material RAW-%'
+        OR "itemCode" ILIKE 'TEST-%'
+        OR "itemCode" ILIKE 'FG-T%'
+        OR "itemCode" ILIKE 'RAW-T%'
+      )
+  `;
+
+  for (const assetType of assetTypes) {
+    await sql`
+      INSERT INTO "AssetType" (
+        id,
+        code,
+        name,
+        description,
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${makeSeedId("asset-type", assetType.code)},
+        ${assetType.code},
+        ${assetType.name},
+        ${assetType.description},
+        true,
+        false,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("code") DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        "isActive" = true,
+        "isArchived" = false,
+        "updatedAt" = NOW()
+    `;
+  }
+
   for (const priceList of priceLists) {
     await sql`
       INSERT INTO "PriceList" (
@@ -901,7 +1270,45 @@ async function seedMasterData() {
     `;
   }
 
-  for (const prefix of ["PO", "SO", "GRN", "INV", "PR", "REQ", "ST", "ADJ", "SRET", "SINV", "SPAY"]) {
+  for (const prefix of [
+    "PO",
+    "SO",
+    "GRN",
+    "INV",
+    "PR",
+    "REQ",
+    "ST",
+    "ADJ",
+    "SRET",
+    "SINV",
+    "SPAY",
+    "MT",
+    "WO",
+    "PM",
+    "SPR",
+    "DT",
+    "AAS",
+    "ATR",
+    "AST",
+    "ATA",
+    "MTK",
+    "QC-WAT",
+    "QC-CLR",
+    "QC-TRT",
+    "QC-PHY",
+    "QC-MIC",
+    "QC-PRE",
+    "QC-HND",
+    "QC-CAP",
+    "QC-PKG",
+    "QC-CIP",
+    "QC-RET",
+    "QC-HLD",
+    "QC-NCR",
+    "QC-MRV",
+    "QC-AUD",
+    "QC-CAPLAN",
+  ]) {
     await sql`
       INSERT INTO "DocumentNumbering" (
         "id",
@@ -921,25 +1328,25 @@ async function seedMasterData() {
         ${makeSeedId("docnum", prefix)},
         ${prefix},
         ${titleCase(prefix)},
-        ${prefix},
+        'PREFIX',
         '-',
         'YYYY',
         'MM',
         'DD',
-        4,
+        2,
         0,
         true,
         false
       )
       ON CONFLICT ("prefix") DO UPDATE SET
         "description" = EXCLUDED."description",
-        "prefixFormat" = EXCLUDED."prefixFormat",
+        "prefixFormat" = 'PREFIX',
         "separator" = EXCLUDED."separator",
         "yearFormat" = EXCLUDED."yearFormat",
         "monthFormat" = EXCLUDED."monthFormat",
         "dayFormat" = EXCLUDED."dayFormat",
-        "sequenceLength" = EXCLUDED."sequenceLength",
-        "currentSequence" = EXCLUDED."currentSequence",
+        "sequenceLength" = 2,
+        "currentSequence" = GREATEST("DocumentNumbering"."currentSequence", EXCLUDED."currentSequence"),
         "isActive" = true,
         "isArchived" = false
     `;
@@ -1008,15 +1415,96 @@ async function seedCompanyAndSettings() {
     { key: "date_format", value: "DD/MM/YYYY", category: "general" },
     { key: "timezone", value: "Africa/Nairobi", category: "general" },
     { key: "enable_audit_log", value: "true", category: "security" },
-    { key: "inventory_require_adjustment_approval", value: "false", category: "inventory" },
-    { key: "inventory_require_issue_approval", value: "false", category: "inventory" },
-    { key: "inventory_require_return_approval", value: "false", category: "inventory" },
-    { key: "inventory_require_requisition_approval", value: "false", category: "inventory" },
-    { key: "inventory_policy_transfer", value: JSON.stringify({ documentType: "transfer", title: "Transfer Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
-    { key: "inventory_policy_adjustment", value: JSON.stringify({ documentType: "adjustment", title: "Adjustment Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
-    { key: "inventory_policy_issue", value: JSON.stringify({ documentType: "issue", title: "Issue Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
-    { key: "inventory_policy_return", value: JSON.stringify({ documentType: "return", title: "Return Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
-    { key: "inventory_policy_requisition", value: JSON.stringify({ documentType: "requisition", title: "Store Requisition Approval", requireApproval: false, minimumValueThreshold: 0, minimumQuantityThreshold: 0, requiredRole: "", autoApproveForAdmin: false, isActive: true }), category: "inventory" },
+    {
+      key: "inventory_require_adjustment_approval",
+      value: "false",
+      category: "inventory",
+    },
+    {
+      key: "inventory_require_issue_approval",
+      value: "false",
+      category: "inventory",
+    },
+    {
+      key: "inventory_require_return_approval",
+      value: "false",
+      category: "inventory",
+    },
+    {
+      key: "inventory_require_requisition_approval",
+      value: "false",
+      category: "inventory",
+    },
+    {
+      key: "inventory_policy_transfer",
+      value: JSON.stringify({
+        documentType: "transfer",
+        title: "Transfer Approval",
+        requireApproval: false,
+        minimumValueThreshold: 0,
+        minimumQuantityThreshold: 0,
+        requiredRole: "",
+        autoApproveForAdmin: false,
+        isActive: true,
+      }),
+      category: "inventory",
+    },
+    {
+      key: "inventory_policy_adjustment",
+      value: JSON.stringify({
+        documentType: "adjustment",
+        title: "Adjustment Approval",
+        requireApproval: false,
+        minimumValueThreshold: 0,
+        minimumQuantityThreshold: 0,
+        requiredRole: "",
+        autoApproveForAdmin: false,
+        isActive: true,
+      }),
+      category: "inventory",
+    },
+    {
+      key: "inventory_policy_issue",
+      value: JSON.stringify({
+        documentType: "issue",
+        title: "Issue Approval",
+        requireApproval: false,
+        minimumValueThreshold: 0,
+        minimumQuantityThreshold: 0,
+        requiredRole: "",
+        autoApproveForAdmin: false,
+        isActive: true,
+      }),
+      category: "inventory",
+    },
+    {
+      key: "inventory_policy_return",
+      value: JSON.stringify({
+        documentType: "return",
+        title: "Return Approval",
+        requireApproval: false,
+        minimumValueThreshold: 0,
+        minimumQuantityThreshold: 0,
+        requiredRole: "",
+        autoApproveForAdmin: false,
+        isActive: true,
+      }),
+      category: "inventory",
+    },
+    {
+      key: "inventory_policy_requisition",
+      value: JSON.stringify({
+        documentType: "requisition",
+        title: "Store Requisition Approval",
+        requireApproval: false,
+        minimumValueThreshold: 0,
+        minimumQuantityThreshold: 0,
+        requiredRole: "",
+        autoApproveForAdmin: false,
+        isActive: true,
+      }),
+      category: "inventory",
+    },
   ];
 
   for (const setting of settings) {
@@ -1034,9 +1522,43 @@ async function seedCompanyAndSettings() {
     { module: "procurement", key: "pr.requireApproval", value: "false" },
     { module: "procurement", key: "po.requireApproval", value: "false" },
     { module: "procurement", key: "grn.requireApproval", value: "false" },
-    { module: "procurement", key: "supplierReturn.requireApproval", value: "false" },
+    {
+      module: "procurement",
+      key: "supplierReturn.requireApproval",
+      value: "false",
+    },
     { module: "procurement", key: "invoice.requireApproval", value: "false" },
     { module: "procurement", key: "payment.requireApproval", value: "false" },
+    {
+      module: "hr",
+      key: "overtimeReasons",
+      value: JSON.stringify([
+        "Machine Breakdown",
+        "Urgent Dispatch",
+        "Inventory Count",
+        "Other",
+      ]),
+    },
+    { module: "hr", key: "payroll.taxPercent", value: "30" },
+    { module: "hr", key: "payroll.employeePensionPercent", value: "7" },
+    { module: "hr", key: "payroll.employerPensionPercent", value: "11" },
+    { module: "hr", key: "payroll.overtimeMultiplier", value: "1.5" },
+    { module: "hr", key: "payroll.normalDayOvertimeMultiplier", value: "1.5" },
+    { module: "hr", key: "payroll.weekendOvertimeMultiplier", value: "2" },
+    { module: "hr", key: "payroll.holidayOvertimeMultiplier", value: "2.5" },
+    { module: "hr", key: "payroll.standardWorkDaysPerMonth", value: "26" },
+    { module: "hr", key: "payroll.attendanceRequiredForSalary", value: "true" },
+    { module: "hr", key: "payroll.weekendDays", value: "[0]" },
+    { module: "hr", key: "payroll.holidayDates", value: "[]" },
+    { module: "hr", key: "payroll.salaryExpenseAccountId", value: "" },
+    { module: "hr", key: "payroll.employerPensionExpenseAccountId", value: "" },
+    { module: "hr", key: "payroll.salaryPayableAccountId", value: "" },
+    { module: "hr", key: "payroll.taxPayableAccountId", value: "" },
+    { module: "hr", key: "payroll.pensionPayableAccountId", value: "" },
+    { module: "maintenance", key: "expenseAccountId", value: "" },
+    { module: "maintenance", key: "spareInventoryAccountId", value: "" },
+    { module: "maintenance", key: "externalServiceAccountId", value: "" },
+    { module: "maintenance", key: "assetCapitalizationAccountId", value: "" },
   ];
 
   for (const setting of moduleSettings) {
@@ -1062,7 +1584,7 @@ async function main() {
     {
       id: makeSeedId("user", "admin"),
       name: "System Administrator",
-      email: "admin@newerp.local",
+      email: "derejemasresha27@gmail.com",
       username: "admin",
       role: "Super Admin",
       roleId: roles.superAdminId,
@@ -1077,10 +1599,25 @@ async function main() {
     userId: roles.userId,
   });
 
-  await seedUserLocations(adminUserId, seededLocations.map((location) => location.id));
-  await seedUserLocations(additionalUsers.managerUserId, seededLocations.slice(0, 3).map((location) => location.id));
-  await seedUserLocations(additionalUsers.clerkUserId, seededLocations.slice(1, 3).map((location) => location.id));
+  await seedUserLocations(
+    adminUserId,
+    seededLocations.map((location) => location.id),
+  );
+  await seedUserLocations(
+    additionalUsers.managerUserId,
+    seededLocations.slice(0, 3).map((location) => location.id),
+  );
+  await seedUserLocations(
+    additionalUsers.clerkUserId,
+    seededLocations.slice(1, 3).map((location) => location.id),
+  );
   await seedMasterData();
+  const { normalizeDocumentNumberingDefaults } = await import("@/lib/document-numbering");
+  const { repairLegacyItemCodes } = await import("@/lib/server/item-data");
+  await normalizeDocumentNumberingDefaults();
+  await repairLegacyItemCodes();
+  const { seedOperationalQcMaster } = await import("@/services/qc/qc-master.service");
+  await seedOperationalQcMaster();
 
   if (process.env.SEED_OPENING_STOCK === "true") {
     const stockSeed = await seedOpeningStock({

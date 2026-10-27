@@ -281,14 +281,26 @@ export async function deleteAdministrationRecord(
           FROM "Location"
           WHERE "parentLocationId" = ${id} AND "isArchived" = false
         `;
-        const userLocations = await tx<Array<{ count: bigint }>>`
-          SELECT COUNT(*)::bigint AS count
-          FROM "UserLocation"
-          WHERE "locationId" = ${id}
-        `;
-        if (Number(childLocations[0]?.count ?? 0) > 0 || Number(userLocations[0]?.count ?? 0) > 0) {
-          return protectedRecord("This location is in use and cannot be deleted.");
+        if (Number(childLocations[0]?.count ?? 0) > 0) {
+          return protectedRecord("This location has child locations and cannot be deleted.");
         }
+
+        const stock = await tx<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM "StockBalance"
+          WHERE "locationId" = ${id}
+            AND ("quantity" <> 0 OR "reservedQuantity" <> 0)
+        `;
+        const movements = await tx<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM "StockMovement"
+          WHERE "locationId" = ${id} AND "isArchived" = false
+        `;
+        if (Number(stock[0]?.count ?? 0) > 0 || Number(movements[0]?.count ?? 0) > 0) {
+          return protectedRecord("This location has stock history and cannot be deleted.");
+        }
+
+        await tx`DELETE FROM "UserLocation" WHERE "locationId" = ${id}`;
 
         const updated = await tx<Array<{ id: string }>>`
           UPDATE "Location"

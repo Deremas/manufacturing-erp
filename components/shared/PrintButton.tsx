@@ -4,6 +4,7 @@ import React from "react";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
+import { useAccess } from "@/lib/auth/use-access";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -42,6 +43,9 @@ export default function PrintButton({
   label = "Print",
   disabled,
 }: PrintButtonProps) {
+  const { canAction } = useAccess();
+  if (!canAction(label)) return null;
+
   return (
     <button
       style={buttonStyle(!!disabled)}

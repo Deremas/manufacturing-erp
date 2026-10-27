@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: "Goods receipt not found" }, { status: 404 });
     }
     return receipt;
-  });
+  }, "procurement.grn.view");
 }
 
 export async function PUT(
@@ -24,5 +24,5 @@ export async function PUT(
   return withGoodsReceiptAction(async (userId) => {
     const body = await request.json();
     return updateReceipt(id, body as Record<string, unknown>, userId);
-  });
+  }, "procurement.grn.update");
 }

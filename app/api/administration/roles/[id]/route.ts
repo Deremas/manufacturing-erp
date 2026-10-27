@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/auth";
+import { checkPermission } from "@/lib/permissions/permissions";
 
 function splitPermissionKey(value: string): { module: string; action: string } {
-  const [module, action] = value.split(".");
-  return { module: module?.trim() ?? "", action: action?.trim() ?? "" };
+  const [module, ...actionParts] = value.split(".");
+  return { module: module?.trim() ?? "", action: actionParts.join(".").trim() ?? "" };
 }
 
 async function resolvePermissionIds(permissionKeys: string[]) {
@@ -38,6 +40,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkPermission(user, "administration.role.update")) return NextResponse.json({ error: "Forbidden: missing permission administration.role.update" }, { status: 403 });
   try {
     const { id } = await params;
     const body = await request.json();

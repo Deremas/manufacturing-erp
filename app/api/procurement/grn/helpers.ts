@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/auth";
+import { checkPermission } from "@/lib/permissions/permissions";
 import {
   approveGoodsReceipt,
   cancelGoodsReceipt,
@@ -10,16 +11,19 @@ import {
   listGoodsReceipts,
   postGoodsReceipt,
   rejectGoodsReceipt,
+  submitGoodsReceipt,
   updateGoodsReceipt,
 } from "@/services/procurement/grn.service";
 
 export async function withGoodsReceiptAction<T>(
   action: (userId: string) => Promise<T | Response>,
+  requiredPermission: string,
 ) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!checkPermission(user, requiredPermission)) return NextResponse.json({ error: `Forbidden: missing permission ${requiredPermission}` }, { status: 403 });
 
   try {
     const result = await action(user.id);
@@ -87,12 +91,16 @@ export async function updateReceipt(id: string, body: Record<string, unknown>, u
   });
 }
 
-export async function approveReceipt(id: string, userId: string) {
-  return approveGoodsReceipt(id, userId);
+export async function approveReceipt(id: string, userId: string, comment?: string) {
+  return approveGoodsReceipt(id, userId, comment);
 }
 
-export async function rejectReceipt(id: string, userId: string) {
-  return rejectGoodsReceipt(id, userId);
+export async function rejectReceipt(id: string, userId: string, comment?: string) {
+  return rejectGoodsReceipt(id, userId, comment);
+}
+
+export async function submitReceipt(id: string, userId: string, input?: { approverId?: string; comment?: string }) {
+  return submitGoodsReceipt(id, userId, input);
 }
 
 export async function cancelReceipt(id: string, userId: string) {

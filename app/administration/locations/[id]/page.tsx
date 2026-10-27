@@ -1,19 +1,10 @@
-import { notFound } from "next/navigation";
-import { LocationDetailPage } from "@/features/administration/locations";
-import { getLocationById } from "@/lib/master-data-db";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-interface LocationPageProps {
-  params: { id: string };
-}
-
-export default async function ViewLocationPage({
+export default async function LegacyRedirect({
   params,
-}: LocationPageProps) {
-  const location = await getLocationById(params.id);
-
-  if (!location) {
-    notFound();
-  }
-
-  return <LocationDetailPage location={location} />;
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  await redirectLegacyToPublicUrl("administration.location", id, "view");
 }

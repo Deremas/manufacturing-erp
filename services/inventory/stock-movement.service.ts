@@ -56,6 +56,8 @@ export async function listStockMovements(
       totalCost: number | null;
       referenceType: string | null;
       referenceNo: string | null;
+      sourceModule: string | null;
+      sourceDocumentId: string | null;
       createdById: string;
       createdByName: string;
       remarks: string | null;
@@ -78,6 +80,8 @@ export async function listStockMovements(
       sm."totalCost",
       sm."referenceType",
       sm."referenceId" AS "referenceNo",
+      sm."sourceModule",
+      sm."sourceDocumentId",
       sm."createdById",
       u.name AS "createdByName",
       sm.remarks
@@ -86,6 +90,7 @@ export async function listStockMovements(
     INNER JOIN "Location" l ON l.id = sm."locationId"
     INNER JOIN "User" u ON u.id = sm."createdById"
     WHERE sm."isArchived" = false
+      AND i."isArchived" = false
       ${filters.itemId ? sql`AND sm."itemId" = ${filters.itemId}` : sql``}
       ${filters.locationId ? sql`AND sm."locationId" = ${filters.locationId}` : sql``}
       ${filters.movementType ? sql`AND sm."movementType" = ${filters.movementType}` : sql``}
@@ -121,8 +126,8 @@ export async function listStockMovements(
       totalCost: row.totalCost,
       referenceType: row.referenceType,
       referenceNo: row.referenceNo,
-      sourceModule: row.referenceType,
-      sourceDocumentId: null,
+      sourceModule: row.sourceModule,
+      sourceDocumentId: row.sourceDocumentId,
       createdById: row.createdById,
       createdByName: row.createdByName,
       remarks: row.remarks,

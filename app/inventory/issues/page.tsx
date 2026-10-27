@@ -1,4 +1,5 @@
 import { InventoryDocumentListPage } from "@/features/inventory/live/document-pages";
+import { formatStockIssueNumber } from "@/app/inventory/_lib/requisition-number";
 import { listIssues } from "@/services/inventory/inventory-documents.service";
 
 export default async function IssuesRoute() {
@@ -15,7 +16,8 @@ export default async function IssuesRoute() {
       createHref="/inventory/issues/create"
       rows={issues.map((issue) => ({
         id: issue.id,
-        number: issue.issueNo,
+        publicId: issue.publicId,
+        number: formatStockIssueNumber(issue.issueNo),
         date: issue.issueDate,
         status: issue.status,
         itemCount: issue.itemCount,
@@ -27,7 +29,7 @@ export default async function IssuesRoute() {
       primaryColumnLabel="Issued To"
       secondaryColumnLabel="Location"
       ownerColumnLabel="Created By"
-      baseHref="/inventory/issues"
+      routeKey="inventory.issue"
     />
   );
 }

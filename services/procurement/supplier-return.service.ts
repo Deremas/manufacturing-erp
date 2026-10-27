@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/procurement/routes";
 import { postSupplierReturnDocument } from "@/services/inventory/module-integration.service";
 import {
   approveProcurementApproval,
+  assertCanSubmitProcurementStatus,
   ensureProcurementCanPost,
   nextProcurementDocumentNumber,
   normalizeProcurementStatus,
@@ -27,11 +29,13 @@ export interface SupplierReturnLineInput {
 
 export interface SupplierReturnSummary {
   id: string;
+  publicId: number;
   returnNo: string;
   returnDate: string;
   supplierId: string;
   supplierName: string;
   grnId: string | null;
+  grnPublicId?: number | null;
   grnNo: string | null;
   returnLocationId: string;
   returnLocationName: string;
@@ -173,6 +177,7 @@ export async function listSupplierReturns(): Promise<SupplierReturnSummary[]> {
     return await sql<Array<SupplierReturnSummary>>`
       SELECT
         sr.id,
+        sr."publicId",
         sr."returnNo",
         sr."returnDate"::text,
         sr."supplierId",
@@ -199,16 +204,18 @@ export async function listSupplierReturns(): Promise<SupplierReturnSummary[]> {
   }
 }
 
-export async function getSupplierReturnById(id: string): Promise<SupplierReturnDetail | null> {
+export async function getSupplierReturnById(key: string): Promise<SupplierReturnDetail | null> {
   try {
     const rows = await sql<Array<SupplierReturnSummary>>`
       SELECT
         sr.id,
+        sr."publicId",
         sr."returnNo",
         sr."returnDate"::text,
         sr."supplierId",
         s.name AS "supplierName",
         sr."grnId",
+        gr."publicId" AS "grnPublicId",
         gr."grnNo",
         sr."returnLocationId",
         l."locationName" AS "returnLocationName",
@@ -222,8 +229,8 @@ export async function getSupplierReturnById(id: string): Promise<SupplierReturnD
       INNER JOIN "Location" l ON l.id = sr."returnLocationId"
       LEFT JOIN "GoodsReceipt" gr ON gr.id = sr."grnId"
       LEFT JOIN "SupplierReturnItem" sri ON sri."returnId" = sr.id
-      WHERE sr.id = ${id}
-      GROUP BY sr.id, s.name, gr."grnNo", l."locationName"
+      WHERE ${isPublicIdParam(key) ? sql`sr."publicId" = ${Number(key)}` : sql`sr.id = ${key}`}
+      GROUP BY sr.id, s.name, gr."publicId", gr."grnNo", l."locationName"
       LIMIT 1
     `;
 
@@ -268,7 +275,7 @@ export async function getSupplierReturnById(id: string): Promise<SupplierReturnD
       INNER JOIN "Item" i ON i.id = sri."itemId"
       LEFT JOIN "Unit" u ON u.id = sri."uomId"
       LEFT JOIN "GoodsReceiptItem" gri ON gri.id = sri."grnItemId"
-      WHERE sri."returnId" = ${id}
+      WHERE sri."returnId" = ${header.id}
       ORDER BY i."itemCode" ASC
     `;
 
@@ -357,7 +364,7 @@ export async function createSupplierReturn(payload: SupplierReturnPayload) {
     const id = randomUUID();
     const returnNo = await nextProcurementDocumentNumber(tx, "SRET", "Supplier Return");
 
-    await tx`
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "SupplierReturn" (
         id, "returnNo", "returnDate", "supplierId", "grnId", "returnLocationId", reason, status,
         subtotal, "taxAmount", "totalAmount", remarks, "createdById", "updatedById", "createdAt", "updatedAt"
@@ -380,6 +387,7 @@ export async function createSupplierReturn(payload: SupplierReturnPayload) {
         NOW(),
         NOW()
       )
+      RETURNING "publicId"
     `;
 
     await writeItems(tx, id, items);
@@ -389,12 +397,12 @@ export async function createSupplierReturn(payload: SupplierReturnPayload) {
       documentType: "supplier-return",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.supplier-return", "CREATE", id, payload);
     await writeProcurementHistory(tx, "procurement.supplier-return", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, returnNo };
+    return { id, returnNo, publicId: inserted[0]?.publicId };
   });
 }
 
@@ -442,7 +450,7 @@ export async function updateSupplierReturn(id: string, payload: SupplierReturnPa
       documentType: "supplier-return",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.supplier-return", "UPDATE", id, payload);
@@ -451,18 +459,18 @@ export async function updateSupplierReturn(id: string, payload: SupplierReturnPa
   });
 }
 
-export async function approveSupplierReturn(id: string, userId: string) {
+export async function approveSupplierReturn(id: string, userId: string, comment?: string) {
   const document = await getSupplierReturnById(id);
   if (!document) throw new Error("Supplier return not found");
-  await approveProcurementApproval("procurement.supplier-return", id, userId);
+  await approveProcurementApproval("procurement.supplier-return", id, userId, comment);
   await sql.begin(async (tx) => {
     await tx`
       UPDATE "SupplierReturn"
       SET status = 'APPROVED', "updatedById" = ${userId}, "updatedAt" = NOW()
       WHERE id = ${id}
     `;
-    await writeProcurementAudit(tx, userId, "procurement.supplier-return", "APPROVE", id, { id });
-    await writeProcurementHistory(tx, "procurement.supplier-return", id, "APPROVE", userId, document.returnNo);
+    await writeProcurementAudit(tx, userId, "procurement.supplier-return", "APPROVE", id, { id, comment });
+    await writeProcurementHistory(tx, "procurement.supplier-return", id, "APPROVE", userId, comment ?? document.returnNo);
   });
   return { id };
 }
@@ -504,6 +512,35 @@ export async function cancelSupplierReturn(id: string, userId: string) {
     });
     await writeProcurementAudit(tx, userId, "procurement.supplier-return", "CANCEL", id, { id });
     await writeProcurementHistory(tx, "procurement.supplier-return", id, "CANCEL", userId, document.returnNo);
+  });
+  return { id };
+}
+
+export async function submitSupplierReturn(
+  id: string,
+  userId: string,
+  input?: { approverId?: string; comment?: string },
+) {
+  const document = await getSupplierReturnById(id);
+  if (!document) throw new Error("Supplier return not found");
+  assertCanSubmitProcurementStatus(document.status);
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE "SupplierReturn"
+      SET status = 'SUBMITTED', "updatedById" = ${userId}, "updatedAt" = NOW()
+      WHERE id = ${id}
+    `;
+    await syncProcurementApproval(tx, {
+      referenceType: "procurement.supplier-return",
+      referenceId: id,
+      documentType: "supplier-return",
+      status: "SUBMITTED",
+      requestedById: userId,
+      assignedApproverId: null,
+      comment: input?.comment,
+    });
+    await writeProcurementAudit(tx, userId, "procurement.supplier-return", "SUBMIT", id, { id, ...input });
+    await writeProcurementHistory(tx, "procurement.supplier-return", id, "SUBMIT", userId, input?.comment ?? document.returnNo);
   });
   return { id };
 }

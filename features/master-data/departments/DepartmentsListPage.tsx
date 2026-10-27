@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -16,6 +16,7 @@ import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { Eye, Pencil, Trash2, Building2 } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface DepartmentsListPageProps {
   initialData?: Department[];
@@ -26,6 +27,7 @@ export default function DepartmentsListPage({
 }: DepartmentsListPageProps) {
   const router = useRouter();
   const [data] = useState<Department[]>(initialData);
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Master Data", href: "/master-data" },
@@ -57,11 +59,25 @@ export default function DepartmentsListPage({
     },
   ];
 
-  const handleCreate = () => router.push(window.location.pathname + "/create");
+  const handleCreate = () => router.push("/master-data/departments/create");
+
+  const filteredData = useMemo(() => {
+    const search = filters.search?.trim().toLowerCase() ?? "";
+    const status = filters.status?.trim() ?? "";
+
+    return data.filter((department) => {
+      if (status && String(department.isActive) !== status) return false;
+      if (!search) return true;
+
+      return [department.name, department.code, department.managerName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+  }, [data, filters]);
 
   const tableActions: TableAction[] = [
-    { label: "View", icon: <Eye size={16} />, onClick: (record) => router.push(window.location.pathname + "/" + record.id) },
-    { label: "Edit", icon: <Pencil size={16} />, onClick: (record) => router.push(window.location.pathname + "/" + record.id + "/edit") },
+    { label: "View", icon: <Eye size={16} />, onClick: (record) => router.push(publicViewUrl("master-data.department", record.publicId)) },
+    { label: "Edit", icon: <Pencil size={16} />, onClick: (record) => router.push(publicEditUrl("master-data.department", record.publicId)) },
     {
       label: "Delete",
       icon: <Trash2 size={16} />,
@@ -104,9 +120,14 @@ export default function DepartmentsListPage({
         actions={<ActionButtons actions={pageActions} />}
       />
 
-      <FilterCard title="Filter Departments" fields={filterFields} onFilter={(values) => console.log("Filter values", values)} onReset={() => undefined} />
+      <FilterCard
+        title="Filter Departments"
+        fields={filterFields}
+        onFilter={setFilters}
+        onReset={() => setFilters({})}
+      />
 
-      <DataTable columns={columns} data={data} actions={tableActions} emptyState={emptyState} recordCount={data.length} />
+      <DataTable columns={columns} data={filteredData} actions={tableActions} emptyState={emptyState} recordCount={filteredData.length} />
     </div>
   );
 }

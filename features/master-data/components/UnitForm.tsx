@@ -43,7 +43,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "7px 10px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: "6px",
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -107,20 +107,25 @@ export default function UnitForm({
   const isEdit = !!initialData;
 
   const [form, setForm] = useState<UnitInput>({
+    code: "",
     name: "",
     abbreviation: "",
     type: "",
+    decimalPrecision: 0,
     isActive: true,
   });
 
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     if (initialData) {
       setForm({
+        code: initialData.code ?? "",
         name: initialData.name,
         abbreviation: initialData.abbreviation,
         type: initialData.type ?? "",
+        decimalPrecision: initialData.decimalPrecision ?? 0,
         isActive: initialData.isActive ?? true,
       });
     }
@@ -133,10 +138,17 @@ export default function UnitForm({
     const checked =
       type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
 
+    let nextValue: string | boolean = checked !== undefined ? checked : value;
+
+    if (checked === undefined && (name === "code" || name === "abbreviation")) {
+      nextValue = String(value).toUpperCase();
+    }
+
     setForm((prev) => ({
       ...prev,
-      [name]: checked !== undefined ? checked : value,
+      [name]: nextValue,
     }));
+    setFormError("");
 
     if (errors[name]) {
       setErrors((prev) => {
@@ -150,6 +162,7 @@ export default function UnitForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setFormError("");
 
     const parsed = unitSchema.safeParse(form);
     if (!parsed.success) {
@@ -157,7 +170,22 @@ export default function UnitForm({
       return;
     }
 
-    await onSubmit(parsed.data);
+    try {
+      await onSubmit(parsed.data);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to save unit";
+
+      if (/unit code .* already exists/i.test(message)) {
+        setErrors((prev) => ({
+          ...prev,
+          code: [message],
+        }));
+        return;
+      }
+
+      setFormError(message);
+    }
   };
 
   const handleCancel = () => {
@@ -199,7 +227,7 @@ export default function UnitForm({
             value={String(fieldValue ?? "")}
             onChange={handleChange}
           >
-            <option value="">{placeholder ?? `Select ${label}`}</option>
+            <option value="">{placeholder ?? "Select ..."}</option>
             {options.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -216,6 +244,7 @@ export default function UnitForm({
             }}
             value={String(fieldValue ?? "")}
             onChange={handleChange}
+            autoCapitalize={name === "code" || name === "abbreviation" ? "characters" : undefined}
             placeholder={placeholder ?? `Enter ${label.toLowerCase()}...`}
           />
         )}
@@ -237,6 +266,7 @@ export default function UnitForm({
         footer={{ actions: <ActionButtons actions={footerActions} /> }}
       >
         <div style={gridStyle}>
+          {renderField("code", "Code", "text", undefined, "e.g. KG")}
           {renderField("name", "Unit Name", "text", undefined, "e.g. Kilogram")}
           {renderField(
             "abbreviation",
@@ -247,12 +277,21 @@ export default function UnitForm({
           )}
         </div>
         <div style={{ marginTop: "16px" }}>
-          {renderField(
-            "type",
-            "Unit Type",
-            "select",
-            unitTypeOptions.map((t) => ({ label: t, value: t })),
-          )}
+          <div style={gridStyle}>
+            {renderField(
+              "type",
+              "Unit Type",
+              "select",
+              unitTypeOptions.map((t) => ({ label: t, value: t })),
+            )}
+            {renderField(
+              "decimalPrecision",
+              "Decimal Precision",
+              "text",
+              undefined,
+              "e.g. 0",
+            )}
+          </div>
         </div>
         <div style={{ marginTop: "16px" }}>
           <div style={toggleRowStyle}>
@@ -266,6 +305,9 @@ export default function UnitForm({
             <span style={toggleLabelStyle}>Active</span>
           </div>
         </div>
+        {formError ? (
+          <div style={{ ...errorTextStyle, marginTop: "12px" }}>{formError}</div>
+        ) : null}
       </FormCard>
     </form>
   );

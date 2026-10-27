@@ -1,20 +1,14 @@
-import { InventoryDocumentListPage } from "@/features/inventory/live/document-pages";
+import TransfersListPage from "@/features/inventory/transfers/TransfersListPage";
 import { listTransfers } from "@/services/inventory/inventory-documents.service";
 
 export default async function TransfersRoute() {
   const transfers = await listTransfers();
 
   return (
-    <InventoryDocumentListPage
-      title="Stock Transfers"
-      subtitle="Move stock between live locations through controlled inventory documents."
-      breadcrumbs={[
-        { label: "Inventory", href: "/inventory" },
-        { label: "Transfers" },
-      ]}
-      createHref="/inventory/transfers/create"
+    <TransfersListPage
       rows={transfers.map((transfer) => ({
         id: transfer.id,
+        publicId: transfer.publicId,
         number: transfer.transferNo,
         date: transfer.transferDate,
         status: transfer.status,
@@ -23,11 +17,6 @@ export default async function TransfersRoute() {
         secondaryText: transfer.toLocationName,
         ownerText: transfer.createdByName,
       }))}
-      searchPlaceholder="Search transfer number, location, or status..."
-      primaryColumnLabel="From Location"
-      secondaryColumnLabel="To Location"
-      ownerColumnLabel="Created By"
-      baseHref="/inventory/transfers"
     />
   );
 }

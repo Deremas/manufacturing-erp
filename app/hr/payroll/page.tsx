@@ -1,15 +1,14 @@
-"use client";
+import { requireAuth } from "@/lib/auth/auth";
+import PayrollRunsListPage from "@/features/hr/PayrollRunsListPage";
+import { listPayrollRuns } from "@/services/hr/payroll.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function PayrollPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Payroll" subtitle="Manage employee payroll" />
-      <EmptyState title="Payroll" message="Module coming soon." />
-    </div>
-  );
+export default async function HrPayrollRoute() {
+  const user = await requireAuth();
+  const rows = await listPayrollRuns({
+    accessibleLocationIds: user.accessibleLocationIds,
+  });
+
+  return <PayrollRunsListPage rows={rows} />;
 }

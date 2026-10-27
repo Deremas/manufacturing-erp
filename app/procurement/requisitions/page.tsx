@@ -14,11 +14,14 @@ export default async function PurchaseRequisitionsPage() {
       ]}
       createHref="/procurement/requisitions/create"
       baseHref="/procurement/requisitions"
+      apiBasePath="/api/procurement/requisitions"
+      kind="pr"
       primaryLabel="Department"
-      secondaryLabel="Location"
+      secondaryLabel="Receiving Location"
       ownerLabel="Requested By"
       rows={requisitions.map((row) => ({
         id: row.id,
+        publicId: row.publicId,
         number: row.requisitionNo,
         date: row.requisitionDate,
         status: row.status,
@@ -27,6 +30,7 @@ export default async function PurchaseRequisitionsPage() {
         owner: row.requestedByName,
         itemCount: row.itemCount,
         amount: row.estimatedTotal,
+        canConvert: row.canConvert,
       }))}
     />
   );

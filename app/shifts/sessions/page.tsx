@@ -1,7 +1,5 @@
-import { ShiftSessionsLivePage } from "@/features/shift/live-pages";
-import { listShiftSessions } from "@/services/shift/shift-session.service";
+import { redirect } from "next/navigation";
 
-export default async function ShiftSessionsPage() {
-  const rows = await listShiftSessions();
-  return <ShiftSessionsLivePage rows={rows} />;
+export default function LegacyShiftSessionsPage() {
+  redirect("/production/shift-sessions");
 }

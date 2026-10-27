@@ -1,0 +1,8 @@
+import { notFound } from "next/navigation";
+import { requireAuth } from "@/lib/auth/auth";
+import { getLocations } from "@/lib/master-data-db";
+import { QcOperationalReportPage } from "@/features/reports/QcOperationalReportPage";
+import { getQcOperationalReport, type QcReportType } from "@/services/reports/qc-report.service";
+export const dynamic = "force-dynamic";
+const titles: Record<QcReportType, string> = { "task-status": "QC Task Status and Overdue", "parameter-trends": "QC Parameter Trends", "batch-release": "Batch Release Register", "hold-aging": "QC Hold Aging", "corrective-actions": "Nonconformity and Corrective Actions", "disposition-cost": "Rejection, Scrap, and Rework Cost", "machine-failures": "Machine Quality Failures" };
+export default async function Page({ params, searchParams }: { params: Promise<{ report: string }>; searchParams: Promise<{ dateFrom?: string; dateTo?: string; locationId?: string; status?: string }> }) { const { report } = await params; if (!(report in titles)) notFound(); const user = await requireAuth(); const filters = await searchParams; const accessibleLocationIds = user.permissions.includes("*") ? undefined : user.accessibleLocationIds; const [rows, allLocations] = await Promise.all([getQcOperationalReport(report as QcReportType, { ...filters, accessibleLocationIds }), getLocations()]); const locations = allLocations.filter((location) => !accessibleLocationIds || accessibleLocationIds.includes(location.id)).map((location) => ({ id: location.id, locationCode: location.locationCode, locationName: location.locationName })); return <QcOperationalReportPage title={titles[report as QcReportType]} reportType={report} rows={rows} filters={filters} locations={locations} />; }

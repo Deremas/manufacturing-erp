@@ -1,0 +1,2 @@
+ALTER TABLE "StockReturnItem"
+  ADD COLUMN IF NOT EXISTS "condition" TEXT NOT NULL DEFAULT 'Excess';

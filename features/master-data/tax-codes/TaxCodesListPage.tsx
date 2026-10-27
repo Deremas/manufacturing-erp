@@ -24,6 +24,7 @@ import { spacing } from "@/components/ui/spacing";
 import { typography } from "@/components/ui/typography";
 import { Eye, Pencil, Trash2, Receipt, CheckCircle, XCircle } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface TaxCodesListPageProps {
   initialData?: TaxCode[];
@@ -34,6 +35,7 @@ export default function TaxCodesListPage({
 }: TaxCodesListPageProps) {
   const router = useRouter();
   const [data] = useState<TaxCode[]>(initialData);
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Master Data", href: "/master-data" },
@@ -96,11 +98,27 @@ export default function TaxCodesListPage({
     },
   ];
 
-  const handleCreate = () => router.push(window.location.pathname + "/create");
+  const handleCreate = () => router.push("/master-data/tax-codes/create");
+
+  const filteredData = useMemo(() => {
+    const search = filters.search?.trim().toLowerCase() ?? "";
+    const type = filters.type?.trim() ?? "";
+    const status = filters.status?.trim() ?? "";
+
+    return data.filter((taxCode) => {
+      if (type && taxCode.taxType !== type) return false;
+      if (status && String(taxCode.isActive) !== status) return false;
+      if (!search) return true;
+
+      return [taxCode.taxName, taxCode.taxType, String(taxCode.rate)]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+  }, [data, filters]);
 
   const tableActions: TableAction[] = [
-    { label: "View", icon: <Eye size={16} />, onClick: (record) => router.push(window.location.pathname + "/" + record.id) },
-    { label: "Edit", icon: <Pencil size={16} />, onClick: (record) => router.push(window.location.pathname + "/" + record.id + "/edit") },
+    { label: "View", icon: <Eye size={16} />, onClick: (record) => router.push(publicViewUrl("master-data.tax-code", record.publicId)) },
+    { label: "Edit", icon: <Pencil size={16} />, onClick: (record) => router.push(publicEditUrl("master-data.tax-code", record.publicId)) },
     {
       label: "Delete",
       icon: <Trash2 size={16} />,
@@ -152,9 +170,14 @@ export default function TaxCodesListPage({
         <MetricCard label="Inactive" value={inactiveCodes} icon={<XCircle size={18} />} borderColor={colors.danger[500]} color={colors.danger[700]} />
       </div>
 
-      <FilterCard title="Filter Tax Codes" fields={filterFields} onFilter={(values) => console.log("Filter values", values)} onReset={() => undefined} />
+      <FilterCard
+        title="Filter Tax Codes"
+        fields={filterFields}
+        onFilter={setFilters}
+        onReset={() => setFilters({})}
+      />
 
-      <DataTable columns={columns} data={data} actions={tableActions} emptyState={emptyState} recordCount={data.length} />
+      <DataTable columns={columns} data={filteredData} actions={tableActions} emptyState={emptyState} recordCount={filteredData.length} />
     </div>
   );
 }

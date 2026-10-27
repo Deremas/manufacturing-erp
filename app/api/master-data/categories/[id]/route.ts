@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/routing/public-id";
 
 export async function GET(
   _request: Request,
@@ -10,6 +11,7 @@ export async function GET(
     const rows = await sql<
       Array<{
         id: string;
+        publicId: number;
         code: string | null;
         name: string;
         parentCategoryId: string | null;
@@ -21,6 +23,7 @@ export async function GET(
     >`
       SELECT
         c.id,
+        c."publicId",
         c.code,
         c.name,
         c."parentCategoryId",
@@ -30,7 +33,7 @@ export async function GET(
         c."isActive"
       FROM "Category" c
       LEFT JOIN "Category" p ON p.id = c."parentCategoryId"
-      WHERE c.id = ${id} AND c."isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`c."publicId" = ${Number(id)}` : sql`c.id = ${id}`} AND c."isArchived" = false
       LIMIT 1
     `;
 
@@ -41,6 +44,7 @@ export async function GET(
 
     return NextResponse.json({
       id: row.id,
+      publicId: row.publicId,
       code: row.code ?? "",
       name: row.name,
       parentCategoryId: row.parentCategoryId ?? "",
@@ -81,7 +85,7 @@ export async function PUT(
         "displayOrder" = ${Number(body.displayOrder ?? 0)},
         "isActive" = ${body.isActive ?? true},
         "updatedAt" = NOW()
-      WHERE id = ${id} AND "isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`"publicId" = ${Number(id)}` : sql`id = ${id}`} AND "isArchived" = false
       RETURNING id
     `;
 

@@ -8,6 +8,7 @@
 
 export interface BaseEntity {
   id: string;
+  publicId: number;
   isActive: boolean;
   isArchived: boolean;
   createdAt: string;
@@ -27,6 +28,7 @@ export interface Item extends BaseEntity {
   itemTypeId?: string;
   itemTypeName?: string;
   uomId?: string;
+  uomCode?: string;
   uomName?: string;
   batchTracking: boolean;
   reorderPoint: number;
@@ -189,6 +191,7 @@ export interface CreateCustomerInput {
   defaultSalesLocationId?: string;
   taxCodeId?: string;
   remarks?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateCustomerInput extends Partial<CreateCustomerInput> {}
@@ -277,6 +280,7 @@ export interface CreateSupplierInput {
   defaultBankAccountId?: string;
   taxCodeId?: string;
   remarks?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateSupplierInput extends Partial<CreateSupplierInput> {}
@@ -347,6 +351,7 @@ export interface CreateDepartmentInput {
   description?: string;
   locationId?: string;
   managerId?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateDepartmentInput extends Partial<CreateDepartmentInput> {}
@@ -369,6 +374,7 @@ export interface CreateBankInput {
   shortName?: string;
   swiftCode?: string;
   description?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateBankInput extends Partial<CreateBankInput> {}
@@ -412,6 +418,7 @@ export interface CreateBankAccountInput {
   allowPayments?: boolean;
   allowReceipts?: boolean;
   openingBalanceDate?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateBankAccountInput extends Partial<CreateBankAccountInput> {}
@@ -474,6 +481,7 @@ export interface CreateLocationInput {
   allowNegativeStock?: boolean;
   requireTransferApproval?: boolean;
   enableLocationNumbering?: boolean;
+  isActive?: boolean;
 }
 
 export interface UpdateLocationInput extends Partial<CreateLocationInput> {}
@@ -483,30 +491,39 @@ export interface UpdateLocationInput extends Partial<CreateLocationInput> {}
 export interface PriceList extends BaseEntity {
   code?: string;
   name?: string;
+  channel: string;
   currency: string;
   customerGroup?: string;
-  price?: number;
-  effectiveDate?: string;
+  customerId?: string;
+  customerName?: string;
+  locationId?: string;
+  locationName?: string;
+  description?: string;
   effectiveFrom?: string;
   effectiveTo?: string;
-  customerId?: string;
-  locationId?: string;
+  effectiveDate?: string;
+  isDefault: boolean;
   createdById?: string;
   updatedById?: string;
+  itemsCount?: number;
   items?: PriceListItem[];
+  usage?: PriceListUsageRecord[];
 }
 
 export interface CreatePriceListInput {
   code?: string;
   name?: string;
+  channel: string;
   currency?: string;
   customerGroup?: string;
-  price?: number;
-  effectiveDate?: string;
-  effectiveFrom?: string;
-  effectiveTo?: string;
   customerId?: string;
   locationId?: string;
+  description?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  items: CreatePriceListItemInput[];
 }
 
 export interface UpdatePriceListInput extends Partial<CreatePriceListInput> {}
@@ -516,24 +533,37 @@ export interface UpdatePriceListInput extends Partial<CreatePriceListInput> {}
 export interface PriceListItem extends BaseEntity {
   priceListId: string;
   itemId: string;
+  itemCode?: string;
   itemName?: string;
   unitId?: string;
+  uomCode?: string;
   unitName?: string;
+  unitPrice?: number;
   sellingPrice: number;
+  minimumQty: number;
   minimumPrice?: number;
   taxIncluded: boolean;
 }
 
 export interface CreatePriceListItemInput {
-  priceListId: string;
   itemId: string;
   unitId?: string;
-  sellingPrice: number;
-  minimumPrice?: number;
+  unitPrice: number;
+  minimumQty?: number;
   taxIncluded?: boolean;
+  isActive?: boolean;
 }
 
 export interface UpdatePriceListItemInput extends Partial<CreatePriceListItemInput> {}
+
+export interface PriceListUsageRecord {
+  documentType: string;
+  documentNo: string;
+  date: string;
+  counterparty?: string;
+  totalQuantity: number;
+  totalValue: number;
+}
 
 // ── TaxCode ───────────────────────────────────────────────────────────────────
 

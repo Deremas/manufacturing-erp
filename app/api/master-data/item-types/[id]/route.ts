@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/routing/public-id";
 
 export async function GET(
   _request: Request,
@@ -18,7 +19,7 @@ export async function GET(
     >`
       SELECT id, code, name, description, "isActive"
       FROM "ItemType"
-      WHERE id = ${id} AND "isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`"publicId" = ${Number(id)}` : sql`id = ${id}`} AND "isArchived" = false
       LIMIT 1
     `;
 
@@ -64,7 +65,7 @@ export async function PUT(
         description = ${body.description?.trim() || null},
         "isActive" = ${body.isActive ?? true},
         "updatedAt" = NOW()
-      WHERE id = ${id} AND "isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`"publicId" = ${Number(id)}` : sql`id = ${id}`} AND "isArchived" = false
       RETURNING id
     `;
 

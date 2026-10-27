@@ -48,30 +48,36 @@ const titleStyle: React.CSSProperties = {
 };
 
 const fieldsContainerStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
   gap: "12px",
-  alignItems: "flex-end",
+  alignItems: "end",
 };
 
 const fieldGroupStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "4px",
-  minWidth: "160px",
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+};
+
+const dateFieldStyle: React.CSSProperties = {
+  ...fieldGroupStyle,
 };
 
 const labelStyle: React.CSSProperties = {
   fontFamily: typography.fontFamily,
   fontSize: typography.sizes.caption.fontSize,
-  fontWeight: typography.weights.medium,
-  color: colors.text.secondary,
+  fontWeight: 700,
+  color: "#334155",
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "7px 10px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -93,6 +99,9 @@ const buttonRowStyle: React.CSSProperties = {
   alignItems: "center",
   gap: "8px",
   paddingTop: "4px",
+  gridColumn: "1 / -1",
+  justifyContent: "flex-start",
+  flexWrap: "wrap",
 };
 
 const filterButtonStyle: React.CSSProperties = {
@@ -110,10 +119,10 @@ const filterButtonStyle: React.CSSProperties = {
 
 const resetButtonStyle: React.CSSProperties = {
   padding: "7px 18px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.secondary[200]}`,
   borderRadius: radius.components.button,
-  backgroundColor: colors.surface,
-  color: colors.text.secondary,
+  backgroundColor: colors.secondary[100],
+  color: colors.text.primary,
   fontFamily: typography.fontFamily,
   fontSize: typography.sizes.body.fontSize,
   fontWeight: typography.weights.medium,
@@ -151,8 +160,8 @@ export default function FilterCard({
       {title && <h4 style={titleStyle}>{title}</h4>}
       <div style={fieldsContainerStyle}>
         {fields.map((field) => (
-          <div key={field.key} style={fieldGroupStyle}>
-            <label style={labelStyle}>{field.label}</label>
+          <div key={field.key} style={field.type === "date" || field.type === "dateRange" ? dateFieldStyle : fieldGroupStyle}>
+            <span className="qc-field-label" style={labelStyle}>{field.label}</span>
             {field.type === "select" ? (
               <select
                 style={selectStyle}

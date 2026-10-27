@@ -1,18 +1,10 @@
-"use client";
+import { requireAuth } from "@/lib/auth/auth";
+import PayrollSettingsPage from "@/features/hr/PayrollSettingsPage";
+import { getPayrollSettingsReferenceData } from "@/services/hr/payroll.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export default async function HrPayrollSettingsRoute() {
+  await requireAuth();
+  const { settings, accounts } = await getPayrollSettingsReferenceData();
 
-export default function PayrollSettingsPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Payroll Settings"
-        subtitle="Configure payroll settings"
-      />
-      <EmptyState title="Payroll Settings" message="Module coming soon." />
-    </div>
-  );
+  return <PayrollSettingsPage settings={settings} accounts={accounts} />;
 }

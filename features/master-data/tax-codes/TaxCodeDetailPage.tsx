@@ -270,6 +270,7 @@ export default function TaxCodeDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="md.tax"
         title={currentTaxCode.taxName}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Customer name is required" }, { status: 400 });
     }
 
-    const rows = await sql<Array<{ id: string }>>`
+    const rows = await sql<Array<{ id: string; publicId: number }>>`
       INSERT INTO "Customer" (
         "customerCode",
         name,
@@ -40,10 +40,10 @@ export async function POST(request: Request) {
         NOW(),
         NOW()
       )
-      RETURNING id
+      RETURNING id, "publicId"
     `;
 
-    return NextResponse.json({ success: true, id: rows[0]?.id });
+    return NextResponse.json({ success: true, id: rows[0]?.id, publicId: rows[0]?.publicId });
   } catch (error) {
     console.error("Failed to create customer", error);
     return NextResponse.json({ error: "Failed to create customer" }, { status: 500 });

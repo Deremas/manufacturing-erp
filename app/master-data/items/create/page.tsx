@@ -6,6 +6,7 @@ import { ItemFormPage } from "@/features/master-data/items";
 import type { Item } from "@/features/master-data/types";
 import type { CreateItemInput } from "@/types/master-data";
 import * as itemService from "@/services/master-data/itemService";
+import { publicViewUrl } from "@/lib/routing/urls";
 
 export default function CreateItemPage() {
   const router = useRouter();
@@ -16,7 +17,11 @@ export default function CreateItemPage() {
       alert(result.error || "Failed to create item");
       return;
     }
-    router.push("/master-data/items");
+    router.push(
+      result.data?.publicId
+        ? publicViewUrl("master-data.item", result.data.publicId)
+        : "/master-data/items",
+    );
   };
 
   return <ItemFormPage onSubmit={handleSubmit} />;

@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/procurement/routes";
 import { postProcurementReceiptDocument } from "@/services/inventory/module-integration.service";
 import {
   approveProcurementApproval,
+  assertCanSubmitProcurementStatus,
   ensureProcurementCanPost,
   nextProcurementDocumentNumber,
   normalizeProcurementStatus,
@@ -27,13 +29,16 @@ export interface GoodsReceiptLineInput {
   unitCost?: number;
   taxAmount?: number;
   remarks?: string;
+  receiptType?: "INVENTORY" | "ASSET" | "SERVICE";
 }
 
 export interface GoodsReceiptSummary {
   id: string;
+  publicId: number;
   grnNo: string;
   grnDate: string;
   poId: string | null;
+  poPublicId?: number | null;
   poNo: string | null;
   supplierId: string;
   supplierName: string;
@@ -74,6 +79,7 @@ export interface GoodsReceiptDetail extends GoodsReceiptSummary {
     taxAmount: number;
     lineTotal: number;
     remarks: string;
+    receiptType: "INVENTORY" | "ASSET" | "SERVICE";
   }>;
 }
 
@@ -163,7 +169,7 @@ async function ensureDraftEditable(tx: Tx, id: string) {
 
 async function validateAgainstPurchaseOrder(poId: string | null | undefined, items: ReturnType<typeof validateLineItems>) {
   if (!poId) {
-    return;
+    return items.map((item) => ({ ...item, receiptType: "INVENTORY" as const }));
   }
 
   const poItems = await sql<
@@ -172,6 +178,7 @@ async function validateAgainstPurchaseOrder(poId: string | null | undefined, ite
       itemId: string;
       orderedQty: number;
       receivedQty: number;
+      receiptType: "INVENTORY" | "ASSET" | "SERVICE";
     }>
   >`
     SELECT
@@ -179,6 +186,7 @@ async function validateAgainstPurchaseOrder(poId: string | null | undefined, ite
       poi."itemId",
       poi."orderedQty",
       poi."receivedQty"
+      , poi."receiptType"
     FROM "PurchaseOrderItem" poi
     WHERE poi."poId" = ${poId}
   `;
@@ -200,7 +208,9 @@ async function validateAgainstPurchaseOrder(poId: string | null | undefined, ite
     if (item.receivedQty > maxReceivable) {
       throw new Error("Received quantity cannot exceed the remaining purchase order quantity");
     }
+    item.receiptType = poItem.receiptType;
   }
+  return items;
 }
 
 async function writeItems(tx: Tx, grnId: string, items: ReturnType<typeof validateLineItems>) {
@@ -208,7 +218,7 @@ async function writeItems(tx: Tx, grnId: string, items: ReturnType<typeof valida
     await tx`
       INSERT INTO "GoodsReceiptItem" (
         id, "goodsReceiptId", "poItemId", "itemId", "uomId", "orderedQty", "previouslyReceivedQty",
-        "quantityReceived", "acceptedQty", "rejectedQty", "unitCost", "taxAmount", "lineTotal", remarks
+        "quantityReceived", "acceptedQty", "rejectedQty", "unitCost", "taxAmount", "lineTotal", remarks, "receiptType"
       )
       VALUES (
         ${randomUUID()},
@@ -224,7 +234,8 @@ async function writeItems(tx: Tx, grnId: string, items: ReturnType<typeof valida
         ${item.unitCost},
         ${item.taxAmount},
         ${item.lineTotal},
-        ${item.remarks ?? null}
+        ${item.remarks ?? null},
+        ${item.receiptType ?? "INVENTORY"}
       )
     `;
   }
@@ -293,6 +304,7 @@ export async function listGoodsReceipts(): Promise<GoodsReceiptSummary[]> {
     return await sql<Array<GoodsReceiptSummary>>`
       SELECT
         gr.id,
+        gr."publicId",
         gr."grnNo",
         gr."grnDate"::text,
         gr."poId",
@@ -321,14 +333,16 @@ export async function listGoodsReceipts(): Promise<GoodsReceiptSummary[]> {
   }
 }
 
-export async function getGoodsReceiptById(id: string): Promise<GoodsReceiptDetail | null> {
+export async function getGoodsReceiptById(key: string): Promise<GoodsReceiptDetail | null> {
   try {
     const rows = await sql<Array<GoodsReceiptDetail>>`
       SELECT
         gr.id,
+        gr."publicId",
         gr."grnNo",
         gr."grnDate"::text,
         gr."poId",
+        po."publicId" AS "poPublicId",
         po."poNo",
         gr."supplierId",
         s.name AS "supplierName",
@@ -355,8 +369,8 @@ export async function getGoodsReceiptById(id: string): Promise<GoodsReceiptDetai
       LEFT JOIN "User" receiver ON receiver.id = gr."receivedById"
       LEFT JOIN "PurchaseOrder" po ON po.id = gr."poId"
       LEFT JOIN "GoodsReceiptItem" gri ON gri."goodsReceiptId" = gr.id
-      WHERE gr.id = ${id}
-      GROUP BY gr.id, po."poNo", s.name, l."locationName", createdBy.name, receiver.name
+      WHERE ${isPublicIdParam(key) ? sql`gr."publicId" = ${Number(key)}` : sql`gr.id = ${key}`}
+      GROUP BY gr.id, po."publicId", po."poNo", s.name, l."locationName", createdBy.name, receiver.name
       LIMIT 1
     `;
 
@@ -382,10 +396,11 @@ export async function getGoodsReceiptById(id: string): Promise<GoodsReceiptDetai
         COALESCE(gri."taxAmount", 0) AS "taxAmount",
         COALESCE(gri."lineTotal", (COALESCE(gri."acceptedQty", COALESCE(gri."quantityReceived", 0)) * COALESCE(gri."unitCost", 0))) AS "lineTotal",
         COALESCE(gri.remarks, '') AS remarks
+        , gri."receiptType"
       FROM "GoodsReceiptItem" gri
       INNER JOIN "Item" i ON i.id = gri."itemId"
       LEFT JOIN "Unit" u ON u.id = COALESCE(gri."uomId", i."uomId")
-      WHERE gri."goodsReceiptId" = ${id}
+      WHERE gri."goodsReceiptId" = ${header.id}
       ORDER BY i."itemCode" ASC
     `;
 
@@ -427,6 +442,7 @@ export async function getGoodsReceiptPrefillFromPurchaseOrder(poId: string) {
       remainingQty: number;
       unitCost: number;
       taxAmount: number;
+      receiptType: "INVENTORY" | "ASSET" | "SERVICE";
     }>
   >`
     SELECT
@@ -441,6 +457,7 @@ export async function getGoodsReceiptPrefillFromPurchaseOrder(poId: string) {
       GREATEST(poi."orderedQty" - poi."receivedQty", 0)::double precision AS "remainingQty",
       poi."unitPrice" AS "unitCost",
       poi."taxAmount"
+      , poi."receiptType"
     FROM "PurchaseOrderItem" poi
     INNER JOIN "Item" i ON i.id = poi."itemId"
     LEFT JOIN "Unit" u ON u.id = poi."uomId"
@@ -453,8 +470,7 @@ export async function getGoodsReceiptPrefillFromPurchaseOrder(poId: string) {
 }
 
 export async function createGoodsReceipt(payload: GoodsReceiptPayload) {
-  const items = validateLineItems(payload.lineItems);
-  await validateAgainstPurchaseOrder(payload.poId, items);
+  const items = await validateAgainstPurchaseOrder(payload.poId, validateLineItems(payload.lineItems));
   const status = normalizeProcurementStatus(payload.status);
   const amountTotals = totals(items);
 
@@ -462,7 +478,7 @@ export async function createGoodsReceipt(payload: GoodsReceiptPayload) {
     const id = randomUUID();
     const grnNo = await nextProcurementDocumentNumber(tx, "GRN", "Goods Receipt");
 
-    await tx`
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "GoodsReceipt" (
         id, "grnNo", "grnDate", "poId", "supplierId", "locationId", "receivingLocationId", "deliveryNoteNo",
         "supplierInvoiceNo", "vehiclePlate", "deliveredBy", "receivedById", status, subtotal, "taxAmount",
@@ -491,6 +507,7 @@ export async function createGoodsReceipt(payload: GoodsReceiptPayload) {
         NOW(),
         NOW()
       )
+      RETURNING "publicId"
     `;
 
     await writeItems(tx, id, items);
@@ -500,18 +517,17 @@ export async function createGoodsReceipt(payload: GoodsReceiptPayload) {
       documentType: "grn",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.grn", "CREATE", id, payload);
     await writeProcurementHistory(tx, "procurement.grn", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, grnNo };
+    return { id, grnNo, publicId: inserted[0]?.publicId };
   });
 }
 
 export async function updateGoodsReceipt(id: string, payload: GoodsReceiptPayload) {
-  const items = validateLineItems(payload.lineItems);
-  await validateAgainstPurchaseOrder(payload.poId, items);
+  const items = await validateAgainstPurchaseOrder(payload.poId, validateLineItems(payload.lineItems));
   const status = normalizeProcurementStatus(payload.status);
   const amountTotals = totals(items);
 
@@ -549,7 +565,7 @@ export async function updateGoodsReceipt(id: string, payload: GoodsReceiptPayloa
       documentType: "grn",
       status,
       requestedById: payload.createdById,
-      assignedApproverId: payload.approverId,
+      assignedApproverId: null,
       comment: payload.remarks,
     });
     await writeProcurementAudit(tx, payload.createdById, "procurement.grn", "UPDATE", id, payload);
@@ -558,21 +574,21 @@ export async function updateGoodsReceipt(id: string, payload: GoodsReceiptPayloa
   });
 }
 
-export async function approveGoodsReceipt(id: string, userId: string) {
+export async function approveGoodsReceipt(id: string, userId: string, comment?: string) {
   const receipt = await getGoodsReceiptById(id);
   if (!receipt) throw new Error("Goods receipt not found");
   if (receipt.status === "POSTED") throw new Error("Posted goods receipt cannot be approved again");
   if (receipt.status === "CANCELLED") throw new Error("Cancelled goods receipt cannot be approved");
 
-  await approveProcurementApproval("procurement.grn", id, userId);
+  await approveProcurementApproval("procurement.grn", id, userId, comment);
   await sql.begin(async (tx) => {
     await tx`
       UPDATE "GoodsReceipt"
       SET status = 'APPROVED', "approvedById" = ${userId}, "updatedAt" = NOW()
       WHERE id = ${id}
     `;
-    await writeProcurementAudit(tx, userId, "procurement.grn", "APPROVE", id, { id });
-    await writeProcurementHistory(tx, "procurement.grn", id, "APPROVE", userId, receipt.grnNo);
+    await writeProcurementAudit(tx, userId, "procurement.grn", "APPROVE", id, { id, comment });
+    await writeProcurementHistory(tx, "procurement.grn", id, "APPROVE", userId, comment ?? receipt.grnNo);
   });
 
   return { id };
@@ -622,6 +638,35 @@ export async function cancelGoodsReceipt(id: string, userId: string) {
   return { id };
 }
 
+export async function submitGoodsReceipt(
+  id: string,
+  userId: string,
+  input?: { approverId?: string; comment?: string },
+) {
+  const receipt = await getGoodsReceiptById(id);
+  if (!receipt) throw new Error("Goods receipt not found");
+  assertCanSubmitProcurementStatus(receipt.status);
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE "GoodsReceipt"
+      SET status = 'SUBMITTED', "updatedAt" = NOW()
+      WHERE id = ${id}
+    `;
+    await syncProcurementApproval(tx, {
+      referenceType: "procurement.grn",
+      referenceId: id,
+      documentType: "grn",
+      status: "SUBMITTED",
+      requestedById: userId,
+      assignedApproverId: null,
+      comment: input?.comment,
+    });
+    await writeProcurementAudit(tx, userId, "procurement.grn", "SUBMIT", id, { id, ...input });
+    await writeProcurementHistory(tx, "procurement.grn", id, "SUBMIT", userId, input?.comment ?? receipt.grnNo);
+  });
+  return { id };
+}
+
 export async function postGoodsReceipt(id: string, userId: string) {
   const receipt = await getGoodsReceiptById(id);
   if (!receipt) throw new Error("Goods receipt not found");
@@ -647,7 +692,7 @@ export async function postGoodsReceipt(id: string, userId: string) {
       createdById: userId,
       remarks: receipt.remarks,
       lines: receipt.items
-        .filter((item) => item.acceptedQty > 0)
+        .filter((item) => item.acceptedQty > 0 && item.receiptType === "INVENTORY")
         .map((item) => ({
           itemId: item.itemId,
           quantity: item.acceptedQty,
@@ -655,6 +700,23 @@ export async function postGoodsReceipt(id: string, userId: string) {
           remarks: item.remarks,
         })),
     }, { tx });
+
+    for (const item of receipt.items.filter((line) => line.acceptedQty > 0 && line.receiptType === "ASSET")) {
+      if (!Number.isInteger(item.acceptedQty)) {
+        throw new Error(`Asset receipt quantity for ${item.itemCode} must be a whole number`);
+      }
+      const assetReceiptNo = await nextProcurementDocumentNumber(tx, "ARCV", "Asset Receipt");
+      await tx`
+        INSERT INTO "AssetReceipt" (
+          id, "assetReceiptNo", "grnId", "grnItemId", "itemId", "receivedQty", "registeredQty",
+          "remainingQty", status, "createdById", "createdAt", "updatedAt"
+        ) VALUES (
+          ${randomUUID()}, ${assetReceiptNo}, ${id}, ${item.id}, ${item.itemId}, ${item.acceptedQty}, 0,
+          ${item.acceptedQty}, 'PENDING', ${userId}, NOW(), NOW()
+        )
+        ON CONFLICT ("grnItemId") DO NOTHING
+      `;
+    }
 
     await tx`
       UPDATE "GoodsReceipt"

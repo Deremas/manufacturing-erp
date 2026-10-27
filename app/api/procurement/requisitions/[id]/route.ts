@@ -14,7 +14,7 @@ export async function GET(
       return NextResponse.json({ error: "Purchase requisition not found" }, { status: 404 });
     }
     return requisition;
-  });
+  }, "procurement.pr.view");
 }
 
 export async function PUT(
@@ -25,5 +25,5 @@ export async function PUT(
   return withProcurementAction(async (userId) => {
     const body = await request.json();
     return updateRequisition(id, body as Record<string, unknown>, userId);
-  });
+  }, "procurement.pr.update");
 }

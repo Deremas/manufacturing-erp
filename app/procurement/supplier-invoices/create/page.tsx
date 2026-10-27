@@ -2,13 +2,15 @@ import { getAccountsPayableReferenceData } from "@/app/procurement/_lib/ap-refer
 import { SupplierInvoiceEditor } from "@/features/procurement/ap-pages";
 
 export default async function CreateSupplierInvoicePage(
-  { searchParams }: { searchParams: Promise<{ poId?: string; grnId?: string }> },
+  { searchParams }: { searchParams: Promise<{ poPublicId?: string; grnPublicId?: string }> },
 ) {
-  const { poId, grnId } = await searchParams;
-  const referenceData = await getAccountsPayableReferenceData({ poId, grnId });
+  const { poPublicId, grnPublicId } = await searchParams;
+  const referenceData = await getAccountsPayableReferenceData({ poPublicId, grnPublicId });
   const prefillHeader = referenceData.invoicePrefill?.header;
-  const prefillPoId = prefillHeader?.poId ?? poId ?? "";
-  const prefillGrnId = prefillHeader && "grnId" in prefillHeader ? prefillHeader.grnId : grnId ?? "";
+  const prefillPoId =
+    prefillHeader && "poId" in prefillHeader ? String(prefillHeader.poId ?? "") : "";
+  const prefillGrnId =
+    prefillHeader && "grnId" in prefillHeader ? String(prefillHeader.grnId ?? "") : "";
   const prefillRemarks =
     prefillHeader && "grnNo" in prefillHeader
       ? `Generated from ${String(prefillHeader.grnNo ?? "")}`

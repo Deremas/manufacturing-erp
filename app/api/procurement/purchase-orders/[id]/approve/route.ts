@@ -1,10 +1,11 @@
-import { withProcurementAction } from "@/app/api/procurement/helpers";
+import { withProcurementAction, readProcurementActionBody } from "@/app/api/procurement/helpers";
 import { approveOrder } from "@/app/api/procurement/purchase-orders/helpers";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return withProcurementAction(async (userId) => approveOrder(id, userId));
+  const { comment } = await readProcurementActionBody(request);
+  return withProcurementAction(async (userId) => approveOrder(id, userId, comment), "procurement.po.approve");
 }

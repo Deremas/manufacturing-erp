@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/routing/public-id";
 import {
   nextProductionDocumentNumber,
   normalizeBomStatus,
@@ -15,7 +16,6 @@ export interface BomLineInput {
   quantity: number;
   wastagePercent?: number;
   required?: boolean;
-  remarks?: string;
 }
 
 export interface BomPayload {
@@ -23,7 +23,6 @@ export interface BomPayload {
   finishedGoodId: string;
   outputQty: number;
   uomId?: string | null;
-  version?: string;
   isDefault?: boolean;
   status?: string;
   description?: string;
@@ -36,6 +35,7 @@ export async function listBoms() {
   try {
     return await sql<Array<{
       id: string;
+      publicId: number;
       bomNo: string;
       bomName: string;
       finishedGoodId: string;
@@ -43,29 +43,33 @@ export async function listBoms() {
       finishedGoodName: string;
       outputQty: number;
       uomName: string | null;
-      version: string;
       status: string;
       isDefault: boolean;
+      description: string | null;
+      createdByName: string | null;
       componentCount: number;
     }>>`
       SELECT
         b.id,
+        b."publicId",
         b."bomNo",
         b."bomName",
         b."finishedGoodId",
         fg."itemCode" AS "finishedGoodCode",
         fg."itemName" AS "finishedGoodName",
         b."outputQty",
-        u.name AS "uomName",
-        b.version,
+        COALESCE(NULLIF(TRIM(u.abbreviation), ''), u.name) AS "uomName",
         b.status::text AS status,
         b."isDefault",
+        b.description,
+        creator.name AS "createdByName",
         COALESCE(COUNT(bi.id), 0)::int AS "componentCount"
       FROM "BOM" b
       INNER JOIN "Item" fg ON fg.id = b."finishedGoodId"
       LEFT JOIN "Unit" u ON u.id = b."uomId"
+      LEFT JOIN "User" creator ON creator.id = b."createdById"
       LEFT JOIN "BOMItem" bi ON bi."bomId" = b.id
-      GROUP BY b.id, fg."itemCode", fg."itemName", u.name
+      GROUP BY b.id, fg."itemCode", fg."itemName", u.name, u.abbreviation, creator.name
       ORDER BY b."createdAt" DESC
     `;
   } catch {
@@ -73,9 +77,10 @@ export async function listBoms() {
   }
 }
 
-export async function getBomById(id: string) {
+export async function getBomById(key: string) {
   const rows = await sql<Array<{
     id: string;
+    publicId: number;
     bomNo: string;
     bomName: string;
     finishedGoodId: string;
@@ -84,13 +89,13 @@ export async function getBomById(id: string) {
     outputQty: number;
     uomId: string | null;
     uomName: string | null;
-    version: string;
     status: string;
     isDefault: boolean;
     description: string | null;
   }>>`
     SELECT
       b.id,
+      b."publicId",
       b."bomNo",
       b."bomName",
       b."finishedGoodId",
@@ -99,14 +104,13 @@ export async function getBomById(id: string) {
       b."outputQty",
       b."uomId",
       u.name AS "uomName",
-      b.version,
       b.status::text AS status,
       b."isDefault",
       b.description
     FROM "BOM" b
     INNER JOIN "Item" fg ON fg.id = b."finishedGoodId"
     LEFT JOIN "Unit" u ON u.id = b."uomId"
-    WHERE b.id = ${id}
+    WHERE ${isPublicIdParam(key) ? sql`b."publicId" = ${Number(key)}` : sql`b.id = ${key}`}
     LIMIT 1
   `;
 
@@ -123,7 +127,6 @@ export async function getBomById(id: string) {
     quantity: number;
     wastagePercent: number;
     required: boolean;
-    remarks: string | null;
   }>>`
     SELECT
       bi.id,
@@ -134,12 +137,11 @@ export async function getBomById(id: string) {
       u.name AS "uomName",
       bi.quantity,
       bi."wastagePercent",
-      bi.required,
-      bi.remarks
+      bi.required
     FROM "BOMItem" bi
     INNER JOIN "Item" i ON i.id = bi."componentItemId"
     LEFT JOIN "Unit" u ON u.id = bi."uomId"
-    WHERE bi."bomId" = ${id}
+    WHERE bi."bomId" = ${header.id}
     ORDER BY i."itemCode" ASC
   `;
 
@@ -148,15 +150,16 @@ export async function getBomById(id: string) {
   return { ...header, items, costEstimate };
 }
 
-function validateBomItems(items: BomLineInput[]) {
-  if (!items.length) {
-    throw new Error("At least one BOM component is required");
-  }
+function validateBomPayload(payload: BomPayload) {
+  if (!payload.bomName?.trim()) throw new Error("BOM name is required");
+  if (!payload.finishedGoodId) throw new Error("Finished good is required");
+  if (Number(payload.outputQty ?? 0) <= 0) throw new Error("Output quantity must be greater than zero");
+  if (!payload.items.length) throw new Error("At least one material is required");
   const seen = new Set<string>();
-  for (const item of items) {
-    if (!item.componentItemId) throw new Error("Component item is required");
-    if (seen.has(item.componentItemId)) throw new Error("Duplicate BOM component items are not allowed");
-    if (Number(item.quantity ?? 0) <= 0) throw new Error("Component quantity must be greater than zero");
+  for (const item of payload.items) {
+    if (!item.componentItemId) throw new Error("Material is required");
+    if (seen.has(item.componentItemId)) throw new Error("Use one row per material and increase the quantity");
+    if (Number(item.quantity ?? 0) <= 0) throw new Error("Material quantity must be greater than zero");
     seen.add(item.componentItemId);
   }
 }
@@ -174,7 +177,7 @@ async function writeBomItems(tx: Tx, bomId: string, items: BomLineInput[]) {
   for (const item of items) {
     await tx`
       INSERT INTO "BOMItem" (
-        id, "bomId", "componentItemId", "uomId", quantity, "wastagePercent", required, remarks
+        id, "bomId", "componentItemId", "uomId", quantity, "wastagePercent", required
       )
       VALUES (
         ${randomUUID()},
@@ -183,26 +186,33 @@ async function writeBomItems(tx: Tx, bomId: string, items: BomLineInput[]) {
         ${item.uomId ?? null},
         ${Number(item.quantity)},
         ${Number(item.wastagePercent ?? 0)},
-        ${item.required ?? true},
-        ${item.remarks ?? null}
+        ${item.required ?? true}
       )
     `;
   }
 }
 
 export async function createBom(payload: BomPayload) {
-  validateBomItems(payload.items);
-  if (Number(payload.outputQty ?? 0) <= 0) throw new Error("Output quantity must be greater than zero");
+  validateBomPayload(payload);
 
   return sql.begin(async (tx) => {
     const id = randomUUID();
     const bomNo = await nextProductionDocumentNumber(tx, "BOM", "Bill of Materials");
-    if (payload.isDefault) {
+    const existingDefaults = await tx<Array<{ id: string }>>`
+      SELECT id
+      FROM "BOM"
+      WHERE "finishedGoodId" = ${payload.finishedGoodId}
+        AND "isDefault" = true
+        AND status = 'ACTIVE'
+      LIMIT 1
+    `;
+    const isDefault = Boolean(payload.isDefault) || existingDefaults.length === 0;
+    if (isDefault) {
       await ensureSingleDefault(tx, payload.finishedGoodId);
     }
     await tx`
       INSERT INTO "BOM" (
-        id, "bomNo", "bomName", "finishedGoodId", "outputQty", "uomId", version,
+        id, "bomNo", "bomName", "finishedGoodId", "outputQty", "uomId",
         "isDefault", status, description, "createdById", "updatedById", "createdAt", "updatedAt"
       )
       VALUES (
@@ -212,8 +222,7 @@ export async function createBom(payload: BomPayload) {
         ${payload.finishedGoodId},
         ${Number(payload.outputQty)},
         ${payload.uomId ?? null},
-        ${payload.version ?? "1.0"},
-        ${payload.isDefault ?? false},
+        ${isDefault},
         ${normalizeBomStatus(payload.status)},
         ${payload.description ?? null},
         ${payload.createdById},
@@ -230,7 +239,7 @@ export async function createBom(payload: BomPayload) {
 }
 
 export async function updateBom(id: string, payload: BomPayload) {
-  validateBomItems(payload.items);
+  validateBomPayload(payload);
   return sql.begin(async (tx) => {
     if (payload.isDefault) {
       await ensureSingleDefault(tx, payload.finishedGoodId, id);
@@ -242,7 +251,6 @@ export async function updateBom(id: string, payload: BomPayload) {
         "finishedGoodId" = ${payload.finishedGoodId},
         "outputQty" = ${Number(payload.outputQty)},
         "uomId" = ${payload.uomId ?? null},
-        version = ${payload.version ?? "1.0"},
         "isDefault" = ${payload.isDefault ?? false},
         status = ${normalizeBomStatus(payload.status)}::"BOMStatus",
         description = ${payload.description ?? null},
@@ -266,7 +274,6 @@ export async function duplicateBom(id: string, userId: string) {
     finishedGoodId: existing.finishedGoodId,
     outputQty: existing.outputQty,
     uomId: existing.uomId,
-    version: `${existing.version}-copy`,
     isDefault: false,
     status: existing.status,
     description: existing.description ?? undefined,
@@ -277,7 +284,6 @@ export async function duplicateBom(id: string, userId: string) {
       quantity: item.quantity,
       wastagePercent: item.wastagePercent,
       required: item.required,
-      remarks: item.remarks ?? undefined,
     })),
   });
 }

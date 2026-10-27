@@ -16,10 +16,7 @@ import type {
   CommitmentRegisterRow,
   SupplierPerformanceRow,
 } from "@/services/procurement/procurement-report.service";
-
-function formatMoney(value: number) {
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { formatMoney } from "@/lib/utils/format-number";
 
 function formatPercent(value: number) {
   return `${Number(value ?? 0).toFixed(1)}%`;
@@ -107,7 +104,7 @@ export function CommitmentRegisterReportPage({ rows }: { rows: CommitmentRegiste
     { key: "poNo", label: "PO No" },
     { key: "poDate", label: "PO Date", render: (value) => new Date(String(value)).toLocaleDateString("en-KE") },
     { key: "supplierName", label: "Supplier" },
-    { key: "deliveryLocationName", label: "Delivery Location" },
+    { key: "deliveryLocationName", label: "Receiving Location" },
     { key: "expectedDeliveryDate", label: "Expected Delivery", render: (value) => value ? new Date(String(value)).toLocaleDateString("en-KE") : "-" },
     { key: "status", label: "Status", render: (value) => <span style={{ color: colors.text.primary }}>{String(value)}</span> },
     { key: "totalAmount", label: "PO Value", render: (value) => formatMoney(Number(value ?? 0)) },

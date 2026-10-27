@@ -1,20 +1,43 @@
-import { PageHeader } from "@/components/shared";
-import { colors } from "@/components/ui/colors";
-import { radius } from "@/components/ui/radius";
-import { spacing } from "@/components/ui/spacing";
+import { FuelRecordsPage } from "@/features/fleet/FuelRecordsPage";
+import { requireAuth } from "@/lib/auth/auth";
+import {
+  getBankAccounts,
+  getFleetDrivers,
+  getLocations,
+  getSuppliers,
+  getVehicles,
+} from "@/lib/master-data-db";
+import { getFleetTrips, getFuelRecords } from "@/services/fleet/fleet.service";
 
-export default function FuelRecordsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function FleetFuelRecordsPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const user = await requireAuth();
+  const query = await searchParams;
+  const [fuelRecords, vehicles, drivers, trips, suppliers, bankAccounts, locations] = await Promise.all([
+    getFuelRecords({ accessibleLocationIds: user?.accessibleLocationIds }),
+    getVehicles(),
+    getFleetDrivers(),
+    getFleetTrips({ accessibleLocationIds: user?.accessibleLocationIds }),
+    getSuppliers(),
+    getBankAccounts(),
+    getLocations(),
+  ]);
+
+  const scopedLocations = user?.isSystem
+    ? locations
+    : locations.filter((location) => (user?.accessibleLocationIds ?? []).includes(location.id));
+
   return (
-    <div style={{ padding: spacing.page.padding, display: "flex", flexDirection: "column", gap: spacing.page.gap }}>
-      <PageHeader title="Fuel Records" subtitle="Fleet to inventory integration checkpoint" />
-      <div style={{ padding: 24, border: `1px solid ${colors.border}`, borderRadius: radius.components.card, backgroundColor: colors.surface }}>
-        <p>Fleet-managed fuel and spares can now route through inventory issue/return helpers.</p>
-        <ul>
-          <li>Fuel issues should call inventory store issue logic if fuel is tracked as inventory.</li>
-          <li>Tyres and spares should follow the same controlled issue path.</li>
-          <li>Fleet should not update stock balances directly.</li>
-        </ul>
-      </div>
-    </div>
+    <FuelRecordsPage
+      initialItems={fuelRecords}
+      vehicles={vehicles}
+      drivers={drivers}
+      trips={trips}
+      suppliers={suppliers}
+      bankAccounts={bankAccounts}
+      locations={scopedLocations}
+      initialEditingId={query.edit}
+    />
   );
 }

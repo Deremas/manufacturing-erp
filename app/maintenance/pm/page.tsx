@@ -1,18 +1,11 @@
-"use client";
+import { PreventiveMaintenanceListPage } from "@/features/maintenance/WorkflowPages";
+import { getPreventiveMaintenancePlans } from "@/services/maintenance/maintenance.service";
+import { requireAuth } from "@/lib/auth/auth";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function PMSchedulePage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="PM Schedule"
-        subtitle="Manage preventive maintenance schedules"
-      />
-      <EmptyState title="PM Schedule" message="Module coming soon." />
-    </div>
-  );
+export default async function PreventiveMaintenancePlansPage() {
+  const user = await requireAuth();
+  const plans = await getPreventiveMaintenancePlans();
+  return <PreventiveMaintenanceListPage plans={user.accessibleLocationIds?.length ? plans.filter((plan) => user.accessibleLocationIds?.includes(plan.locationId)) : plans} />;
 }

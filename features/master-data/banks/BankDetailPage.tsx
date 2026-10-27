@@ -236,6 +236,7 @@ export default function BankDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="md.bank"
         title={currentBank.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

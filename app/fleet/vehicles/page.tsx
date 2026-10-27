@@ -1,15 +1,9 @@
-"use client";
+import { VehiclesPage as FleetVehiclesPage } from "@/features/fleet/FleetMasterPages";
+import { getVehicles } from "@/services/fleet/fleet.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function VehiclesPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Vehicles" subtitle="Manage fleet vehicles" />
-      <EmptyState title="Vehicles" message="Module coming soon." />
-    </div>
-  );
+export default async function VehiclesPage() {
+  const items = await getVehicles();
+  return <FleetVehiclesPage initialItems={items} />;
 }

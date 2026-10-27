@@ -171,6 +171,7 @@ export default function LocationDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="admin.location"
         title={location.locationName}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

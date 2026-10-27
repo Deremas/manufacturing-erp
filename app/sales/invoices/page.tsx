@@ -1,20 +1,30 @@
-import { PageHeader } from "@/components/shared";
-import { colors } from "@/components/ui/colors";
-import { radius } from "@/components/ui/radius";
-import { spacing } from "@/components/ui/spacing";
+import { requireAuth } from "@/lib/auth/auth";
+import { SalesInvoiceListPage } from "@/features/sales/SalesInvoicePages";
+import { getSystemPreferences } from "@/lib/server/system-preferences";
+import { listSalesInvoices } from "@/services/sales/sales-invoice.service";
 
-export default function SalesHistoryPage() {
+export default async function SalesInvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const user = await requireAuth();
+  const params = await searchParams;
+  const selectedChannel = typeof params.channel === "string" ? params.channel.toUpperCase() : null;
+
+  const [items, preferences] = await Promise.all([
+    listSalesInvoices({
+      accessibleLocationIds: user.accessibleLocationIds,
+      channel: selectedChannel,
+    }),
+    getSystemPreferences(),
+  ]);
+
   return (
-    <div style={{ padding: spacing.page.padding, display: "flex", flexDirection: "column", gap: spacing.page.gap }}>
-      <PageHeader title="Sales History / Invoices" subtitle="Sales to inventory integration checkpoint" />
-      <div style={{ padding: 24, border: `1px solid ${colors.border}`, borderRadius: radius.components.card, backgroundColor: colors.surface }}>
-        <p>This screen is now positioned to issue finished goods through the inventory posting engine.</p>
-        <ul>
-          <li>Invoice posting should call `issueForSales()`.</li>
-          <li>Sales returns should call `receiveSalesReturn()`.</li>
-          <li>Sales must read/store the selected location before posting stock movement.</li>
-        </ul>
-      </div>
-    </div>
+    <SalesInvoiceListPage
+      items={items}
+      currencyCode={preferences.currencyCode}
+      channelFilter={selectedChannel}
+    />
   );
 }

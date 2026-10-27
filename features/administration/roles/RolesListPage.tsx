@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 import {
   PageHeader,
   FilterCard,
@@ -105,13 +106,13 @@ export default function RolesListPage({
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(`/administration/roles/${record.id}`),
+      onClick: (record) => router.push(publicViewUrl("administration.role", (record as { publicId: number }).publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
       onClick: (record) =>
-        router.push(`/administration/roles/${record.id}/edit`),
+        router.push(publicEditUrl("administration.role", (record as { publicId: number }).publicId)),
     },
     {
       label: "Delete",
@@ -165,11 +166,9 @@ export default function RolesListPage({
     },
   ];
 
-  const handleFilter = (values: Record<string, string>) => {
-    console.log("Filter values", values);
-  };
+  const handleFilter = (_values: Record<string, string>) => undefined;
 
-  const handleReset = () => console.log("Filters reset");
+  const handleReset = () => undefined;
 
   const totalRoles = data.length;
   const activeRoles = data.filter((role) => role.isActive).length;

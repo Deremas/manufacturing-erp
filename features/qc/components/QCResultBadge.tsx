@@ -1,0 +1,1 @@
+export { QCResultBadge } from "./QCStatusBadge";

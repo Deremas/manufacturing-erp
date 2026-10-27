@@ -1,18 +1,10 @@
-import { notFound } from "next/navigation";
-import { PriceListForm } from "@/features/master-data/components";
-import { getPriceListById } from "@/lib/master-data-db";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-interface PageProps {
-  params: { id: string };
-}
-
-export default async function EditPriceListPage({ params }: PageProps) {
-  const priceList = await getPriceListById(params.id);
-  if (!priceList) notFound();
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24, padding: 24 }}>
-      <PriceListForm initialData={priceList} />
-    </div>
-  );
+export default async function LegacyRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  await redirectLegacyToPublicUrl("master-data.price-list", id, "edit");
 }

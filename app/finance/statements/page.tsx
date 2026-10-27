@@ -1,18 +1,11 @@
-"use client";
+import FinancialStatementsLivePage from "@/features/finance/FinancialStatementsLivePage";
+import { requireAuth } from "@/lib/auth/auth";
+import { getFinancialStatementRows } from "@/services/accounting/accounting.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function FinancialStatementsPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader
-        title="Financial Statements"
-        subtitle="View financial statements"
-      />
-      <EmptyState title="Financial Statements" message="Module coming soon." />
-    </div>
-  );
+export default async function FinancialStatementsPage() {
+  await requireAuth();
+  const rows = await getFinancialStatementRows();
+  return <FinancialStatementsLivePage rows={rows} />;
 }

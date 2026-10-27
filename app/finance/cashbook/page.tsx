@@ -1,15 +1,11 @@
-"use client";
+import CashBookLivePage from "@/features/finance/CashBookLivePage";
+import { requireAuth } from "@/lib/auth/auth";
+import { getCashBookRows } from "@/services/accounting/accounting.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function CashBookPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Cash Book" subtitle="Manage cash book entries" />
-      <EmptyState title="Cash Book" message="Module coming soon." />
-    </div>
-  );
+export default async function CashBookPage() {
+  await requireAuth();
+  const rows = await getCashBookRows();
+  return <CashBookLivePage rows={rows} />;
 }

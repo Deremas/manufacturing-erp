@@ -5,5 +5,5 @@ export async function POST(
   { params }: { params: Promise<{ document: string; id: string }> },
 ) {
   const { document, id } = await params;
-  return withInventoryDocument(document, async (key, userId) => postDocument(key, id, userId));
+  return withInventoryDocument(document, async (key, userId) => postDocument(key, id, userId), "post");
 }

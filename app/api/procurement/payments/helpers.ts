@@ -5,6 +5,7 @@ import {
   getSupplierPaymentById,
   listSupplierPayments,
   rejectSupplierPayment,
+  submitSupplierPayment,
   updateSupplierPayment,
 } from "@/services/procurement/supplier-payment.service";
 
@@ -23,6 +24,7 @@ export async function createPayment(body: Record<string, unknown>, userId: strin
     amount: Number(body.amount ?? 0),
     remarks: String(body.remarks ?? ""),
     status: body.status as never,
+    approverId: body.approverId ? String(body.approverId) : undefined,
     createdById: userId,
   });
 }
@@ -39,10 +41,12 @@ export async function updatePayment(id: string, body: Record<string, unknown>, u
     amount: Number(body.amount ?? 0),
     remarks: String(body.remarks ?? ""),
     status: body.status as never,
+    approverId: body.approverId ? String(body.approverId) : undefined,
     createdById: userId,
   });
 }
 
 export const approvePayment = approveSupplierPayment;
 export const rejectPayment = rejectSupplierPayment;
+export const submitPayment = submitSupplierPayment;
 export const cancelPayment = cancelSupplierPayment;

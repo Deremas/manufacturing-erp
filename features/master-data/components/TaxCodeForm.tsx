@@ -44,7 +44,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "7px 10px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: "6px",
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -202,7 +202,7 @@ export default function TaxCodeForm({
             value={String(fieldValue ?? "")}
             onChange={handleChange}
           >
-            <option value="">{placeholder ?? `Select ${label}`}</option>
+            <option value="">{placeholder ?? "Select ..."}</option>
             {options.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}

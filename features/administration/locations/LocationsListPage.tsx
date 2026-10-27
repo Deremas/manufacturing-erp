@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -32,6 +32,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface LocationsListPageProps {
   initialData?: Location[];
@@ -41,7 +42,12 @@ export default function LocationsListPage({
   initialData = [],
 }: LocationsListPageProps) {
   const router = useRouter();
-  const [data] = useState<Location[]>(initialData);
+  const [data, setData] = useState<Location[]>(initialData);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Administration", href: "/administration" },
@@ -120,13 +126,13 @@ export default function LocationsListPage({
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(`/administration/locations/${record.id}`),
+      onClick: (record) => router.push(publicViewUrl("administration.location", record.publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
       onClick: (record) =>
-        router.push(`/administration/locations/${record.id}/edit`),
+        router.push(publicEditUrl("administration.location", record.publicId)),
     },
     {
       label: "Delete",
@@ -134,10 +140,12 @@ export default function LocationsListPage({
       color: colors.danger[600],
       onClick: async (record) => {
         try {
-          await deleteRecord(
+          const deleted = await deleteRecord(
             `/api/records/administration/locations/${record.id}`,
             "location",
           );
+          if (!deleted) return;
+          setData((current) => current.filter((location) => location.id !== record.id));
           router.refresh();
         } catch (error) {
           console.error(error);
@@ -169,9 +177,26 @@ export default function LocationsListPage({
     },
   ];
 
-  const handleFilter = (values: Record<string, string>) => {
-    console.log("Filter values", values);
-  };
+  const filteredData = useMemo(() => {
+    const search = filters.search?.trim().toLowerCase() ?? "";
+    const type = filters.type?.trim() ?? "";
+    const status = filters.status?.trim() ?? "";
+
+    return data.filter((location) => {
+      if (type && location.locationType !== type) return false;
+      if (status && String(location.isActive) !== status) return false;
+      if (!search) return true;
+
+      return [
+        location.locationCode,
+        location.locationName,
+        location.locationType,
+        location.address,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+  }, [data, filters]);
 
   const totalLocations = data.length;
   const activeLocations = data.filter((location) => location.isActive).length;
@@ -224,16 +249,16 @@ export default function LocationsListPage({
       <FilterCard
         title="Filter Locations"
         fields={filterFields}
-        onFilter={handleFilter}
-        onReset={() => undefined}
+        onFilter={setFilters}
+        onReset={() => setFilters({})}
       />
 
       <DataTable
         columns={columns}
-        data={data}
+        data={filteredData}
         actions={tableActions}
         emptyState={emptyState}
-        recordCount={data.length}
+        recordCount={filteredData.length}
       />
     </div>
   );

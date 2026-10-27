@@ -110,9 +110,9 @@ const jsonBlockStyle: React.CSSProperties = {
 // Page Component
 // ----------------------------------------------------------------------------
 export default function AuditLogsPage({ initialData = [] }: AuditLogsPageProps) {
-  const router = useRouter();
   const [data] = useState<AuditLog[]>(initialData);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Administration", href: "/administration" },
@@ -245,9 +245,30 @@ export default function AuditLogsPage({ initialData = [] }: AuditLogsPageProps) 
     />
   );
 
-  const handleFilter = (values: Record<string, string>) =>
-    console.log("Filter", values);
-  const handleReset = () => console.log("Reset");
+  const filteredData = data.filter((log) => {
+    const action = filters.action?.trim() ?? "";
+    const module = filters.module?.trim() ?? "";
+    const user = filters.user?.trim().toLowerCase() ?? "";
+    const dateFrom = filters.dateFrom?.trim() ?? "";
+    const dateTo = filters.dateTo?.trim() ?? "";
+
+    if (action && log.action !== action) return false;
+    if (module && log.module !== module) return false;
+    if (user && !log.user.toLowerCase().includes(user)) return false;
+
+    const logDate = new Date(log.dateTime);
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      if (logDate < from) return false;
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      if (logDate > to) return false;
+    }
+
+    return true;
+  });
 
   return (
     <div style={pageStyle}>
@@ -291,16 +312,16 @@ export default function AuditLogsPage({ initialData = [] }: AuditLogsPageProps) 
       <FilterCard
         title="Filter Audit Logs"
         fields={filterFields}
-        onFilter={handleFilter}
-        onReset={handleReset}
+        onFilter={setFilters}
+        onReset={() => setFilters({})}
       />
 
       <DataTable
         columns={columns}
-        data={data}
+        data={filteredData}
         actions={tableActions}
         emptyState={emptyState}
-        recordCount={data.length}
+        recordCount={filteredData.length}
       />
 
       {selectedLog && (

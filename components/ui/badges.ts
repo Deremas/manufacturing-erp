@@ -96,6 +96,11 @@ export const badges: BadgeConfig = {
     bg: "#fee2e2", // danger-100
     border: "#fecaca", // danger-200
   },
+  overstock: {
+    text: "#0f766e", // teal-700
+    bg: "#ccfbf1", // teal-100
+    border: "#99f6e4", // teal-200
+  },
 };
 
 export default badges;

@@ -1,40 +1,10 @@
-import { notFound } from "next/navigation";
-import { PageHeader } from "@/components/shared";
-import { TaxCodeDetail } from "@/features/master-data/components";
-import { getTaxCodeById } from "@/lib/master-data-db";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-interface TaxCodeDetailRouteProps {
-  params: { id: string };
-}
-
-export default async function TaxCodeDetailRoute({
+export default async function LegacyRedirect({
   params,
-}: TaxCodeDetailRouteProps) {
-  const { id } = params;
-  const taxCode = await getTaxCodeById(id);
-
-  if (!taxCode) {
-    notFound();
-  }
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "24px",
-        padding: "24px",
-      }}
-    >
-      <PageHeader
-        title={taxCode.taxName}
-        breadcrumbs={[
-          { label: "Master Data", href: "/master-data" },
-          { label: "Tax Codes", href: "/master-data/tax-codes" },
-          { label: taxCode.taxName },
-        ]}
-      />
-      <TaxCodeDetail taxCode={taxCode} />
-    </div>
-  );
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  await redirectLegacyToPublicUrl("master-data.tax-code", id, "view");
 }

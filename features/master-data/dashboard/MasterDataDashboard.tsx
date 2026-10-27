@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { HeroBanner, MetricCard, ActionButtons } from "@/components/shared";
-import type { Action } from "@/components/shared";
+import React from "react";
+import Link from "next/link";
+import { HeroBanner, MetricCard } from "@/components/shared";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { radius } from "@/components/ui/radius";
@@ -139,34 +139,31 @@ export default function MasterDataDashboard({
   recentAdded = [],
   recentUpdated = [],
 }: MasterDataDashboardProps) {
-
-  const handleCreate = (entity: string) => console.log("Create", entity);
-
   const quickActions = [
     {
       label: "Create Item",
       icon: <Package size={18} />,
-      onClick: () => handleCreate("Item"),
+      href: "/master-data/items/create",
     },
     {
       label: "Create Customer",
       icon: <Users size={18} />,
-      onClick: () => handleCreate("Customer"),
+      href: "/master-data/customers/create",
     },
     {
       label: "Create Supplier",
       icon: <Truck size={18} />,
-      onClick: () => handleCreate("Supplier"),
+      href: "/master-data/suppliers/create",
     },
     {
       label: "Create Category",
       icon: <FolderTree size={18} />,
-      onClick: () => handleCreate("Category"),
+      href: "/master-data/categories/create",
     },
     {
       label: "Create Unit",
       icon: <Ruler size={18} />,
-      onClick: () => handleCreate("Unit"),
+      href: "/master-data/units/create",
     },
   ];
 
@@ -222,14 +219,14 @@ export default function MasterDataDashboard({
         </h3>
         <div style={gridStyle}>
           {quickActions.map((action) => (
-            <button
+            <Link
               key={action.label}
-              onClick={action.onClick}
+              href={action.href}
               style={quickActionStyle}
             >
               {action.icon}
               {action.label}
-            </button>
+            </Link>
           ))}
         </div>
       </div>

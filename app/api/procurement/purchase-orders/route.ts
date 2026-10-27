@@ -4,7 +4,7 @@ import { withProcurementAction } from "@/app/api/procurement/helpers";
 import { createOrder, listOrders } from "@/app/api/procurement/purchase-orders/helpers";
 
 export async function GET() {
-  return withProcurementAction(async () => listOrders());
+  return withProcurementAction(async () => listOrders(), "procurement.po.view");
 }
 
 export async function POST(request: Request) {
@@ -12,5 +12,5 @@ export async function POST(request: Request) {
     const body = await request.json();
     const created = await createOrder(body as Record<string, unknown>, userId);
     return NextResponse.json(created, { status: 201 });
-  });
+  }, "procurement.po.create");
 }

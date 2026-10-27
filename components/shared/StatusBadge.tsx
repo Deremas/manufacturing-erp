@@ -14,6 +14,7 @@ export type BadgeSize = "sm" | "md" | "lg";
 export interface StatusBadgeProps {
   status: BadgeVariant;
   size?: BadgeSize;
+  label?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -28,9 +29,14 @@ const sizeConfig: Record<BadgeSize, { fontSize: string; padding: string }> = {
 // ----------------------------------------------------------------------------
 // Component
 // ----------------------------------------------------------------------------
-export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
+export default function StatusBadge({ status, size = "md", label }: StatusBadgeProps) {
   const config = badges[status];
   const sizeStyles = sizeConfig[size];
+  const displayLabel = label ?? (
+    config
+      ? status.charAt(0).toUpperCase() + status.slice(1).replace("-", " ")
+      : status
+  );
 
   if (!config) {
     // Fallback for unknown status
@@ -50,7 +56,7 @@ export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
           whiteSpace: "nowrap",
         }}
       >
-        {status}
+        {displayLabel}
       </span>
     );
   }
@@ -71,7 +77,7 @@ export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
         whiteSpace: "nowrap",
       }}
     >
-      {status.charAt(0).toUpperCase() + status.slice(1).replace("-", " ")}
+      {displayLabel}
     </span>
   );
 }

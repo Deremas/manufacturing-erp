@@ -1,16 +1,10 @@
-import { notFound } from "next/navigation";
-import { RoleDetailPage } from "@/features/administration/roles";
-import { getRoleById } from "@/lib/administration-db";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-interface PageProps {
+export default async function LegacyRedirect({
+  params,
+}: {
   params: Promise<{ id: string }>;
-}
-
-export default async function ViewRolePage({ params }: PageProps) {
+}) {
   const { id } = await params;
-  const role = await getRoleById(id);
-  if (!role) {
-    notFound();
-  }
-  return <RoleDetailPage role={role} />;
+  await redirectLegacyToPublicUrl("administration.role", id, "view");
 }

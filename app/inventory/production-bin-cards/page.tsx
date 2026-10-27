@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { ProductionBinCardPage } from "@/features/inventory";
-
-export default function ProductionBinCardRoute() {
-  return <ProductionBinCardPage />;
+export default function InventoryProductionBinCardsRedirect() {
+  redirect("/production-bin-cards");
 }

@@ -204,8 +204,6 @@ export default function CategoryDetailPage({
       onClick: (record) => {
         if (onViewSubCategory) {
           onViewSubCategory(record.id);
-        } else {
-          console.log("View sub-category", record.id);
         }
       },
     },
@@ -235,6 +233,7 @@ export default function CategoryDetailPage({
       }}
     >
       <PageHeader
+        recordKind="md.category"
         title={category.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

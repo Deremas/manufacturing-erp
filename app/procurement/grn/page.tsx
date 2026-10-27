@@ -8,6 +8,7 @@ export default async function GoodsReceiptsPage() {
     <GoodsReceiptListPage
       rows={receipts.map((receipt) => ({
         id: receipt.id,
+        publicId: receipt.publicId,
         number: receipt.grnNo,
         date: receipt.grnDate,
         status: receipt.status,

@@ -23,6 +23,7 @@ import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { Eye, Pencil, Trash2, CreditCard, CheckCircle, XCircle } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface BankAccountsListPageProps {
   initialData?: BankAccount[];
@@ -40,6 +41,7 @@ export default function BankAccountsListPage({
 }: BankAccountsListPageProps) {
   const router = useRouter();
   const [data] = useState<BankAccount[]>(initialData);
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Master Data", href: "/master-data" },
@@ -88,11 +90,32 @@ export default function BankAccountsListPage({
     },
   ];
 
-  const handleCreate = () => router.push(window.location.pathname + "/create");
+  const handleCreate = () => router.push("/master-data/bank-accounts/create");
+
+  const filteredData = useMemo(() => {
+    const search = filters.search?.trim().toLowerCase() ?? "";
+    const bankName = filters.bankName?.trim() ?? "";
+    const status = filters.status?.trim() ?? "";
+
+    return data.filter((account) => {
+      if (bankName && account.bankName !== bankName) return false;
+      if (status && String(account.isActive) !== status) return false;
+      if (!search) return true;
+
+      return [
+        account.accountName,
+        account.accountCode,
+        account.accountNumber,
+        account.bankName,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+  }, [data, filters]);
 
   const tableActions: TableAction[] = [
-    { label: "View", icon: <Eye size={16} />, onClick: (record) => router.push(window.location.pathname + "/" + record.id) },
-    { label: "Edit", icon: <Pencil size={16} />, onClick: (record) => router.push(window.location.pathname + "/" + record.id + "/edit") },
+    { label: "View", icon: <Eye size={16} />, onClick: (record) => router.push(publicViewUrl("master-data.bank-account", record.publicId)) },
+    { label: "Edit", icon: <Pencil size={16} />, onClick: (record) => router.push(publicEditUrl("master-data.bank-account", record.publicId)) },
     {
       label: "Delete",
       icon: <Trash2 size={16} />,
@@ -148,9 +171,14 @@ export default function BankAccountsListPage({
         <MetricCard label="Inactive" value={inactiveAccounts} icon={<XCircle size={18} />} borderColor={colors.danger[500]} color={colors.danger[700]} />
       </div>
 
-      <FilterCard title="Filter Bank Accounts" fields={filterFields} onFilter={(values) => console.log("Filter values", values)} onReset={() => undefined} />
+      <FilterCard
+        title="Filter Bank Accounts"
+        fields={filterFields}
+        onFilter={setFilters}
+        onReset={() => setFilters({})}
+      />
 
-      <DataTable columns={columns} data={data} actions={tableActions} emptyState={emptyState} recordCount={data.length} />
+      <DataTable columns={columns} data={filteredData} actions={tableActions} emptyState={emptyState} recordCount={filteredData.length} />
     </div>
   );
 }

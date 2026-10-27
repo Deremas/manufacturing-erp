@@ -1,15 +1,11 @@
-"use client";
+import { requireAuth } from "@/lib/auth/auth";
+import { getExpenseRegisterRows } from "@/services/accounting/accounting.service";
+import ExpenseRegisterPage from "@/features/finance/ExpenseRegisterPage";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function ExpensesPage() {
-  return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Expenses" subtitle="Manage expense records" />
-      <EmptyState title="Expenses" message="Module coming soon." />
-    </div>
-  );
+export default async function ExpensesPage() {
+  await requireAuth();
+  const rows = await getExpenseRegisterRows();
+  return <ExpenseRegisterPage rows={rows} />;
 }

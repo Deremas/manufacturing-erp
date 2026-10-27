@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/routing/public-id";
 import type { Location, Role, User } from "@/features/administration/types";
 
 export interface PermissionGroup {
@@ -18,11 +19,30 @@ function titleCase(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function buildEffectivePermissions(input: {
+  isSystem: boolean;
+  rolePermissions: string[];
+  allowPermissions: string[];
+  denyPermissions: string[];
+}) {
+  if (input.isSystem) {
+    return ["*"];
+  }
+
+  const denied = new Set(input.denyPermissions);
+  return Array.from(
+    new Set([...input.rolePermissions, ...input.allowPermissions]),
+  )
+    .filter((permission) => !denied.has(permission))
+    .sort();
+}
+
 export async function getRoles(): Promise<Role[]> {
   try {
     const rows = await sql<
       Array<{
         id: string;
+        publicId: number;
         name: string;
         description: string | null;
         isSystem: boolean;
@@ -33,6 +53,7 @@ export async function getRoles(): Promise<Role[]> {
     >`
       SELECT
         r.id,
+        r."publicId",
         r.name,
         r.description,
         r."isSystem",
@@ -54,6 +75,7 @@ export async function getRoles(): Promise<Role[]> {
 
     return rows.map((row) => ({
       id: row.id,
+      publicId: row.publicId,
       name: row.name,
       description: row.description ?? "",
       isSystem: row.isSystem,
@@ -67,11 +89,12 @@ export async function getRoles(): Promise<Role[]> {
   }
 }
 
-export async function getRoleById(id: string): Promise<Role | null> {
+export async function getRoleById(key: string): Promise<Role | null> {
   try {
     const roleRows = await sql<
       Array<{
         id: string;
+        publicId: number;
         name: string;
         description: string | null;
         isSystem: boolean;
@@ -82,6 +105,7 @@ export async function getRoleById(id: string): Promise<Role | null> {
     >`
       SELECT
         r.id,
+        r."publicId",
         r.name,
         r.description,
         r."isSystem",
@@ -97,7 +121,8 @@ export async function getRoleById(id: string): Promise<Role | null> {
           WHERE u."roleId" = r.id AND u."isArchived" = false
         ), 0)::int AS "usersCount"
       FROM "Role" r
-      WHERE r.id = ${id} AND r."isArchived" = false
+      WHERE ${isPublicIdParam(key) ? sql`r."publicId" = ${Number(key)}` : sql`r.id = ${key}`}
+        AND r."isArchived" = false
       LIMIT 1
     `;
 
@@ -116,7 +141,7 @@ export async function getRoleById(id: string): Promise<Role | null> {
         rp.module,
         rp.action
       FROM "RolePermission" rp
-      WHERE rp."roleId" = ${id} AND rp."isArchived" = false
+      WHERE rp."roleId" = ${role.id} AND rp."isArchived" = false
       ORDER BY rp.module ASC, rp.action ASC
     `;
 
@@ -129,12 +154,13 @@ export async function getRoleById(id: string): Promise<Role | null> {
     >`
       SELECT id, name, email
       FROM "User"
-      WHERE "roleId" = ${id} AND "isArchived" = false
+      WHERE "roleId" = ${role.id} AND "isArchived" = false
       ORDER BY name ASC
     `;
 
     return {
       id: role.id,
+      publicId: role.publicId,
       name: role.name,
       description: role.description ?? "",
       isSystem: role.isSystem,
@@ -229,6 +255,7 @@ export async function getUsers(): Promise<User[]> {
     const rows = await sql<
       Array<{
         id: string;
+        publicId: number;
         name: string;
         email: string;
         username: string | null;
@@ -239,12 +266,15 @@ export async function getUsers(): Promise<User[]> {
         isSystem: boolean;
         isActive: boolean;
         lastLogin: Date | null;
+        salesAllowPermissions: string[] | null;
+        salesDenyPermissions: string[] | null;
         permissionsCount: number;
         locationsCount: number;
       }>
     >`
       SELECT
         u.id,
+        u."publicId",
         u.name,
         u.email,
         u.username,
@@ -255,6 +285,8 @@ export async function getUsers(): Promise<User[]> {
         COALESCE(r."isSystem", false) AS "isSystem",
         u."isActive",
         u."lastLogin",
+        u."salesAllowPermissions",
+        u."salesDenyPermissions",
         COALESCE((
           SELECT COUNT(*)
           FROM "RolePermission" rp
@@ -273,6 +305,7 @@ export async function getUsers(): Promise<User[]> {
 
     return rows.map((row) => ({
       id: row.id,
+      publicId: row.publicId,
       name: row.name,
       email: row.email,
       username: row.username ?? undefined,
@@ -284,6 +317,8 @@ export async function getUsers(): Promise<User[]> {
       isSystem: row.isSystem,
       lastLogin: row.lastLogin?.toISOString(),
       permissions: [],
+      salesAllowPermissions: row.salesAllowPermissions ?? [],
+      salesDenyPermissions: row.salesDenyPermissions ?? [],
       locations: [],
       createdAt: row.lastLogin?.toISOString() ?? new Date().toISOString(),
     }));
@@ -292,11 +327,12 @@ export async function getUsers(): Promise<User[]> {
   }
 }
 
-export async function getUserById(id: string): Promise<User | null> {
+export async function getUserById(key: string): Promise<User | null> {
   try {
     const userRows = await sql<
       Array<{
         id: string;
+        publicId: number;
         name: string;
         email: string;
         username: string | null;
@@ -306,10 +342,13 @@ export async function getUserById(id: string): Promise<User | null> {
         lastLogin: Date | null;
         roleId: string | null;
         isSystem: boolean;
+        salesAllowPermissions: string[] | null;
+        salesDenyPermissions: string[] | null;
       }>
     >`
       SELECT
         u.id,
+        u."publicId",
         u.name,
         u.email,
         u.username,
@@ -318,10 +357,13 @@ export async function getUserById(id: string): Promise<User | null> {
         u."roleId",
         COALESCE(r."isSystem", false) AS "isSystem",
         u."isActive",
-        u."lastLogin"
+        u."lastLogin",
+        u."salesAllowPermissions",
+        u."salesDenyPermissions"
       FROM "User" u
       LEFT JOIN "Role" r ON r.id = u."roleId"
-      WHERE u.id = ${id} AND u."isArchived" = false
+      WHERE ${isPublicIdParam(key) ? sql`u."publicId" = ${Number(key)}` : sql`u.id = ${key}`}
+        AND u."isArchived" = false
       LIMIT 1
     `;
 
@@ -337,7 +379,7 @@ export async function getUserById(id: string): Promise<User | null> {
         `
       : [];
 
-    const permissionRows = user.roleId
+    const rolePermissionRows = user.roleId
       ? await sql<Array<{ module: string; action: string }>>`
           SELECT rp.module, rp.action
           FROM "RolePermission" rp
@@ -350,26 +392,27 @@ export async function getUserById(id: string): Promise<User | null> {
       SELECT l."locationName"
       FROM "UserLocation" ul
       INNER JOIN "Location" l ON l.id = ul."locationId"
-      WHERE ul."userId" = ${id}
+      WHERE ul."userId" = ${user.id}
       ORDER BY l."locationName" ASC
     `;
 
     const defaultLocationRows = await sql<Array<{ locationId: string }>>`
       SELECT "locationId"
       FROM "UserLocation"
-      WHERE "userId" = ${id} AND "isDefault" = true
+      WHERE "userId" = ${user.id} AND "isDefault" = true
       LIMIT 1
     `;
 
     const accessibleLocationRows = await sql<Array<{ locationId: string }>>`
       SELECT "locationId"
       FROM "UserLocation"
-      WHERE "userId" = ${id}
+      WHERE "userId" = ${user.id}
       ORDER BY "isDefault" DESC, "createdAt" ASC
     `;
 
     return {
       id: user.id,
+      publicId: user.publicId,
       name: user.name,
       email: user.email,
       username: user.username ?? undefined,
@@ -380,7 +423,14 @@ export async function getUserById(id: string): Promise<User | null> {
       isActive: user.isActive,
       isSystem: user.isSystem,
       lastLogin: user.lastLogin?.toISOString(),
-      permissions: permissionRows.map((row) => `${row.module}.${row.action}`),
+      permissions: buildEffectivePermissions({
+        isSystem: user.isSystem,
+        rolePermissions: rolePermissionRows.map((row) => `${row.module}.${row.action}`),
+        allowPermissions: user.salesAllowPermissions ?? [],
+        denyPermissions: user.salesDenyPermissions ?? [],
+      }),
+      salesAllowPermissions: user.salesAllowPermissions ?? [],
+      salesDenyPermissions: user.salesDenyPermissions ?? [],
       locations: locationRows.map((row) => row.locationName),
       defaultLocationId: defaultLocationRows[0]?.locationId,
       accessibleLocationIds: accessibleLocationRows.map((row) => row.locationId),

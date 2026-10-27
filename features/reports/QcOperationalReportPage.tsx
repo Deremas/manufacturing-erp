@@ -1,0 +1,16 @@
+"use client";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import ReportExportActions from "@/components/reporting/ReportExportActions";
+import ReportHeader from "@/components/reporting/ReportHeader";
+import ReportPageShell from "@/components/reporting/ReportPageShell";
+
+export function QcOperationalReportPage({ title, reportType, rows, filters, locations }: { title: string; reportType: string; rows: Array<Record<string, unknown>>; filters: { dateFrom?: string; dateTo?: string; locationId?: string; status?: string }; locations: Array<{ id: string; locationCode: string; locationName: string }> }) {
+  const router = useRouter(); const [form, setForm] = useState(filters); const columns = rows[0] ? Object.keys(rows[0]).filter((key) => !["id", "source_date", "Source"].includes(key)) : [];
+  const exportRows = rows.map(({ id: _id, source_date: _date, Source: _source, ...row }) => row as Record<string, string | number | boolean | null | undefined>);
+  function apply() { const query = new URLSearchParams(); Object.entries(form).forEach(([key, value]) => value && query.set(key, value)); router.push(`/reports/qc/${reportType}?${query}`); }
+  return <ReportPageShell hero={<ReportHeader title={title} subtitle="Live QC, production, inventory, and maintenance data with source drill-down." refreshedAt={new Date().toLocaleString()} actions={<ReportExportActions fileName={`qc-${reportType}`} reportTitle={title} rows={exportRows} filters={filters} />} />} filters={<div className="no-print" style={{ background: "white", borderRadius: 16, padding: 18, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}><input type="date" value={form.dateFrom ?? ""} onChange={(e) => setForm({ ...form, dateFrom: e.target.value })} /><input type="date" value={form.dateTo ?? ""} onChange={(e) => setForm({ ...form, dateTo: e.target.value })} /><select value={form.locationId ?? ""} onChange={(e) => setForm({ ...form, locationId: e.target.value })}><option value="">All accessible locations</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.locationCode} - {location.locationName}</option>)}</select><button onClick={apply} style={{ border: 0, borderRadius: 10, background: "#00897b", color: "white", fontWeight: 700 }}>Apply Filters</button></div>}>
+    <div className="print-content" style={{ background: "white", borderRadius: 16, overflowX: "auto" }}>{rows.length === 0 ? <p style={{ padding: 24, color: "#64748b" }}>No records match the selected filters.</p> : <table style={{ borderCollapse: "collapse", minWidth: 900, width: "100%" }}><thead><tr>{columns.map((column) => <th key={column} style={{ textAlign: "left", padding: 12, background: "#f1f5f9" }}>{column}</th>)}<th>Action</th></tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id ?? index)}>{columns.map((column) => <td key={column} style={{ padding: 12, borderTop: "1px solid #e2e8f0" }}>{String(row[column] ?? "-")}</td>)}<td style={{ padding: 12, borderTop: "1px solid #e2e8f0" }}>{row.Source ? <Link href={String(row.Source)}>View</Link> : "-"}</td></tr>)}</tbody></table>}</div>
+  </ReportPageShell>;
+}

@@ -23,6 +23,7 @@ import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { Eye, Pencil, Trash2, Users, UserCheck, UserX } from "lucide-react";
 import { deleteRecord } from "@/lib/client/record-actions";
+import { publicEditUrl, publicViewUrl } from "@/lib/routing/urls";
 
 export interface CustomersListPageProps {
   initialData?: Customer[];
@@ -33,6 +34,7 @@ export default function CustomersListPage({
 }: CustomersListPageProps) {
   const router = useRouter();
   const [data] = useState<Customer[]>(initialData);
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Master Data", href: "/master-data" },
@@ -47,6 +49,27 @@ export default function CustomersListPage({
       })),
     [data],
   );
+
+  const filteredData = useMemo(() => {
+    const search = filters.search?.trim().toLowerCase() ?? "";
+    const paymentTerms = filters.paymentTerms?.trim() ?? "";
+    const status = filters.status?.trim() ?? "";
+
+    return data.filter((customer) => {
+      if (paymentTerms && customer.paymentTerms !== paymentTerms) return false;
+      if (status && String(customer.isActive) !== status) return false;
+      if (!search) return true;
+
+      return [
+        customer.name,
+        customer.customerCode,
+        customer.phone,
+        customer.email,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+  }, [data, filters]);
 
   const filterFields: FilterField[] = [
     {
@@ -97,13 +120,13 @@ export default function CustomersListPage({
     {
       label: "View",
       icon: <Eye size={16} />,
-      onClick: (record) => router.push(`/master-data/customers/${record.id}`),
+      onClick: (record) => router.push(publicViewUrl("master-data.customer", record.publicId)),
     },
     {
       label: "Edit",
       icon: <Pencil size={16} />,
       onClick: (record) =>
-        router.push(`/master-data/customers/${record.id}/edit`),
+        router.push(publicEditUrl("master-data.customer", record.publicId)),
     },
     {
       label: "Delete",
@@ -133,7 +156,7 @@ export default function CustomersListPage({
       message="There are no customers to display. Create your first customer to get started."
       action={{
         label: "Create Customer",
-        onClick: () => router.push(window.location.pathname + "/create"),
+        onClick: () => router.push("/master-data/customers/create"),
       }}
     />
   );
@@ -142,7 +165,7 @@ export default function CustomersListPage({
     {
       label: "Create Customer",
       variant: "primary",
-      onClick: () => router.push(window.location.pathname + "/create"),
+      onClick: () => router.push("/master-data/customers/create"),
     },
   ];
 
@@ -165,14 +188,19 @@ export default function CustomersListPage({
         <MetricCard label="Inactive Customers" value={inactiveCustomers} icon={<UserX size={20} />} color={colors.danger[600]} borderColor={colors.danger[500]} />
       </div>
 
-      <FilterCard title="Filter Customers" fields={filterFields} onFilter={(values) => console.log("Filter values", values)} onReset={() => undefined} />
+      <FilterCard
+        title="Filter Customers"
+        fields={filterFields}
+        onFilter={setFilters}
+        onReset={() => setFilters({})}
+      />
 
       <DataTable
         columns={columns}
-        data={data}
+        data={filteredData}
         actions={tableActions}
         emptyState={emptyState}
-        recordCount={data.length}
+        recordCount={filteredData.length}
       />
     </div>
   );

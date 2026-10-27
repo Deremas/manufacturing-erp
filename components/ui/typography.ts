@@ -39,7 +39,7 @@ export interface TypographyConfig {
 }
 
 export const typography: TypographyConfig = {
-  fontFamily: "Inter, sans-serif",
+  fontFamily: "Lexend, sans-serif",
 
   sizes: {
     h1: { fontSize: "32px", lineHeight: "40px", letterSpacing: "-0.02em" },

@@ -4,18 +4,30 @@ import React from "react";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
+import { useAccess } from "@/lib/auth/use-access";
 
 // ----------------------------------------------------------------------------
 // Types
 // ----------------------------------------------------------------------------
+export type ApprovalDialogPendingAction = "approve" | "reject";
+export type ApprovalDialogIntent = "approve" | "reject" | "submit";
+
 export interface ApprovalDialogProps {
   open: boolean;
   onClose: () => void;
-  onApprove: (comment?: string) => void;
-  onReject: (comment?: string) => void;
+  onApprove?: (comment?: string) => void;
+  onReject?: (comment?: string) => void;
   title: string;
   recordInfo?: string;
+  /** Which decision this modal is for. Defaults to approve-only unless onReject is provided without intent. */
+  intent?: ApprovalDialogIntent;
+  /** @deprecated Use pendingAction instead */
   loading?: boolean;
+  pendingAction?: ApprovalDialogPendingAction | null;
+  approveLabel?: string;
+  rejectLabel?: string;
+  error?: string;
+  children?: React.ReactNode;
 }
 
 // ----------------------------------------------------------------------------
@@ -75,7 +87,7 @@ const labelStyle: React.CSSProperties = {
 const textareaStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   fontFamily: typography.fontFamily,
   fontSize: typography.sizes.body.fontSize,
@@ -144,20 +156,41 @@ export default function ApprovalDialog({
   onReject,
   title,
   recordInfo,
+  intent,
   loading,
+  pendingAction = null,
+  approveLabel = "Approve",
+  rejectLabel = "Reject",
+  error,
+  children,
 }: ApprovalDialogProps) {
   const [comment, setComment] = React.useState("");
+  const { canAction } = useAccess();
+  const resolvedIntent: ApprovalDialogIntent =
+    intent ?? (onReject && onApprove ? "approve" : onReject ? "reject" : "approve");
+  const isRejectIntent = resolvedIntent === "reject";
+  const showApprove = !isRejectIntent && Boolean(onApprove) && canAction(approveLabel);
+  const showReject = isRejectIntent && Boolean(onReject) && canAction(rejectLabel);
+  const commentLabel = isRejectIntent ? "Rejection reason (optional)" : "Comment (optional)";
+  const commentPlaceholder = isRejectIntent
+    ? "Why is this being rejected?"
+    : "Add a comment...";
+
+  React.useEffect(() => {
+    if (!open) setComment("");
+  }, [open]);
 
   if (!open) return null;
 
+  const activeAction = pendingAction ?? (loading ? "approve" : null);
+  const isBusy = activeAction != null;
+
   const handleApprove = () => {
-    onApprove(comment);
-    setComment("");
+    onApprove?.(comment.trim() || undefined);
   };
 
   const handleReject = () => {
-    onReject(comment);
-    setComment("");
+    onReject?.(comment.trim() || undefined);
   };
 
   return (
@@ -166,37 +199,45 @@ export default function ApprovalDialog({
         <div style={bodyStyle}>
           <h3 style={titleStyle}>{title}</h3>
           {recordInfo && <p style={recordInfoStyle}>{recordInfo}</p>}
-          <label style={labelStyle}>Comment (optional)</label>
+          {children}
+          <label style={labelStyle}>{commentLabel}</label>
           <textarea
             style={textareaStyle}
-            placeholder="Add a comment..."
+            placeholder={commentPlaceholder}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            disabled={loading}
+            disabled={isBusy}
           />
+          {error ? (
+            <p style={{ margin: "12px 0 0", color: "#dc2626", fontSize: 13 }}>{error}</p>
+          ) : null}
         </div>
         <div style={footerStyle}>
           <button
             style={cancelButtonStyle}
             onClick={onClose}
-            disabled={loading}
+            disabled={isBusy}
           >
             Cancel
           </button>
-          <button
-            style={rejectButtonStyle}
-            onClick={handleReject}
-            disabled={loading}
-          >
-            {loading ? "Processing..." : "Reject"}
-          </button>
+          {showReject ? (
+            <button
+              style={rejectButtonStyle}
+              onClick={handleReject}
+              disabled={isBusy}
+            >
+              {activeAction === "reject" ? "Processing..." : rejectLabel}
+            </button>
+          ) : null}
+          {showApprove ? (
           <button
             style={approveButtonStyle}
             onClick={handleApprove}
-            disabled={loading}
+            disabled={isBusy}
           >
-            {loading ? "Processing..." : "Approve"}
+            {activeAction === "approve" ? "Processing..." : approveLabel}
           </button>
+          ) : null}
         </div>
       </div>
     </div>

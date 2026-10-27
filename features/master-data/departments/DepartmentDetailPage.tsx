@@ -243,6 +243,7 @@ export default function DepartmentDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="md.department"
         title={currentDepartment.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={actions} />}

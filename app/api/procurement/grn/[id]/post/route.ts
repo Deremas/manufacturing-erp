@@ -5,5 +5,5 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return withGoodsReceiptAction(async (userId) => postReceipt(id, userId));
+  return withGoodsReceiptAction(async (userId) => postReceipt(id, userId), "procurement.grn.post");
 }

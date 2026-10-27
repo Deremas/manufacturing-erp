@@ -1,6 +1,10 @@
-"use client";
-import { DocumentNumberingFormPage } from "@/features/administration/document-numbering";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-export default function EditDocumentNumberingPage() {
-  return <DocumentNumberingFormPage />;
+export default async function LegacyRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  await redirectLegacyToPublicUrl("administration.docnum", id, "edit");
 }

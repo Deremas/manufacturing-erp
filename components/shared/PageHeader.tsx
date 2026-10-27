@@ -1,10 +1,12 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { colors } from "@/components/ui/colors";
 import { spacing } from "@/components/ui/spacing";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
+import { RecordDetailIcon } from "./RecordDetailIcon";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -18,6 +20,8 @@ export interface PageHeaderProps {
   title: string;
   subtitle?: string;
   icon?: React.ReactNode;
+  recordKind?: string;
+  leadingAction?: React.ReactNode;
   breadcrumbs?: Breadcrumb[];
   actions?: React.ReactNode;
 }
@@ -27,26 +31,28 @@ export interface PageHeaderProps {
 // ----------------------------------------------------------------------------
 const containerStyle: React.CSSProperties = {
   display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  flexWrap: "wrap",
-  gap: `${spacing.card.gap}px`,
+  flexDirection: "column",
+  gap: "4px",
   padding: `${spacing.card.padding}px`,
   backgroundColor: colors.surface,
   borderRadius: radius.components.card,
   border: `1px solid ${colors.border}`,
 };
 
-const leftSectionStyle: React.CSSProperties = {
+const titleRowStyle: React.CSSProperties = {
   display: "flex",
-  flexDirection: "column",
-  gap: "4px",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "10px",
+  minWidth: 0,
 };
 
-const titleRowStyle: React.CSSProperties = {
+const titleLeftStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
+  minWidth: 0,
+  flex: 1,
 };
 
 const iconWrapperStyle: React.CSSProperties = {
@@ -76,7 +82,6 @@ const subtitleStyle: React.CSSProperties = {
   lineHeight: typography.sizes.small.lineHeight,
   color: colors.text.secondary,
   margin: 0,
-  marginLeft: "42px",
 };
 
 const breadcrumbContainerStyle: React.CSSProperties = {
@@ -110,6 +115,8 @@ const actionsStyle: React.CSSProperties = {
   alignItems: "center",
   gap: "8px",
   flexWrap: "wrap",
+  marginLeft: "auto",
+  flexShrink: 0,
 };
 
 // ----------------------------------------------------------------------------
@@ -119,54 +126,55 @@ export default function PageHeader({
   title,
   subtitle,
   icon,
+  recordKind,
+  leadingAction,
   breadcrumbs,
   actions,
 }: PageHeaderProps) {
+  const router = useRouter();
+  const resolvedIcon = icon
+    ? <span style={iconWrapperStyle}>{icon}</span>
+    : recordKind
+      ? <RecordDetailIcon kind={recordKind} />
+      : null;
   return (
-    <div style={containerStyle}>
-      <div style={leftSectionStyle}>
-        {/* Breadcrumbs */}
-        {breadcrumbs && breadcrumbs.length > 0 && (
-          <div style={breadcrumbContainerStyle}>
-            {breadcrumbs.map((crumb, index) => {
-              const isLast = index === breadcrumbs.length - 1;
-              return (
-                <React.Fragment key={crumb.label + index}>
-                  {index > 0 && <span style={breadcrumbSeparatorStyle}>/</span>}
-                  {crumb.href && !isLast ? (
-                    <a href={crumb.href} style={breadcrumbLinkStyle}>
-                      {crumb.label}
-                    </a>
-                  ) : (
-                    <span
-                      style={{
-                        ...breadcrumbTextStyle,
-                        color: isLast
-                          ? colors.text.secondary
-                          : breadcrumbTextStyle.color,
-                      }}
-                    >
-                      {crumb.label}
-                    </span>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Title row */}
-        <div style={titleRowStyle}>
-          {icon && <span style={iconWrapperStyle}>{icon}</span>}
+    <div className="erp-page-header" style={containerStyle}>
+      <div style={titleRowStyle}>
+        <div style={titleLeftStyle}>
+          {leadingAction}
+          {resolvedIcon}
           <h1 style={titleStyle}>{title}</h1>
         </div>
-
-        {/* Subtitle */}
-        {subtitle && <p style={subtitleStyle}>{subtitle}</p>}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: 42,
+            padding: "0 16px",
+            borderRadius: 8,
+            border: "1px solid #94a3b8",
+            backgroundColor: "#ffffff",
+            color: colors.text.primary,
+            fontFamily: typography.fontFamily,
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 1px 2px rgba(15, 23, 42, 0.12)",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+            boxSizing: "border-box",
+          }}
+        >
+          Back
+        </button>
       </div>
-
-      {/* Actions */}
-      {actions && <div style={actionsStyle}>{actions}</div>}
+      {subtitle ? <p style={{ ...subtitleStyle, marginLeft: resolvedIcon ? 42 : 0 }}>{subtitle}</p> : null}
+      {actions ? (
+        <div style={{ ...actionsStyle, marginTop: 8 }}>{actions}</div>
+      ) : null}
     </div>
   );
 }

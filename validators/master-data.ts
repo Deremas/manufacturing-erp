@@ -38,12 +38,19 @@ export type CategoryInput = z.infer<typeof categorySchema>;
 
 // ─── Unit ───────────────────────────────────────────────────────────────────
 export const unitSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .max(20, "Code must be 20 characters or less")
+    .optional()
+    .default(""),
   name: z.string().min(1, "Unit name is required"),
   abbreviation: z
     .string()
     .min(1, "Abbreviation is required")
     .max(10, "Abbreviation must be 10 characters or less"),
   type: z.string().optional().default(""),
+  decimalPrecision: z.coerce.number().int().min(0).max(6).optional().default(0),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -135,11 +142,55 @@ export type LocationInput = z.infer<typeof locationSchema>;
 
 // ─── Price List ─────────────────────────────────────────────────────────────
 export const priceListSchema = z.object({
-  itemId: z.string().min(1, "Item is required"),
+  code: z.string().trim().min(1, "Code is required"),
+  name: z.string().trim().min(1, "Name is required"),
+  channel: z.string().trim().min(1, "Channel is required"),
+  currency: z.string().trim().min(1, "Currency is required").default("ETB"),
   customerGroup: z.string().optional().default(""),
-  price: z.coerce.number().positive("Price must be positive"),
-  effectiveDate: z.string().optional().default(""),
+  customerId: z.string().optional().default(""),
+  locationId: z.string().optional().default(""),
+  description: z.string().optional().default(""),
+  effectiveFrom: z.string().min(1, "Effective from is required"),
+  effectiveTo: z.string().optional().default(""),
+  isDefault: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true),
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1, "Item is required"),
+        unitId: z.string().optional().default(""),
+        unitPrice: z.coerce
+          .number()
+          .positive("Unit price must be greater than zero"),
+        minimumQty: z.coerce
+          .number()
+          .min(1, "Minimum quantity must be at least 1")
+          .default(1),
+        taxIncluded: z.boolean().optional().default(false),
+        isActive: z.boolean().optional().default(true),
+      }),
+    )
+    .min(1, "At least one price item is required"),
+}).superRefine((value, context) => {
+  if (value.effectiveTo && value.effectiveTo < value.effectiveFrom) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["effectiveTo"],
+      message: "Effective to cannot be before effective from",
+    });
+  }
+
+  const seenItems = new Set<string>();
+  value.items.forEach((item, index) => {
+    if (seenItems.has(item.itemId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["items", index, "itemId"],
+        message: "Duplicate item rows are not allowed",
+      });
+    }
+    seenItems.add(item.itemId);
+  });
 });
 
 export type PriceListInput = z.infer<typeof priceListSchema>;

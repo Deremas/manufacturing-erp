@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig } from "@prisma/config";
 
-function loadEnvFile(filePath: string) {
+function loadEnvFile(filePath: string, override = false) {
   if (!fs.existsSync(filePath)) {
     return;
   }
@@ -20,7 +20,7 @@ function loadEnvFile(filePath: string) {
     }
 
     const key = trimmed.slice(0, separatorIndex).trim();
-    if (process.env[key] !== undefined) {
+    if (!override && process.env[key] !== undefined) {
       continue;
     }
 
@@ -36,14 +36,32 @@ function loadEnvFile(filePath: string) {
   }
 }
 
-if (!process.env.DATABASE_URL) {
-  loadEnvFile(path.join(process.cwd(), ".env.local"));
-  loadEnvFile(path.join(process.cwd(), ".env"));
+// Match Next.js: .env then .env.local (local wins). Do not keep a stale Neon
+// DATABASE_URL from the shell when .env.local points at the app database.
+loadEnvFile(path.join(process.cwd(), ".env"));
+loadEnvFile(path.join(process.cwd(), ".env.local"), true);
+
+function sanitizePrismaDatasourceUrl(rawUrl: string | undefined) {
+  if (!rawUrl) {
+    return rawUrl;
+  }
+
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol.startsWith("postgres")) {
+      parsed.searchParams.delete("channel_binding");
+      return parsed.toString();
+    }
+  } catch {
+    return rawUrl;
+  }
+
+  return rawUrl;
 }
 
 export default defineConfig({
   schema: "./prisma/schema.prisma",
   datasource: {
-    url: process.env.DATABASE_URL!,
+    url: sanitizePrismaDatasourceUrl(process.env.DATABASE_URL)!,
   },
 });

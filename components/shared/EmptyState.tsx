@@ -3,6 +3,7 @@
 import React from "react";
 import { colors } from "@/components/ui/colors";
 import { typography } from "@/components/ui/typography";
+import { useAccess } from "@/lib/auth/use-access";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -10,6 +11,8 @@ import { typography } from "@/components/ui/typography";
 export interface EmptyStateAction {
   label: string;
   onClick: () => void;
+  permission?: string | string[];
+  href?: string;
 }
 
 export interface EmptyStateProps {
@@ -86,12 +89,17 @@ export default function EmptyState({
   message,
   action,
 }: EmptyStateProps) {
+  const { canAction } = useAccess();
+  const showAction =
+    action &&
+    canAction(action.label, { permission: action.permission, href: action.href });
+
   return (
     <div style={containerStyle}>
       {icon && <div style={iconWrapperStyle}>{icon}</div>}
       <h3 style={titleStyle}>{title}</h3>
       {message && <p style={messageStyle}>{message}</p>}
-      {action && (
+      {showAction && action && (
         <button
           style={buttonStyle}
           onClick={action.onClick}

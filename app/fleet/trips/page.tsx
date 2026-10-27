@@ -1,15 +1,32 @@
-"use client";
+import { TripsPage } from "@/features/fleet/FleetMasterPages";
+import { getFleetDrivers, getLocations, getVehicles } from "@/lib/master-data-db";
+import { requireAuth } from "@/lib/auth/auth";
+import { getFleetTrips } from "@/services/fleet/fleet.service";
 
-import PageHeader from "@/components/shared/PageHeader";
-import EmptyState from "@/components/shared/EmptyState";
+export const dynamic = "force-dynamic";
 
-export default function TripsPage() {
+export default async function FleetTripsPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const user = await requireAuth();
+  const query = await searchParams;
+
+  const [trips, vehicles, drivers, locations] = await Promise.all([
+    getFleetTrips({ accessibleLocationIds: user?.accessibleLocationIds }),
+    getVehicles(),
+    getFleetDrivers(),
+    getLocations(),
+  ]);
+
+  const scopedLocations = user?.isSystem
+    ? locations
+    : locations.filter((location) => (user?.accessibleLocationIds ?? []).includes(location.id));
+
   return (
-    <div
-      style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}
-    >
-      <PageHeader title="Trips" subtitle="Manage fleet trips" />
-      <EmptyState title="Trips" message="Module coming soon." />
-    </div>
+    <TripsPage
+      initialItems={trips}
+      vehicles={vehicles}
+      drivers={drivers}
+      locations={scopedLocations}
+      initialEditingId={query.edit}
+    />
   );
 }

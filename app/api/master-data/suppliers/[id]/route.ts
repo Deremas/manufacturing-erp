@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { isPublicIdParam } from "@/lib/routing/public-id";
 
 export async function GET(
   _request: Request,
@@ -10,6 +11,7 @@ export async function GET(
     const rows = await sql<
       Array<{
         id: string;
+        publicId: number;
         supplierCode: string;
         name: string;
         contactPerson: string | null;
@@ -24,6 +26,7 @@ export async function GET(
     >`
       SELECT
         id,
+        "publicId",
         "supplierCode",
         name,
         "contactPerson",
@@ -35,7 +38,7 @@ export async function GET(
         "paymentTerms",
         "isActive"
       FROM "Supplier"
-      WHERE id = ${id} AND "isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`"publicId" = ${Number(id)}` : sql`id = ${id}`} AND "isArchived" = false
       LIMIT 1
     `;
 
@@ -46,6 +49,7 @@ export async function GET(
 
     return NextResponse.json({
       id: row.id,
+      publicId: row.publicId,
       supplierCode: row.supplierCode ?? "",
       name: row.name,
       contactPerson: row.contactPerson ?? "",
@@ -89,7 +93,7 @@ export async function PUT(
         "paymentTerms" = ${body.paymentTerms?.trim() || null},
         "isActive" = ${body.isActive ?? true},
         "updatedAt" = NOW()
-      WHERE id = ${id} AND "isArchived" = false
+      WHERE ${isPublicIdParam(id) ? sql`"publicId" = ${Number(id)}` : sql`id = ${id}`} AND "isArchived" = false
       RETURNING id
     `;
 

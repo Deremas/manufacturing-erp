@@ -4,6 +4,7 @@
 
 export interface Item {
   id: string;
+  publicId: number;
   itemCode: string;
   itemName: string;
   sku?: string;
@@ -35,6 +36,7 @@ export interface Item {
 
 export interface Category {
   id: string;
+  publicId: number;
   name: string;
   parentCategoryId?: string;
   parentCategoryName?: string;
@@ -44,14 +46,18 @@ export interface Category {
 
 export interface Unit {
   id: string;
+  publicId: number;
+  code?: string;
   name: string;
   abbreviation: string;
   type: string;
+  decimalPrecision?: number;
   isActive: boolean;
 }
 
 export interface Customer {
   id: string;
+  publicId: number;
   customerCode: string;
   name: string;
   phone?: string;
@@ -64,6 +70,7 @@ export interface Customer {
 
 export interface Supplier {
   id: string;
+  publicId: number;
   supplierCode: string;
   name: string;
   contactPerson?: string;
@@ -76,6 +83,7 @@ export interface Supplier {
 
 export interface Department {
   id: string;
+  publicId: number;
   name: string;
   code: string;
   managerId?: string;
@@ -85,6 +93,7 @@ export interface Department {
 
 export interface Bank {
   id: string;
+  publicId: number;
   name: string;
   shortName: string;
   isActive: boolean;
@@ -92,6 +101,7 @@ export interface Bank {
 
 export interface BankAccount {
   id: string;
+  publicId: number;
   accountCode: string;
   accountName: string;
   bankId: string;
@@ -107,6 +117,7 @@ export interface BankAccount {
 
 export interface Location {
   id: string;
+  publicId: number;
   locationCode: string;
   locationName: string;
   locationType?: string;
@@ -116,23 +127,53 @@ export interface Location {
 
 export interface PriceList {
   id: string;
-  name?: string;
-  itemId?: string;
-  itemName?: string;
-  customerGroup?: string;
-  price?: number;
-  effectiveDate?: string;
+  publicId: number;
   code?: string;
+  name?: string;
+  channel: string;
   currency?: string;
+  customerGroup?: string;
+  customerId?: string;
+  customerName?: string;
+  locationId?: string;
+  locationName?: string;
   effectiveFrom?: string;
   effectiveTo?: string;
-  customerId?: string;
-  locationId?: string;
+  effectiveDate?: string;
+  description?: string;
+  isDefault: boolean;
   isActive: boolean;
+  itemsCount?: number;
+  items?: PriceListItem[];
+  usage?: PriceListUsageRecord[];
+}
+
+export interface PriceListItem {
+  id: string;
+  itemId: string;
+  itemCode?: string;
+  itemName?: string;
+  unitId?: string;
+  uomCode?: string;
+  uomName?: string;
+  unitPrice?: number;
+  minimumQty: number;
+  taxIncluded: boolean;
+  isActive: boolean;
+}
+
+export interface PriceListUsageRecord {
+  documentType: string;
+  documentNo: string;
+  date: string;
+  counterparty?: string;
+  totalQuantity: number;
+  totalValue: number;
 }
 
 export interface TaxCode {
   id: string;
+  publicId: number;
   taxName: string;
   taxType: string;
   rate: number;
@@ -141,6 +182,7 @@ export interface TaxCode {
 
 export interface ItemType {
   id: string;
+  publicId: number;
   name: string;
   code: string;
   description?: string;

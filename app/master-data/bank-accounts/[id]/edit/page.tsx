@@ -1,47 +1,10 @@
-import { notFound } from "next/navigation";
-import { PageHeader } from "@/components/shared";
-import { BankAccountForm } from "@/features/master-data/components";
-import { getBankAccountById, getBanks } from "@/lib/master-data-db";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-interface EditBankAccountRouteProps {
-  params: Promise<{ id: string }>;
-}
-
-export default async function EditBankAccountRoute({
+export default async function LegacyRedirect({
   params,
-}: EditBankAccountRouteProps) {
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
-  const [bankAccount, banks] = await Promise.all([
-    getBankAccountById(id),
-    getBanks(),
-  ]);
-
-  if (!bankAccount) {
-    notFound();
-  }
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "24px",
-        padding: "24px",
-      }}
-    >
-      <PageHeader
-        title={`Edit: ${bankAccount.accountName}`}
-        breadcrumbs={[
-          { label: "Master Data", href: "/master-data" },
-          { label: "Bank Accounts", href: "/master-data/bank-accounts" },
-          { label: bankAccount.accountCode },
-          { label: "Edit" },
-        ]}
-      />
-      <BankAccountForm
-        initialData={bankAccount}
-        banks={banks}
-      />
-    </div>
-  );
+  await redirectLegacyToPublicUrl("master-data.bank-account", id, "edit");
 }

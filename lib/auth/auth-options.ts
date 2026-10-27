@@ -3,6 +3,24 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { sql } from "@/lib/db";
 
+function buildEffectivePermissions(input: {
+  isSystem: boolean;
+  rolePermissions: string[];
+  allowPermissions: string[];
+  denyPermissions: string[];
+}) {
+  if (input.isSystem) {
+    return ["*"];
+  }
+
+  const denied = new Set(input.denyPermissions);
+  const merged = Array.from(
+    new Set([...input.rolePermissions, ...input.allowPermissions]),
+  ).filter((permission) => !denied.has(permission));
+
+  return merged.sort();
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -30,6 +48,8 @@ export const authOptions: NextAuthOptions = {
           isSystem: boolean;
           phone: string | null;
           isActive: boolean;
+          salesAllowPermissions: string[] | null;
+          salesDenyPermissions: string[] | null;
         }>
       >`
           select
@@ -41,7 +61,9 @@ export const authOptions: NextAuthOptions = {
             u."roleId",
             coalesce(r."isSystem", false) as "isSystem",
             u."phone",
-            u."isActive"
+            u."isActive",
+            u."salesAllowPermissions",
+            u."salesDenyPermissions"
           from "User" u
           left join "Role" r on r."id" = u."roleId"
           where u."email" = ${identifier}
@@ -95,6 +117,15 @@ export const authOptions: NextAuthOptions = {
             `
           : [];
 
+        const departmentRows = await sql<Array<{ departmentId: string }>>`
+          SELECT "departmentId" FROM "UserDepartment" WHERE "userId" = ${user.id}
+        `;
+        const allDepartmentRows = user.isSystem
+          ? await sql<Array<{ departmentId: string }>>`
+              SELECT id AS "departmentId" FROM "Department" WHERE "isArchived" = false
+            `
+          : [];
+
         const accessibleLocationIds = user.isSystem
           ? allLocationRows.map((item) => item.locationId)
           : locationRows.map((item) => item.locationId);
@@ -103,6 +134,19 @@ export const authOptions: NextAuthOptions = {
           accessibleLocationIds[0] ??
           null;
         const activeLocationId = defaultLocationId ?? accessibleLocationIds[0] ?? null;
+        const accessibleDepartmentIds = (user.isSystem ? allDepartmentRows : departmentRows)
+          .map((item) => item.departmentId);
+        const rolePermissions = permissionRows.map(
+          (item) => `${item.module}.${item.action}`,
+        );
+        const salesAllowPermissions = user.salesAllowPermissions ?? [];
+        const salesDenyPermissions = user.salesDenyPermissions ?? [];
+        const effectivePermissions = buildEffectivePermissions({
+          isSystem: user.isSystem,
+          rolePermissions,
+          allowPermissions: salesAllowPermissions,
+          denyPermissions: salesDenyPermissions,
+        });
 
         return {
           id: user.id,
@@ -111,11 +155,12 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           roleId: user.roleId,
           isSystem: user.isSystem,
-          permissions: user.isSystem
-            ? ["*"]
-            : permissionRows.map((item) => `${item.module}.${item.action}`),
+          permissions: effectivePermissions,
+          salesAllowPermissions,
+          salesDenyPermissions,
           defaultLocationId,
           accessibleLocationIds,
+          accessibleDepartmentIds,
           activeLocationId,
         } as any;
       },
@@ -131,8 +176,11 @@ export const authOptions: NextAuthOptions = {
         token.roleId = (user as any).roleId ?? null;
         token.isSystem = (user as any).isSystem ?? false;
         token.permissions = (user as any).permissions ?? [];
+        token.salesAllowPermissions = (user as any).salesAllowPermissions ?? [];
+        token.salesDenyPermissions = (user as any).salesDenyPermissions ?? [];
         token.defaultLocationId = (user as any).defaultLocationId ?? null;
         token.accessibleLocationIds = (user as any).accessibleLocationIds ?? [];
+        token.accessibleDepartmentIds = (user as any).accessibleDepartmentIds ?? [];
         token.activeLocationId = (user as any).activeLocationId ?? null;
       }
       return token;
@@ -143,9 +191,12 @@ export const authOptions: NextAuthOptions = {
       (session as any).user.roleId = token.roleId ?? null;
       (session as any).user.isSystem = token.isSystem ?? false;
       (session as any).user.permissions = token.permissions ?? [];
+      (session as any).user.salesAllowPermissions = token.salesAllowPermissions ?? [];
+      (session as any).user.salesDenyPermissions = token.salesDenyPermissions ?? [];
       (session as any).user.defaultLocationId = token.defaultLocationId ?? null;
       (session as any).user.accessibleLocationIds =
         token.accessibleLocationIds ?? [];
+      (session as any).user.accessibleDepartmentIds = token.accessibleDepartmentIds ?? [];
       (session as any).user.activeLocationId = token.activeLocationId ?? null;
       return session;
     },

@@ -5,7 +5,7 @@ export async function GET(
   { params }: { params: Promise<{ document: string }> },
 ) {
   const { document } = await params;
-  return withInventoryDocument(document, async (key) => listDocument(key));
+  return withInventoryDocument(document, async (key) => listDocument(key), "view");
 }
 
 export async function POST(
@@ -14,5 +14,8 @@ export async function POST(
 ) {
   const { document } = await params;
   const body = await request.json();
-  return withInventoryDocument(document, async (key, userId) => createDocument(key, body, userId));
+  return withInventoryDocument(document, async (key, userId) => createDocument(key, body, userId), "create", {
+    locationId: String(body.locationId ?? body.fromLocationId ?? body.fromStoreLocationId ?? "") || null,
+    departmentId: String(body.departmentId ?? body.requestingDepartmentId ?? "") || null,
+  });
 }

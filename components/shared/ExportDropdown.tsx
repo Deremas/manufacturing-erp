@@ -4,6 +4,7 @@ import React from "react";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
+import { useAccess } from "@/lib/auth/use-access";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -71,6 +72,7 @@ const menuItemStyle: React.CSSProperties = {
 // Component
 // ----------------------------------------------------------------------------
 export default function ExportDropdown({ onExport }: ExportDropdownProps) {
+  const { canAction } = useAccess();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -83,6 +85,8 @@ export default function ExportDropdown({ onExport }: ExportDropdownProps) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  if (!canAction("Export")) return null;
 
   const handleSelect = (format: ExportFormat) => {
     onExport(format);

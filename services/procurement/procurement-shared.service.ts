@@ -1,6 +1,11 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import {
+  DEFAULT_DOCUMENT_NUMBERING,
+  formatDocumentNumber,
+  syncDocumentSequenceFromColumn,
+} from "@/lib/document-numbering";
 
 export type ProcurementStatus =
   | "DRAFT"
@@ -29,6 +34,13 @@ export type ProcurementDocumentType =
 
 export type Tx = typeof sql;
 
+export function assertCanSubmitProcurementStatus(status: string) {
+  const current = String(status).toUpperCase();
+  if (current !== "DRAFT" && current !== "REJECTED") {
+    throw new Error(`Only draft or rejected documents can be submitted. Current status: ${status}`);
+  }
+}
+
 export function normalizeProcurementStatus(value?: string): ProcurementStatus {
   const normalized = String(value ?? "DRAFT").trim().toUpperCase();
   switch (normalized) {
@@ -52,11 +64,43 @@ export function normalizeProcurementStatus(value?: string): ProcurementStatus {
   }
 }
 
-export async function nextProcurementDocumentNumber(
+type ProcurementNumberingConfig = {
+  id: string;
+  prefix: string;
+  prefixFormat: string;
+  separator: string;
+  yearFormat: string;
+  monthFormat: string;
+  dayFormat: string;
+  sequenceLength: number;
+  currentSequence: number;
+};
+
+function formatProcurementDocumentNumber(config: ProcurementNumberingConfig, sequence: number) {
+  return formatDocumentNumber(config, sequence);
+}
+
+async function syncProcurementSequenceFromRecords(
   tx: Tx,
-  prefix: string,
-  description: string,
-) {
+  config: ProcurementNumberingConfig,
+): Promise<number> {
+  const tableByPrefix: Record<string, { table: string; column: string }> = {
+    PO: { table: "PurchaseOrder", column: "poNo" },
+    PR: { table: "PurchaseRequisition", column: "requisitionNo" },
+    GRN: { table: "GoodsReceipt", column: "grnNo" },
+    SRET: { table: "SupplierReturn", column: "returnNo" },
+    SINV: { table: "SupplierInvoice", column: "invoiceNo" },
+    SPAY: { table: "SupplierPayment", column: "paymentNo" },
+    ARCV: { table: "AssetReceipt", column: "assetReceiptNo" },
+  };
+  const mapping = tableByPrefix[config.prefix];
+  if (!mapping) {
+    return Number(config.currentSequence ?? 0);
+  }
+  return syncDocumentSequenceFromColumn(tx, config, mapping.table, mapping.column);
+}
+
+async function ensureProcurementNumbering(tx: Tx, prefix: string, description: string) {
   await tx`
     INSERT INTO "DocumentNumbering" (
       id, prefix, description, "prefixFormat", separator,
@@ -67,50 +111,124 @@ export async function nextProcurementDocumentNumber(
       ${`docnum-${prefix.toLowerCase()}`},
       ${prefix},
       ${description},
-      'PREFIX_YEAR',
-      '-',
-      'YYYY',
-      'MM',
-      'DD',
-      4,
-      0,
+      ${DEFAULT_DOCUMENT_NUMBERING.prefixFormat},
+      ${DEFAULT_DOCUMENT_NUMBERING.separator},
+      ${DEFAULT_DOCUMENT_NUMBERING.yearFormat},
+      ${DEFAULT_DOCUMENT_NUMBERING.monthFormat},
+      ${DEFAULT_DOCUMENT_NUMBERING.dayFormat},
+      ${DEFAULT_DOCUMENT_NUMBERING.sequenceLength},
+      ${DEFAULT_DOCUMENT_NUMBERING.currentSequence},
       true,
       false
     )
     ON CONFLICT ("prefix") DO NOTHING
   `;
 
-  const currentRows = await tx<
-    Array<{
-      id: string;
-      prefix: string;
-      separator: string;
-      yearFormat: string;
-      sequenceLength: number;
-      currentSequence: number;
-    }>
-  >`
-    SELECT id, prefix, separator, "yearFormat", "sequenceLength", "currentSequence"
+  const currentRows = await tx<ProcurementNumberingConfig[]>`
+    SELECT
+      id,
+      prefix,
+      "prefixFormat",
+      separator,
+      "yearFormat",
+      "monthFormat",
+      "dayFormat",
+      "sequenceLength",
+      "currentSequence"
     FROM "DocumentNumbering"
     WHERE prefix = ${prefix}
     LIMIT 1
-    FOR UPDATE
   `;
 
-  const config = currentRows[0];
-  const nextSequence = Number(config.currentSequence ?? 0) + 1;
+  return currentRows[0];
+}
+
+export async function nextProcurementDocumentNumber(
+  tx: Tx,
+  prefix: string,
+  description: string,
+) {
+  const config = await ensureProcurementNumbering(tx, prefix, description);
+  const lockedRows = await tx<ProcurementNumberingConfig[]>`
+    SELECT
+      id,
+      prefix,
+      "prefixFormat",
+      separator,
+      "yearFormat",
+      "monthFormat",
+      "dayFormat",
+      "sequenceLength",
+      "currentSequence"
+    FROM "DocumentNumbering"
+    WHERE id = ${config.id}
+    LIMIT 1
+    FOR UPDATE
+  `;
+  const locked = lockedRows[0] ?? config;
+  const syncedSequence = await syncProcurementSequenceFromRecords(tx, locked);
+  const nextSequence = syncedSequence + 1;
 
   await tx`
     UPDATE "DocumentNumbering"
     SET "currentSequence" = ${nextSequence}
-    WHERE id = ${config.id}
+    WHERE id = ${locked.id}
   `;
 
-  const year = config.yearFormat === "YY"
-    ? new Date().getFullYear().toString().slice(-2)
-    : new Date().getFullYear().toString();
+  return formatProcurementDocumentNumber(locked, nextSequence);
+}
 
-  return `${config.prefix}${config.separator}${year}${config.separator}${String(nextSequence).padStart(config.sequenceLength, "0")}`;
+export async function peekProcurementDocumentNumber(prefix: string, description: string, tx: Tx = sql) {
+  const config = await ensureProcurementNumbering(tx, prefix, description);
+  if (!config) {
+    return formatDocumentNumber(
+      {
+        prefix,
+        prefixFormat: DEFAULT_DOCUMENT_NUMBERING.prefixFormat,
+        separator: DEFAULT_DOCUMENT_NUMBERING.separator,
+        yearFormat: DEFAULT_DOCUMENT_NUMBERING.yearFormat,
+        monthFormat: DEFAULT_DOCUMENT_NUMBERING.monthFormat,
+        dayFormat: DEFAULT_DOCUMENT_NUMBERING.dayFormat,
+        sequenceLength: DEFAULT_DOCUMENT_NUMBERING.sequenceLength,
+      },
+      1,
+    );
+  }
+  const syncedSequence = await syncProcurementSequenceFromRecords(tx, config);
+  return formatProcurementDocumentNumber(config, syncedSequence + 1);
+}
+
+export function normalizeRequestedDocumentNo(value?: string | null) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed || /^assigned on save$/i.test(trimmed)) return "";
+  return trimmed;
+}
+
+export async function resolveProcurementDocumentNumber(
+  tx: Tx,
+  prefix: string,
+  description: string,
+  requested?: string | null,
+  options?: { isTaken?: (documentNo: string) => Promise<boolean> },
+) {
+  const requestedNo = normalizeRequestedDocumentNo(requested);
+  const peeked = await peekProcurementDocumentNumber(prefix, description, tx);
+  const isTaken = options?.isTaken ?? (async () => false);
+
+  // Honor a user-edited number only when it is still available.
+  if (requestedNo && requestedNo !== peeked && !(await isTaken(requestedNo))) {
+    return requestedNo;
+  }
+
+  // Allocate the next sequence value, skipping numbers already used in the database.
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = await nextProcurementDocumentNumber(tx, prefix, description);
+    if (!(await isTaken(candidate))) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`${prefix} number could not be allocated`);
 }
 
 export async function writeProcurementAudit(
@@ -328,9 +446,6 @@ export async function approveProcurementApproval(
     if (latest.status !== "PENDING") {
       throw new Error(`Only pending approvals can be approved. Current status: ${latest.status}`);
     }
-    if (latest.assignedApproverId && latest.assignedApproverId !== userId) {
-      throw new Error("You are not the assigned approver for this document");
-    }
 
     await tx`
       UPDATE "Approval"
@@ -369,9 +484,6 @@ export async function rejectProcurementApproval(
     }
     if (latest.status !== "PENDING") {
       throw new Error(`Only pending approvals can be rejected. Current status: ${latest.status}`);
-    }
-    if (latest.assignedApproverId && latest.assignedApproverId !== userId) {
-      throw new Error("You are not the assigned approver for this document");
     }
 
     await tx`

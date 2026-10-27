@@ -205,6 +205,7 @@ export default function SupplierDetailPage({
   return (
     <div style={pageStyle}>
       <PageHeader
+        recordKind="md.supplier"
         title={supplier.name}
         breadcrumbs={breadcrumbs}
         actions={<ActionButtons actions={pageActions} />}

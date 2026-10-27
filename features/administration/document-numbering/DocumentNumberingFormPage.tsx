@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader, FormCard, ActionButtons } from "@/components/shared";
 import type { Breadcrumb, Action } from "@/components/shared";
 import { colors } from "@/components/ui/colors";
@@ -9,16 +10,34 @@ import { radius } from "@/components/ui/radius";
 import { typography } from "@/components/ui/typography";
 import { FileDigit, Save, X } from "lucide-react";
 
-// ----------------------------------------------------------------------------
-// Types
-// ----------------------------------------------------------------------------
-export interface DocNumberingFormPageProps {
-  isCreating?: boolean;
+export interface DocumentNumberingFormData {
+  id?: string;
+  module: string;
+  documentType: string;
+  prefix: string;
+  currentNumber: number;
+  padding: number;
+  resetRule: string;
+  includeYear: boolean;
+  includeMonth: boolean;
+  includeLocation: boolean;
+  isActive: boolean;
 }
 
-// ----------------------------------------------------------------------------
-// Styles
-// ----------------------------------------------------------------------------
+export interface DocNumberingFormPageProps {
+  isCreating?: boolean;
+  initialData?: DocumentNumberingFormData;
+}
+
+const MODULE_OPTIONS = [
+  "Procurement",
+  "Inventory",
+  "Production",
+  "Sales",
+  "Finance",
+  "Administration",
+];
+
 const pageStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -41,7 +60,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -50,25 +69,18 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
   boxSizing: "border-box",
   lineHeight: "20px",
-  height: "48px",
+  minHeight: "48px",
 };
 
 const selectStyle: React.CSSProperties = {
   ...inputStyle,
   cursor: "pointer",
   appearance: "auto",
-  height: "48px",
 };
 
 const rowStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "16px",
-};
-
-const row3Style: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "16px",
 };
 
@@ -103,23 +115,41 @@ const stickyFooterStyle: React.CSSProperties = {
   gap: "8px",
 };
 
-// ----------------------------------------------------------------------------
-// Page Component
-// ----------------------------------------------------------------------------
+function buildPreview(data: DocumentNumberingFormData) {
+  const parts = [data.prefix.trim().toUpperCase() || "DOC"];
+  if (data.includeYear) {
+    parts.push("2026");
+  }
+  if (data.includeMonth) {
+    parts.push("07");
+  }
+  if (data.includeLocation) {
+    parts.push("LOC");
+  }
+  parts.push(String(data.currentNumber || 1).padStart(Math.max(1, Number(data.padding || 4)), "0"));
+  return parts.join("-");
+}
+
 export default function DocumentNumberingFormPage({
   isCreating = true,
+  initialData,
 }: DocNumberingFormPageProps) {
-  const [module, setModule] = useState("Procurement");
-  const [documentType, setDocumentType] = useState("");
-  const [prefix, setPrefix] = useState("");
-  const [suffix, setSuffix] = useState("");
-  const [currentNumber, setCurrentNumber] = useState("1");
-  const [padding, setPadding] = useState("5");
-  const [resetRule, setResetRule] = useState("Never");
-  const [includeYear, setIncludeYear] = useState(true);
-  const [includeMonth, setIncludeMonth] = useState(false);
-  const [includeLocation, setIncludeLocation] = useState(false);
-  const [status, setStatus] = useState("active");
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const [form, setForm] = useState<DocumentNumberingFormData>({
+    id: initialData?.id,
+    module: initialData?.module ?? "Procurement",
+    documentType: initialData?.documentType ?? "",
+    prefix: initialData?.prefix ?? "",
+    currentNumber: initialData?.currentNumber ?? 1,
+    padding: initialData?.padding ?? 4,
+    resetRule: initialData?.resetRule ?? "Never",
+  includeYear: initialData?.includeYear ?? true,
+  includeMonth: initialData?.includeMonth ?? false,
+  includeLocation: initialData?.includeLocation ?? false,
+    isActive: initialData?.isActive ?? true,
+  });
 
   const breadcrumbs: Breadcrumb[] = [
     { label: "Administration", href: "/administration" },
@@ -127,213 +157,199 @@ export default function DocumentNumberingFormPage({
     { label: isCreating ? "Create Configuration" : "Edit Configuration" },
   ];
 
-  const generatePreview = () => {
-    let p = prefix;
-    if (includeYear) p += "-2026";
-    if (includeMonth) p += "-06";
-    if (includeLocation) p += "-MN";
-    p += `-${currentNumber.padStart(Number(padding), "0")}`;
-    if (suffix) p += `-${suffix}`;
-    return p;
-  };
+  const preview = useMemo(() => buildPreview(form), [form]);
 
-  const handleSave = () => console.log("Save");
-  const handleCancel = () => console.log("Cancel");
+  function updateField<Key extends keyof DocumentNumberingFormData>(
+    key: Key,
+    value: DocumentNumberingFormData[Key],
+  ) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleSave() {
+    setError("");
+    startTransition(async () => {
+      const endpoint = isCreating
+        ? "/api/administration/document-numbering"
+        : `/api/administration/document-numbering/${form.id}`;
+      const response = await fetch(endpoint, {
+        method: isCreating ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(result?.error ?? "Unable to save document numbering configuration");
+        return;
+      }
+
+      router.push("/administration/document-numbering");
+      router.refresh();
+    });
+  }
 
   const footerActions: Action[] = [
     {
       label: "Cancel",
       variant: "secondary",
       icon: <X size={16} />,
-      onClick: handleCancel,
+      onClick: () => router.push("/administration/document-numbering"),
+      disabled: isPending,
     },
     {
       label: "Save",
       variant: "primary",
       icon: <Save size={16} />,
       onClick: handleSave,
+      loading: isPending,
     },
   ];
 
   return (
     <div style={pageStyle}>
       <PageHeader
-        title={
-          isCreating ? "Create Document Numbering" : "Edit Document Numbering"
-        }
+        title={isCreating ? "Create Document Numbering" : "Edit Document Numbering"}
         breadcrumbs={breadcrumbs}
       />
 
       <FormCard title="Configuration" icon={<FileDigit size={18} />}>
+        {error ? (
+          <p style={{ marginTop: 0, marginBottom: 16, color: colors.danger[600] }}>
+            {error}
+          </p>
+        ) : null}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div style={rowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Module</label>
               <select
-                value={module}
-                onChange={(e) => setModule(e.target.value)}
+                value={form.module}
+                onChange={(event) => updateField("module", event.target.value)}
                 style={selectStyle}
               >
-                <option value="Procurement">Procurement</option>
-                <option value="Inventory">Inventory</option>
-                <option value="Production">Production</option>
-                <option value="Sales">Sales</option>
-                <option value="Finance">Finance</option>
+                {MODULE_OPTIONS.map((module) => (
+                  <option key={module} value={module}>
+                    {module}
+                  </option>
+                ))}
               </select>
             </div>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Document Type</label>
               <input
                 type="text"
-                value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
+                value={form.documentType}
+                onChange={(event) => updateField("documentType", event.target.value)}
                 style={inputStyle}
                 placeholder="e.g. Purchase Order"
               />
             </div>
           </div>
-          <div style={row3Style}>
+          <div style={rowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Prefix</label>
               <input
                 type="text"
-                value={prefix}
-                onChange={(e) => setPrefix(e.target.value)}
+                value={form.prefix}
+                onChange={(event) => updateField("prefix", event.target.value.toUpperCase())}
                 style={inputStyle}
                 placeholder="e.g. PO"
               />
             </div>
             <div style={formGroupStyle}>
-              <label style={labelStyle}>Suffix</label>
-              <input
-                type="text"
-                value={suffix}
-                onChange={(e) => setSuffix(e.target.value)}
-                style={inputStyle}
-                placeholder="Optional"
-              />
-            </div>
-            <div style={formGroupStyle}>
               <label style={labelStyle}>Padding</label>
               <select
-                value={padding}
-                onChange={(e) => setPadding(e.target.value)}
+                value={String(form.padding)}
+                onChange={(event) => updateField("padding", Number(event.target.value))}
                 style={selectStyle}
               >
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
+                {[3, 4, 5, 6].map((value) => (
+                  <option key={value} value={String(value)}>
+                    {value}
+                  </option>
+                ))}
               </select>
             </div>
-          </div>
-          <div style={rowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Current Number</label>
               <input
                 type="number"
-                value={currentNumber}
-                onChange={(e) => setCurrentNumber(e.target.value)}
+                value={form.currentNumber}
+                onChange={(event) => updateField("currentNumber", Number(event.target.value))}
                 style={inputStyle}
                 min="1"
               />
             </div>
+          </div>
+          <div style={rowStyle}>
             <div style={formGroupStyle}>
               <label style={labelStyle}>Reset Rule</label>
               <select
-                value={resetRule}
-                onChange={(e) => setResetRule(e.target.value)}
+                value={form.resetRule}
+                onChange={(event) => updateField("resetRule", event.target.value)}
                 style={selectStyle}
               >
-                <option value="Never">Never</option>
-                <option value="Daily">Daily</option>
-                <option value="Monthly">Monthly</option>
-                <option value="Yearly">Yearly</option>
+                {["Never", "Yearly", "Monthly", "Daily"].map((rule) => (
+                  <option key={rule} value={rule}>
+                    {rule}
+                  </option>
+                ))}
               </select>
             </div>
-          </div>
-          <div style={formGroupStyle}>
-            <label style={labelStyle}>Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            <div style={formGroupStyle}>
+              <label style={labelStyle}>Status</label>
+              <select
+                value={form.isActive ? "active" : "inactive"}
+                onChange={(event) => updateField("isActive", event.target.value === "active")}
+                style={selectStyle}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
         </div>
       </FormCard>
 
       <FormCard title="Increments" icon={<FileDigit size={18} />}>
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div style={toggleRowStyle}>
+          <label style={toggleRowStyle}>
             <input
               type="checkbox"
-              checked={includeYear}
-              onChange={(e) => setIncludeYear(e.target.checked)}
-              style={{
-                width: "18px",
-                height: "18px",
-                accentColor: colors.primary[600],
-              }}
+              checked={form.includeYear}
+              onChange={(event) => updateField("includeYear", event.target.checked)}
+              style={{ width: "18px", height: "18px", accentColor: colors.primary[600] }}
             />
-            <span
-              style={{
-                fontFamily: typography.fontFamily,
-                fontSize: typography.sizes.body.fontSize,
-                color: colors.text.primary,
-              }}
-            >
+            <span style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.body.fontSize, color: colors.text.primary }}>
               Include Year
             </span>
-          </div>
-          <div style={toggleRowStyle}>
+          </label>
+          <label style={toggleRowStyle}>
             <input
               type="checkbox"
-              checked={includeMonth}
-              onChange={(e) => setIncludeMonth(e.target.checked)}
-              style={{
-                width: "18px",
-                height: "18px",
-                accentColor: colors.primary[600],
-              }}
+              checked={form.includeMonth}
+              onChange={(event) => updateField("includeMonth", event.target.checked)}
+              style={{ width: "18px", height: "18px", accentColor: colors.primary[600] }}
             />
-            <span
-              style={{
-                fontFamily: typography.fontFamily,
-                fontSize: typography.sizes.body.fontSize,
-                color: colors.text.primary,
-              }}
-            >
+            <span style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.body.fontSize, color: colors.text.primary }}>
               Include Month
             </span>
-          </div>
-          <div style={toggleRowStyle}>
+          </label>
+          <label style={toggleRowStyle}>
             <input
               type="checkbox"
-              checked={includeLocation}
-              onChange={(e) => setIncludeLocation(e.target.checked)}
-              style={{
-                width: "18px",
-                height: "18px",
-                accentColor: colors.primary[600],
-              }}
+              checked={form.includeLocation}
+              onChange={(event) => updateField("includeLocation", event.target.checked)}
+              style={{ width: "18px", height: "18px", accentColor: colors.primary[600] }}
             />
-            <span
-              style={{
-                fontFamily: typography.fontFamily,
-                fontSize: typography.sizes.body.fontSize,
-                color: colors.text.primary,
-              }}
-            >
+            <span style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.body.fontSize, color: colors.text.primary }}>
               Include Location Code
             </span>
-          </div>
+          </label>
           <div style={formGroupStyle}>
             <label style={labelStyle}>Preview</label>
-            <div style={previewStyle}>{generatePreview()}</div>
+            <div style={previewStyle}>{preview}</div>
           </div>
         </div>
       </FormCard>

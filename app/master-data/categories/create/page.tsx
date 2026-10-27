@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared";
 import { CategoryForm } from "@/features/master-data/components";
+import { publicViewUrlFromPayload } from "@/lib/routing/urls";
 
 export default function CreateCategoryPage() {
   const router = useRouter();
@@ -14,12 +15,15 @@ export default function CreateCategoryPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string; publicId?: number }
+      | null;
 
     if (!response.ok) {
-      throw new Error("Failed to create category");
+      throw new Error(payload?.error ?? "Failed to create category");
     }
 
-    router.push("/master-data/categories");
+    router.push(publicViewUrlFromPayload("master-data.category", payload, "/master-data/categories"));
   };
 
   return (

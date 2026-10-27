@@ -76,28 +76,38 @@ const footerStyle: React.CSSProperties = {
 };
 
 const cancelButtonStyle: React.CSSProperties = {
-  padding: "8px 18px",
-  border: `1px solid ${colors.border}`,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  height: 42,
+  padding: "0 16px",
+  border: "1px solid #94a3b8",
   borderRadius: radius.components.button,
-  backgroundColor: colors.surface,
-  color: colors.text.secondary,
+  backgroundColor: "#ffffff",
+  color: colors.text.primary,
   fontFamily: typography.fontFamily,
-  fontSize: typography.sizes.body.fontSize,
-  fontWeight: typography.weights.medium,
+  fontSize: 14,
+  fontWeight: 700,
   cursor: "pointer",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.12)",
 };
 
 const confirmButtonStyle = (color: ConfirmColor): React.CSSProperties => ({
-  padding: "8px 18px",
-  border: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  height: 42,
+  padding: "0 16px",
+  border: "1px solid transparent",
   borderRadius: radius.components.button,
   backgroundColor:
     color === "danger" ? colors.danger[600] : colors.primary[600],
   color: colors.text.inverse,
   fontFamily: typography.fontFamily,
-  fontSize: typography.sizes.body.fontSize,
-  fontWeight: typography.weights.medium,
+  fontSize: 14,
+  fontWeight: 700,
   cursor: "pointer",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.12)",
 });
 
 // ----------------------------------------------------------------------------

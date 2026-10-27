@@ -1,27 +1,10 @@
-import { notFound } from "next/navigation";
-import { RoleFormPage } from "@/features/administration/roles";
-import { getPermissionGroups, getRoleById } from "@/lib/administration-db";
+import { redirectLegacyToPublicUrl } from "@/lib/routing/legacy-redirect";
 
-interface PageProps {
+export default async function LegacyRedirect({
+  params,
+}: {
   params: Promise<{ id: string }>;
-}
-
-export default async function EditRolePage({ params }: PageProps) {
+}) {
   const { id } = await params;
-  const [role, permissionGroups] = await Promise.all([
-    getRoleById(id),
-    getPermissionGroups(),
-  ]);
-
-  if (!role) {
-    notFound();
-  }
-
-  return (
-    <RoleFormPage
-      initialData={role}
-      isCreating={false}
-      permissionGroups={permissionGroups}
-    />
-  );
+  await redirectLegacyToPublicUrl("administration.role", id, "edit");
 }

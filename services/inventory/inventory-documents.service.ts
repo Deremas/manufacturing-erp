@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 
 import { sql } from "@/lib/db";
+import { allocateNextDocumentNumber } from "@/lib/document-numbering";
+import { isPublicIdParam } from "@/lib/routing/public-id";
 import { validateInventoryApprovalPolicy } from "@/services/inventory/inventory-insights.service";
 import { evaluateInventoryApprovalRequirement, type InventoryPolicyDocumentType } from "@/services/inventory/inventory-policy.service";
 import { postAdjustment, postStockIssue, postStockReturn, postTransfer } from "@/services/inventory/inventory-posting.service";
@@ -21,6 +23,7 @@ export interface InventoryLineItemInput {
   itemId: string;
   quantity?: number;
   unitCost?: number;
+  condition?: string;
   remarks?: string;
   systemQty?: number;
   physicalQty?: number;
@@ -32,6 +35,7 @@ export interface InventoryLineItemInput {
 
 export interface TransferSummary {
   id: string;
+  publicId: number;
   transferNo: string;
   transferDate: string;
   fromLocationId: string;
@@ -53,6 +57,7 @@ export interface TransferDetail extends TransferSummary {
     itemId: string;
     itemCode: string;
     itemName: string;
+    uomName?: string | null;
     quantity: number;
     unitCost: number;
     remarks: string;
@@ -61,6 +66,7 @@ export interface TransferDetail extends TransferSummary {
 
 export interface AdjustmentSummary {
   id: string;
+  publicId: number;
   adjustmentNo: string;
   adjustmentDate: string;
   locationId: string;
@@ -91,6 +97,7 @@ export interface AdjustmentDetail extends AdjustmentSummary {
 
 export interface IssueSummary {
   id: string;
+  publicId: number;
   issueNo: string;
   issueDate: string;
   locationId: string;
@@ -114,7 +121,10 @@ export interface IssueDetail extends IssueSummary {
     itemId: string;
     itemCode: string;
     itemName: string;
+    uomName?: string | null;
     quantity: number;
+    alreadyReturnedQty: number;
+    remainingReturnableQty: number;
     unitCost: number;
     remarks: string;
   }>;
@@ -122,6 +132,7 @@ export interface IssueDetail extends IssueSummary {
 
 export interface ReturnSummary {
   id: string;
+  publicId: number;
   returnNo: string;
   returnDate: string;
   locationId: string;
@@ -145,24 +156,29 @@ export interface ReturnDetail extends ReturnSummary {
     itemId: string;
     itemCode: string;
     itemName: string;
+    uomName?: string | null;
     quantity: number;
     unitCost: number;
+    condition: string;
     remarks: string;
   }>;
 }
 
 export interface RequisitionSummary {
   id: string;
+  publicId: number;
   requisitionNo: string;
   requisitionDate: string;
-  requestedById: string;
-  requestedByName: string;
+  requestedById: string | null;
+  requestedByName: string | null;
   fromLocationId: string | null;
   fromLocationName: string | null;
   toLocationId: string | null;
   toLocationName: string | null;
   toDepartmentId: string | null;
   toDepartmentName: string | null;
+  shiftCode: string | null;
+  neededByDate: string | null;
   purpose: string;
   status: InventoryStatus;
   remarks: string;
@@ -177,6 +193,7 @@ export interface RequisitionDetail extends RequisitionSummary {
     itemId: string;
     itemCode: string;
     itemName: string;
+    uomName?: string | null;
     requestedQty: number;
     approvedQty: number;
     issuedQty: number;
@@ -185,6 +202,7 @@ export interface RequisitionDetail extends RequisitionSummary {
 }
 
 interface TransferPayload {
+  transferNo?: string;
   transferDate: string;
   fromLocationId: string;
   toLocationId: string;
@@ -196,6 +214,7 @@ interface TransferPayload {
 }
 
 interface AdjustmentPayload {
+  adjustmentNo?: string;
   adjustmentDate: string;
   locationId: string;
   reason: string;
@@ -207,6 +226,7 @@ interface AdjustmentPayload {
 }
 
 interface IssuePayload {
+  issueNo?: string;
   issueDate: string;
   locationId: string;
   issuedToType: string;
@@ -220,6 +240,7 @@ interface IssuePayload {
 }
 
 interface ReturnPayload {
+  returnNo?: string;
   returnDate: string;
   locationId: string;
   returnedFromType: string;
@@ -233,11 +254,15 @@ interface ReturnPayload {
 }
 
 interface RequisitionPayload {
+  requisitionNo?: string;
   requisitionDate: string;
-  requestedById: string;
+  requestedById?: string | null;
+  actorId: string;
   fromLocationId?: string | null;
   toLocationId?: string | null;
   toDepartmentId?: string | null;
+  shiftCode?: string | null;
+  neededByDate?: string | null;
   purpose: string;
   approverId?: string;
   remarks?: string;
@@ -285,75 +310,81 @@ function computeLineTotals(items: InventoryLineItemInput[], quantityField: "quan
 }
 
 async function nextDocumentNumber(tx: Tx, prefix: string, description: string) {
-  await tx`
-    INSERT INTO "DocumentNumbering" (
-      id,
-      prefix,
-      description,
-      "prefixFormat",
-      separator,
-      "yearFormat",
-      "monthFormat",
-      "dayFormat",
-      "sequenceLength",
-      "currentSequence",
-      "isActive",
-      "isArchived"
-    )
-    VALUES (
-      ${`docnum-${prefix.toLowerCase()}`},
-      ${prefix},
-      ${description},
-      'PREFIX_YEAR',
-      '-',
-      'YYYY',
-      'MM',
-      'DD',
-      4,
-      0,
-      true,
-      false
-    )
-    ON CONFLICT ("prefix") DO NOTHING
-  `;
+  return allocateNextDocumentNumber(tx, prefix, description);
+}
 
-  const currentRows = await tx<
-    Array<{
-      id: string;
-      prefix: string;
-      prefixFormat: string;
-      separator: string;
-      yearFormat: string;
-      sequenceLength: number;
-      currentSequence: number;
-    }>
-  >`
-    SELECT
-      id,
-      prefix,
-      "prefixFormat",
-      separator,
-      "yearFormat",
-      "sequenceLength",
-      "currentSequence"
-    FROM "DocumentNumbering"
-    WHERE prefix = ${prefix}
-    LIMIT 1
-    FOR UPDATE
-  `;
+function normalizeIssueDocumentNumber(value?: string) {
+  return normalizePrefixedDocumentNumber(value, "ISS");
+}
 
-  const config = currentRows[0];
-  const nextSequence = Number(config.currentSequence ?? 0) + 1;
-  await tx`
-    UPDATE "DocumentNumbering"
-    SET "currentSequence" = ${nextSequence}
-    WHERE id = ${config.id}
-  `;
+function normalizeReturnDocumentNumber(value?: string) {
+  return normalizePrefixedDocumentNumber(value, "RET");
+}
 
-  const year = config.yearFormat === "YY"
-    ? new Date().getFullYear().toString().slice(-2)
-    : new Date().getFullYear().toString();
-  return `${config.prefix}${config.separator}${year}${config.separator}${String(nextSequence).padStart(config.sequenceLength, "0")}`;
+function normalizePrefixedDocumentNumber(value: string | undefined, prefix: string) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const formatted = trimmed.match(/^([A-Z]+)\/RAW\/(\d{4})\/(\d{4,})$/i);
+  if (formatted) {
+    return `${prefix}-${formatted[2]}-${formatted[3]}`;
+  }
+
+  return trimmed.replace(/\//g, "-");
+}
+
+async function resolveStoreRequisitionNumber(tx: Tx, value: string | undefined, currentId?: string) {
+  const trimmed = String(value ?? "").trim();
+  const display = trimmed.match(/^SR\/RAW\/(\d{4})\/(\d+)$/i);
+  const stored = trimmed.match(/^SRV-(\d{4})-(\d+)$/i);
+  const supplied = display
+    ? `SRV-${display[1]}-${display[2].padStart(4, "0")}`
+    : stored
+      ? `SRV-${stored[1]}-${stored[2].padStart(4, "0")}`
+      : "";
+  if (!supplied) {
+    if (!trimmed && currentId) {
+      const current = await tx<Array<{ requisitionNo: string }>>`
+        SELECT "requisitionNo" FROM "StoreRequisition" WHERE id = ${currentId} LIMIT 1
+      `;
+      if (current[0]?.requisitionNo) return current[0].requisitionNo;
+    }
+    if (!trimmed) return nextDocumentNumber(tx, "SRV", "Store Requisition");
+    throw new Error("Use the format SR/RAW/2026/0250");
+  }
+
+  const duplicates = currentId
+    ? await tx<Array<{ id: string }>>`
+        SELECT id FROM "StoreRequisition"
+        WHERE "requisitionNo" = ${supplied} AND id <> ${currentId}
+        LIMIT 1
+      `
+    : await tx<Array<{ id: string }>>`
+        SELECT id FROM "StoreRequisition"
+        WHERE "requisitionNo" = ${supplied}
+        LIMIT 1
+      `;
+  if (duplicates.length > 0) {
+    throw new Error("Requisition number already exists");
+  }
+
+  const sequence = supplied.match(/^SRV-\d{4}-(\d+)$/i);
+  if (sequence) {
+    await tx`
+      UPDATE "DocumentNumbering"
+      SET "currentSequence" = GREATEST("currentSequence", ${Number(sequence[1])})
+      WHERE prefix = 'SRV' AND "isArchived" = false
+    `;
+  }
+
+  return supplied;
+}
+
+async function nextTransferNumber(tx: Tx) {
+  const number = await nextDocumentNumber(tx, "TRF", "Stock Transfer");
+  return number.replace(/-/g, "/");
 }
 
 async function writeDocumentAudit(tx: Tx, userId: string, action: string, module: string, recordId: string, newValue?: unknown, oldValue?: unknown) {
@@ -644,7 +675,7 @@ async function rejectApprovalRecord(referenceType: string, referenceId: string, 
   });
 }
 
-async function cancelOpenApprovalRecord(referenceType: string, referenceId: string, userId: string) {
+async function cancelOpenApprovalRecord(referenceType: string, referenceId: string, userId: string, comment?: string) {
   return sql.begin(async (tx) => {
     const rows = await tx<Array<{ id: string; status: string; requestedById: string }>>`
       SELECT id, status, "requestedById"
@@ -671,6 +702,7 @@ async function cancelOpenApprovalRecord(referenceType: string, referenceId: stri
       UPDATE "Approval"
       SET
         status = 'CANCELLED',
+        comment = ${comment ?? null},
         "updatedAt" = NOW()
       WHERE id = ${latest.id}
     `;
@@ -684,6 +716,7 @@ export async function listTransfers(): Promise<TransferSummary[]> {
     const rows = await sql<Array<TransferSummary>>`
       SELECT
         st.id,
+        st."publicId",
         st."transferNo",
         st."transferDate"::text,
         st."fromLocationId",
@@ -709,11 +742,12 @@ export async function listTransfers(): Promise<TransferSummary[]> {
   }
 }
 
-export async function getTransferById(id: string): Promise<TransferDetail | null> {
+export async function getTransferById(key: string): Promise<TransferDetail | null> {
   try {
     const rows = await sql<Array<TransferSummary>>`
       SELECT
         st.id,
+        st."publicId",
         st."transferNo",
         st."transferDate"::text,
         st."fromLocationId",
@@ -730,25 +764,27 @@ export async function getTransferById(id: string): Promise<TransferDetail | null
       INNER JOIN "Location" tl ON tl.id = st."toLocationId"
       INNER JOIN "User" u ON u.id = st."createdById"
       LEFT JOIN "StockTransferItem" sti ON sti."transferId" = st.id
-      WHERE st.id = ${id}
+      WHERE ${isPublicIdParam(key) ? sql`st."publicId" = ${Number(key)}` : sql`st.id = ${key}`}
       GROUP BY st.id, fl."locationName", tl."locationName", u.name
       LIMIT 1
     `;
     const header = rows[0];
     if (!header) return null;
-    const approval = await getAssignedApprover("inventory.transfer", id);
+    const approval = await getAssignedApprover("inventory.transfer", header.id);
     const items = await sql<TransferDetail["items"]>`
       SELECT
         sti.id,
         sti."itemId",
         i."itemCode",
         i."itemName",
+        u.name AS "uomName",
         sti.quantity,
         sti."unitCost",
         COALESCE(sti.remarks, '') AS remarks
       FROM "StockTransferItem" sti
       INNER JOIN "Item" i ON i.id = sti."itemId"
-      WHERE sti."transferId" = ${id}
+      LEFT JOIN "Unit" u ON u.id = i."uomId"
+      WHERE sti."transferId" = ${header.id}
       ORDER BY i."itemCode" ASC
     `;
     return { ...header, ...approval, items };
@@ -775,8 +811,8 @@ export async function createTransfer(payload: TransferPayload) {
 
   return sql.begin(async (tx) => {
     const id = randomUUID();
-    const transferNo = await nextDocumentNumber(tx, "TRF", "Stock Transfer");
-    await tx`
+    const transferNo = payload.transferNo?.trim() || await nextTransferNumber(tx);
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "StockTransfer" (
         id, "transferNo", "transferDate", "fromLocationId", "toLocationId",
         status, remarks, "createdById", "createdAt", "updatedAt"
@@ -785,7 +821,9 @@ export async function createTransfer(payload: TransferPayload) {
         ${id}, ${transferNo}, ${new Date(payload.transferDate)}, ${payload.fromLocationId}, ${payload.toLocationId},
         ${normalizeStatus(payload.status)}, ${payload.remarks ?? null}, ${payload.createdById}, NOW(), NOW()
       )
+      RETURNING "publicId"
     `;
+    const publicId = inserted[0]?.publicId ?? 0;
     for (const item of items) {
       await tx`
         INSERT INTO "StockTransferItem" (id, "transferId", "itemId", quantity, "unitCost", remarks)
@@ -795,7 +833,7 @@ export async function createTransfer(payload: TransferPayload) {
     await syncApprovalState(tx, "inventory.transfer", id, normalizeStatus(payload.status), payload.createdById, payload.approverId, payload.remarks);
     await writeDocumentAudit(tx, payload.createdById, "CREATE", "inventory.transfer", id, payload);
     await writeHistory(tx, "inventory.transfer", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, transferNo };
+    return { id, publicId, transferNo };
   });
 }
 
@@ -812,6 +850,7 @@ export async function updateTransfer(id: string, payload: TransferPayload) {
     totalValue: totals.totalValue,
   });
   return sql.begin(async (tx) => {
+    const transferNo = payload.transferNo?.trim() || await nextTransferNumber(tx);
     const existingRows = await tx<Array<{ status: string }>>`
       SELECT status FROM "StockTransfer" WHERE id = ${id} LIMIT 1
     `;
@@ -824,6 +863,7 @@ export async function updateTransfer(id: string, payload: TransferPayload) {
     await tx`
       UPDATE "StockTransfer"
       SET
+        "transferNo" = ${transferNo},
         "transferDate" = ${new Date(payload.transferDate)},
         "fromLocationId" = ${payload.fromLocationId},
         "toLocationId" = ${payload.toLocationId},
@@ -906,30 +946,30 @@ export async function approveTransferDocument(id: string, userId: string) {
   return { id };
 }
 
-export async function rejectTransferDocument(id: string, userId: string) {
+export async function rejectTransferDocument(id: string, userId: string, comment?: string) {
   const transfer = await getTransferById(id);
   if (!transfer) throw new Error("Transfer not found");
-  await rejectApprovalRecord("inventory.transfer", id, userId);
+  await rejectApprovalRecord("inventory.transfer", id, userId, comment);
   await sql`
     UPDATE "StockTransfer"
     SET status = 'REJECTED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.transfer", id, "REJECT", userId);
+  await writeHistory(sql, "inventory.transfer", id, "REJECT", userId, comment);
   return { id };
 }
 
-export async function cancelTransferDocument(id: string, userId: string) {
+export async function cancelTransferDocument(id: string, userId: string, comment?: string) {
   const transfer = await getTransferById(id);
   if (!transfer) throw new Error("Transfer not found");
   if (transfer.status === "POSTED") throw new Error("Posted transfer cannot be cancelled");
-  await cancelOpenApprovalRecord("inventory.transfer", id, userId);
+  await cancelOpenApprovalRecord("inventory.transfer", id, userId, comment);
   await sql`
     UPDATE "StockTransfer"
     SET status = 'CANCELLED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.transfer", id, "CANCEL", userId);
+  await writeHistory(sql, "inventory.transfer", id, "CANCEL", userId, comment);
   return { id };
 }
 
@@ -938,6 +978,7 @@ export async function listAdjustments(): Promise<AdjustmentSummary[]> {
     return await sql<Array<AdjustmentSummary>>`
       SELECT
         sa.id,
+        sa."publicId",
         sa."adjustmentNo",
         sa."adjustmentDate"::text,
         sa."locationId",
@@ -960,11 +1001,12 @@ export async function listAdjustments(): Promise<AdjustmentSummary[]> {
   }
 }
 
-export async function getAdjustmentById(id: string): Promise<AdjustmentDetail | null> {
+export async function getAdjustmentById(key: string): Promise<AdjustmentDetail | null> {
   try {
     const rows = await sql<Array<AdjustmentSummary>>`
       SELECT
         sa.id,
+        sa."publicId",
         sa."adjustmentNo",
         sa."adjustmentDate"::text,
         sa."locationId",
@@ -979,13 +1021,13 @@ export async function getAdjustmentById(id: string): Promise<AdjustmentDetail | 
       INNER JOIN "Location" l ON l.id = sa."locationId"
       INNER JOIN "User" u ON u.id = sa."createdById"
       LEFT JOIN "StockAdjustmentItem" sai ON sai."adjustmentId" = sa.id
-      WHERE sa.id = ${id}
+      WHERE ${isPublicIdParam(key) ? sql`sa."publicId" = ${Number(key)}` : sql`sa.id = ${key}`}
       GROUP BY sa.id, l."locationName", u.name
       LIMIT 1
     `;
     const header = rows[0];
     if (!header) return null;
-    const approval = await getAssignedApprover("inventory.adjustment", id);
+    const approval = await getAssignedApprover("inventory.adjustment", header.id);
     const items = await sql<AdjustmentDetail["items"]>`
       SELECT
         sai.id,
@@ -999,7 +1041,7 @@ export async function getAdjustmentById(id: string): Promise<AdjustmentDetail | 
         COALESCE(sai.remarks, '') AS remarks
       FROM "StockAdjustmentItem" sai
       INNER JOIN "Item" i ON i.id = sai."itemId"
-      WHERE sai."adjustmentId" = ${id}
+      WHERE sai."adjustmentId" = ${header.id}
       ORDER BY i."itemCode" ASC
     `;
     return { ...header, ...approval, items };
@@ -1021,8 +1063,8 @@ export async function createAdjustment(payload: AdjustmentPayload) {
   });
   return sql.begin(async (tx) => {
     const id = randomUUID();
-    const adjustmentNo = await nextDocumentNumber(tx, "ADJ", "Stock Adjustment");
-    await tx`
+    const adjustmentNo = payload.adjustmentNo?.trim() || await nextDocumentNumber(tx, "ADJ", "Stock Adjustment");
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "StockAdjustment" (
         id, "adjustmentNo", "adjustmentDate", "locationId", reason,
         status, remarks, "createdById", "createdAt", "updatedAt"
@@ -1031,7 +1073,9 @@ export async function createAdjustment(payload: AdjustmentPayload) {
         ${id}, ${adjustmentNo}, ${new Date(payload.adjustmentDate)}, ${payload.locationId}, ${payload.reason},
         ${normalizeStatus(payload.status)}, ${payload.remarks ?? null}, ${payload.createdById}, NOW(), NOW()
       )
+      RETURNING "publicId"
     `;
+    const publicId = inserted[0]?.publicId ?? 0;
     for (const item of items) {
       const systemQty = Number(item.systemQty ?? 0);
       const physicalQty = Number(item.physicalQty ?? 0);
@@ -1048,7 +1092,7 @@ export async function createAdjustment(payload: AdjustmentPayload) {
     await syncApprovalState(tx, "inventory.adjustment", id, normalizeStatus(payload.status), payload.createdById, payload.approverId, payload.remarks);
     await writeDocumentAudit(tx, payload.createdById, "CREATE", "inventory.adjustment", id, payload);
     await writeHistory(tx, "inventory.adjustment", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, adjustmentNo };
+    return { id, publicId, adjustmentNo };
   });
 }
 
@@ -1064,7 +1108,7 @@ export async function updateAdjustment(id: string, payload: AdjustmentPayload) {
     totalValue: totals.totalValue,
   });
   return sql.begin(async (tx) => {
-    const existingRows = await tx<Array<{ status: string }>>`SELECT status FROM "StockAdjustment" WHERE id = ${id} LIMIT 1`;
+    const existingRows = await tx<Array<{ status: string; adjustmentNo: string }>>`SELECT status, "adjustmentNo" FROM "StockAdjustment" WHERE id = ${id} LIMIT 1`;
     const existing = existingRows[0];
     if (!existing) throw new Error("Adjustment not found");
     if (existing.status === "POSTED" || existing.status === "CANCELLED") throw new Error("Posted or cancelled adjustment cannot be edited");
@@ -1072,6 +1116,7 @@ export async function updateAdjustment(id: string, payload: AdjustmentPayload) {
     await tx`
       UPDATE "StockAdjustment"
       SET
+        "adjustmentNo" = ${payload.adjustmentNo?.trim() || existing.adjustmentNo},
         "adjustmentDate" = ${new Date(payload.adjustmentDate)},
         "locationId" = ${payload.locationId},
         reason = ${payload.reason},
@@ -1153,30 +1198,30 @@ export async function approveAdjustmentDocument(id: string, userId: string) {
   return { id };
 }
 
-export async function rejectAdjustmentDocument(id: string, userId: string) {
+export async function rejectAdjustmentDocument(id: string, userId: string, comment?: string) {
   const adjustment = await getAdjustmentById(id);
   if (!adjustment) throw new Error("Adjustment not found");
-  await rejectApprovalRecord("inventory.adjustment", id, userId);
+  await rejectApprovalRecord("inventory.adjustment", id, userId, comment);
   await sql`
     UPDATE "StockAdjustment"
     SET status = 'REJECTED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.adjustment", id, "REJECT", userId);
+  await writeHistory(sql, "inventory.adjustment", id, "REJECT", userId, comment);
   return { id };
 }
 
-export async function cancelAdjustmentDocument(id: string, userId: string) {
+export async function cancelAdjustmentDocument(id: string, userId: string, comment?: string) {
   const adjustment = await getAdjustmentById(id);
   if (!adjustment) throw new Error("Adjustment not found");
   if (adjustment.status === "POSTED") throw new Error("Posted adjustment cannot be cancelled");
-  await cancelOpenApprovalRecord("inventory.adjustment", id, userId);
+  await cancelOpenApprovalRecord("inventory.adjustment", id, userId, comment);
   await sql`
     UPDATE "StockAdjustment"
     SET status = 'CANCELLED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.adjustment", id, "CANCEL", userId);
+  await writeHistory(sql, "inventory.adjustment", id, "CANCEL", userId, comment);
   return { id };
 }
 
@@ -1185,6 +1230,7 @@ export async function listIssues(): Promise<IssueSummary[]> {
     return await sql<Array<IssueSummary>>`
       SELECT
         si.id,
+        si."publicId",
         si."issueNo",
         si."issueDate"::text,
         si."locationId",
@@ -1212,24 +1258,67 @@ export async function listIssues(): Promise<IssueSummary[]> {
   }
 }
 
-export async function getIssueById(id: string): Promise<IssueDetail | null> {
+export async function getIssueById(key: string): Promise<IssueDetail | null> {
   try {
-    const rows = await listIssues();
-    const header = rows.find((row) => row.id === id);
+    const rows = await sql<Array<IssueSummary>>`
+      SELECT
+        si.id,
+        si."publicId",
+        si."issueNo",
+        si."issueDate"::text,
+        si."locationId",
+        l."locationName" AS "locationName",
+        si."issuedToType",
+        si."issuedToId",
+        COALESCE(d.name, u2.name, si."issuedToId") AS "issuedToName",
+        si.purpose,
+        si.status,
+        COALESCE(si.remarks, '') AS remarks,
+        si."createdById",
+        u.name AS "createdByName",
+        COALESCE(COUNT(sii.id), 0)::int AS "itemCount"
+      FROM "StockIssue" si
+      INNER JOIN "Location" l ON l.id = si."locationId"
+      INNER JOIN "User" u ON u.id = si."createdById"
+      LEFT JOIN "Department" d ON d.id = si."issuedToId"
+      LEFT JOIN "User" u2 ON u2.id = si."issuedToId"
+      LEFT JOIN "StockIssueItem" sii ON sii."issueId" = si.id
+      WHERE ${isPublicIdParam(key) ? sql`si."publicId" = ${Number(key)}` : sql`si.id = ${key}`}
+      GROUP BY si.id, l."locationName", d.name, u2.name, u.name
+      LIMIT 1
+    `;
+    const header = rows[0];
     if (!header) return null;
-    const approval = await getAssignedApprover("inventory.issue", id);
+    const approval = await getAssignedApprover("inventory.issue", header.id);
     const items = await sql<IssueDetail["items"]>`
       SELECT
         sii.id,
         sii."itemId",
         i."itemCode",
         i."itemName",
+        COALESCE(
+          NULLIF(TRIM(CONCAT_WS(' - ', NULLIF(UPPER(TRIM(COALESCE(uom.code, uom.abbreviation))), ''), NULLIF(TRIM(uom.name), ''))), ''),
+          uom.name,
+          uom.abbreviation,
+          uom.code
+        ) AS "uomName",
         sii.quantity,
+        COALESCE(returned.quantity, 0) AS "alreadyReturnedQty",
+        GREATEST(sii.quantity - COALESCE(returned.quantity, 0), 0) AS "remainingReturnableQty",
         sii."unitCost",
         COALESCE(sii.remarks, '') AS remarks
       FROM "StockIssueItem" sii
       INNER JOIN "Item" i ON i.id = sii."itemId"
-      WHERE sii."issueId" = ${id}
+      LEFT JOIN "Unit" uom ON uom.id = i."uomId"
+      LEFT JOIN LATERAL (
+        SELECT SUM(sri.quantity) AS quantity
+        FROM "StockReturn" sr
+        INNER JOIN "StockReturnItem" sri ON sri."returnId" = sr.id
+        WHERE sr.reason = ${header.id}
+          AND sri."itemId" = sii."itemId"
+          AND sr.status IN ('SUBMITTED', 'APPROVED', 'POSTED')
+      ) returned ON true
+      WHERE sii."issueId" = ${header.id}
       ORDER BY i."itemCode" ASC
     `;
     return { ...header, ...approval, items };
@@ -1251,8 +1340,8 @@ export async function createIssue(payload: IssuePayload) {
   });
   return sql.begin(async (tx) => {
     const id = randomUUID();
-    const issueNo = await nextDocumentNumber(tx, "ISS", "Stock Issue");
-    await tx`
+    const issueNo = normalizeIssueDocumentNumber(payload.issueNo) || await nextDocumentNumber(tx, "ISS", "Stock Issue");
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "StockIssue" (
         id, "issueNo", "issueDate", "locationId", "issuedToType", "issuedToId",
         purpose, status, remarks, "createdById", "createdAt", "updatedAt"
@@ -1261,7 +1350,9 @@ export async function createIssue(payload: IssuePayload) {
         ${id}, ${issueNo}, ${new Date(payload.issueDate)}, ${payload.locationId}, ${payload.issuedToType}, ${payload.issuedToId},
         ${payload.purpose}, ${normalizeStatus(payload.status)}, ${payload.remarks ?? null}, ${payload.createdById}, NOW(), NOW()
       )
+      RETURNING "publicId"
     `;
+    const publicId = inserted[0]?.publicId ?? 0;
     for (const item of items) {
       await tx`
         INSERT INTO "StockIssueItem" (id, "issueId", "itemId", quantity, "unitCost", remarks)
@@ -1271,7 +1362,7 @@ export async function createIssue(payload: IssuePayload) {
     await syncApprovalState(tx, "inventory.issue", id, normalizeStatus(payload.status), payload.createdById, payload.approverId, payload.remarks);
     await writeDocumentAudit(tx, payload.createdById, "CREATE", "inventory.issue", id, payload);
     await writeHistory(tx, "inventory.issue", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, issueNo };
+    return { id, publicId, issueNo };
   });
 }
 
@@ -1287,7 +1378,7 @@ export async function updateIssue(id: string, payload: IssuePayload) {
     totalValue: totals.totalValue,
   });
   return sql.begin(async (tx) => {
-    const existingRows = await tx<Array<{ status: string }>>`SELECT status FROM "StockIssue" WHERE id = ${id} LIMIT 1`;
+    const existingRows = await tx<Array<{ status: string; issueNo: string }>>`SELECT status, "issueNo" FROM "StockIssue" WHERE id = ${id} LIMIT 1`;
     const existing = existingRows[0];
     if (!existing) throw new Error("Issue not found");
     if (existing.status === "POSTED" || existing.status === "CANCELLED") throw new Error("Posted or cancelled issue cannot be edited");
@@ -1295,6 +1386,7 @@ export async function updateIssue(id: string, payload: IssuePayload) {
     await tx`
       UPDATE "StockIssue"
       SET
+        "issueNo" = ${normalizeIssueDocumentNumber(payload.issueNo) || existing.issueNo},
         "issueDate" = ${new Date(payload.issueDate)},
         "locationId" = ${payload.locationId},
         "issuedToType" = ${payload.issuedToType},
@@ -1372,30 +1464,30 @@ export async function approveIssueDocument(id: string, userId: string) {
   return { id };
 }
 
-export async function rejectIssueDocument(id: string, userId: string) {
+export async function rejectIssueDocument(id: string, userId: string, comment?: string) {
   const issue = await getIssueById(id);
   if (!issue) throw new Error("Issue not found");
-  await rejectApprovalRecord("inventory.issue", id, userId);
+  await rejectApprovalRecord("inventory.issue", id, userId, comment);
   await sql`
     UPDATE "StockIssue"
     SET status = 'REJECTED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.issue", id, "REJECT", userId);
+  await writeHistory(sql, "inventory.issue", id, "REJECT", userId, comment);
   return { id };
 }
 
-export async function cancelIssueDocument(id: string, userId: string) {
+export async function cancelIssueDocument(id: string, userId: string, comment?: string) {
   const issue = await getIssueById(id);
   if (!issue) throw new Error("Issue not found");
   if (issue.status === "POSTED") throw new Error("Posted issue cannot be cancelled");
-  await cancelOpenApprovalRecord("inventory.issue", id, userId);
+  await cancelOpenApprovalRecord("inventory.issue", id, userId, comment);
   await sql`
     UPDATE "StockIssue"
     SET status = 'CANCELLED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.issue", id, "CANCEL", userId);
+  await writeHistory(sql, "inventory.issue", id, "CANCEL", userId, comment);
   return { id };
 }
 
@@ -1404,6 +1496,7 @@ export async function listReturns(): Promise<ReturnSummary[]> {
     return await sql<Array<ReturnSummary>>`
       SELECT
         sr.id,
+        sr."publicId",
         sr."returnNo",
         sr."returnDate"::text,
         sr."locationId",
@@ -1431,24 +1524,53 @@ export async function listReturns(): Promise<ReturnSummary[]> {
   }
 }
 
-export async function getReturnById(id: string): Promise<ReturnDetail | null> {
+export async function getReturnById(key: string): Promise<ReturnDetail | null> {
   try {
-    const rows = await listReturns();
-    const header = rows.find((row) => row.id === id);
+    const rows = await sql<Array<ReturnSummary>>`
+      SELECT
+        sr.id,
+        sr."publicId",
+        sr."returnNo",
+        sr."returnDate"::text,
+        sr."locationId",
+        l."locationName" AS "locationName",
+        sr."returnedFromType",
+        sr."returnedFromId",
+        COALESCE(d.name, u2.name, sr."returnedFromId") AS "returnedFromName",
+        sr.reason,
+        sr.status,
+        COALESCE(sr.remarks, '') AS remarks,
+        sr."createdById",
+        u.name AS "createdByName",
+        COALESCE(COUNT(sri.id), 0)::int AS "itemCount"
+      FROM "StockReturn" sr
+      INNER JOIN "Location" l ON l.id = sr."locationId"
+      INNER JOIN "User" u ON u.id = sr."createdById"
+      LEFT JOIN "Department" d ON d.id = sr."returnedFromId"
+      LEFT JOIN "User" u2 ON u2.id = sr."returnedFromId"
+      LEFT JOIN "StockReturnItem" sri ON sri."returnId" = sr.id
+      WHERE ${isPublicIdParam(key) ? sql`sr."publicId" = ${Number(key)}` : sql`sr.id = ${key}`}
+      GROUP BY sr.id, l."locationName", d.name, u2.name, u.name
+      LIMIT 1
+    `;
+    const header = rows[0];
     if (!header) return null;
-    const approval = await getAssignedApprover("inventory.return", id);
+    const approval = await getAssignedApprover("inventory.return", header.id);
     const items = await sql<ReturnDetail["items"]>`
       SELECT
         sri.id,
         sri."itemId",
         i."itemCode",
         i."itemName",
+        uom.name AS "uomName",
         sri.quantity,
         sri."unitCost",
+        COALESCE(NULLIF(sri.condition, ''), 'Excess') AS condition,
         COALESCE(sri.remarks, '') AS remarks
       FROM "StockReturnItem" sri
       INNER JOIN "Item" i ON i.id = sri."itemId"
-      WHERE sri."returnId" = ${id}
+      LEFT JOIN "Unit" uom ON uom.id = i."uomId"
+      WHERE sri."returnId" = ${header.id}
       ORDER BY i."itemCode" ASC
     `;
     return { ...header, ...approval, items };
@@ -1470,8 +1592,8 @@ export async function createReturn(payload: ReturnPayload) {
   });
   return sql.begin(async (tx) => {
     const id = randomUUID();
-    const returnNo = await nextDocumentNumber(tx, "RET", "Stock Return");
-    await tx`
+    const returnNo = normalizeReturnDocumentNumber(payload.returnNo) || await nextDocumentNumber(tx, "RET", "Stock Return");
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "StockReturn" (
         id, "returnNo", "returnDate", "locationId", "returnedFromType", "returnedFromId",
         reason, status, remarks, "createdById", "createdAt", "updatedAt"
@@ -1480,17 +1602,19 @@ export async function createReturn(payload: ReturnPayload) {
         ${id}, ${returnNo}, ${new Date(payload.returnDate)}, ${payload.locationId}, ${payload.returnedFromType}, ${payload.returnedFromId},
         ${payload.reason}, ${normalizeStatus(payload.status)}, ${payload.remarks ?? null}, ${payload.createdById}, NOW(), NOW()
       )
+      RETURNING "publicId"
     `;
+    const publicId = inserted[0]?.publicId ?? 0;
     for (const item of items) {
       await tx`
-        INSERT INTO "StockReturnItem" (id, "returnId", "itemId", quantity, "unitCost", remarks)
-        VALUES (${randomUUID()}, ${id}, ${item.itemId}, ${Number(item.quantity)}, ${Number(item.unitCost ?? 0)}, ${item.remarks ?? null})
+        INSERT INTO "StockReturnItem" (id, "returnId", "itemId", quantity, "unitCost", condition, remarks)
+        VALUES (${randomUUID()}, ${id}, ${item.itemId}, ${Number(item.quantity)}, ${Number(item.unitCost ?? 0)}, ${item.condition?.trim() || "Excess"}, ${item.remarks ?? null})
       `;
     }
     await syncApprovalState(tx, "inventory.return", id, normalizeStatus(payload.status), payload.createdById, payload.approverId, payload.remarks);
     await writeDocumentAudit(tx, payload.createdById, "CREATE", "inventory.return", id, payload);
     await writeHistory(tx, "inventory.return", id, "CREATE", payload.createdById, payload.remarks);
-    return { id, returnNo };
+    return { id, publicId, returnNo };
   });
 }
 
@@ -1506,7 +1630,7 @@ export async function updateReturn(id: string, payload: ReturnPayload) {
     totalValue: totals.totalValue,
   });
   return sql.begin(async (tx) => {
-    const existingRows = await tx<Array<{ status: string }>>`SELECT status FROM "StockReturn" WHERE id = ${id} LIMIT 1`;
+    const existingRows = await tx<Array<{ status: string; returnNo: string }>>`SELECT status, "returnNo" FROM "StockReturn" WHERE id = ${id} LIMIT 1`;
     const existing = existingRows[0];
     if (!existing) throw new Error("Return not found");
     if (existing.status === "POSTED" || existing.status === "CANCELLED") throw new Error("Posted or cancelled return cannot be edited");
@@ -1514,6 +1638,7 @@ export async function updateReturn(id: string, payload: ReturnPayload) {
     await tx`
       UPDATE "StockReturn"
       SET
+        "returnNo" = ${normalizeReturnDocumentNumber(payload.returnNo) || existing.returnNo},
         "returnDate" = ${new Date(payload.returnDate)},
         "locationId" = ${payload.locationId},
         "returnedFromType" = ${payload.returnedFromType},
@@ -1527,8 +1652,8 @@ export async function updateReturn(id: string, payload: ReturnPayload) {
     await tx`DELETE FROM "StockReturnItem" WHERE "returnId" = ${id}`;
     for (const item of items) {
       await tx`
-        INSERT INTO "StockReturnItem" (id, "returnId", "itemId", quantity, "unitCost", remarks)
-        VALUES (${randomUUID()}, ${id}, ${item.itemId}, ${Number(item.quantity)}, ${Number(item.unitCost ?? 0)}, ${item.remarks ?? null})
+        INSERT INTO "StockReturnItem" (id, "returnId", "itemId", quantity, "unitCost", condition, remarks)
+        VALUES (${randomUUID()}, ${id}, ${item.itemId}, ${Number(item.quantity)}, ${Number(item.unitCost ?? 0)}, ${item.condition?.trim() || "Excess"}, ${item.remarks ?? null})
       `;
     }
     await syncApprovalState(tx, "inventory.return", id, normalizeStatus(payload.status), payload.createdById, payload.approverId, payload.remarks);
@@ -1590,30 +1715,30 @@ export async function approveReturnDocument(id: string, userId: string) {
   return { id };
 }
 
-export async function rejectReturnDocument(id: string, userId: string) {
+export async function rejectReturnDocument(id: string, userId: string, comment?: string) {
   const returnDoc = await getReturnById(id);
   if (!returnDoc) throw new Error("Return not found");
-  await rejectApprovalRecord("inventory.return", id, userId);
+  await rejectApprovalRecord("inventory.return", id, userId, comment);
   await sql`
     UPDATE "StockReturn"
     SET status = 'REJECTED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.return", id, "REJECT", userId);
+  await writeHistory(sql, "inventory.return", id, "REJECT", userId, comment);
   return { id };
 }
 
-export async function cancelReturnDocument(id: string, userId: string) {
+export async function cancelReturnDocument(id: string, userId: string, comment?: string) {
   const returnDoc = await getReturnById(id);
   if (!returnDoc) throw new Error("Return not found");
   if (returnDoc.status === "POSTED") throw new Error("Posted return cannot be cancelled");
-  await cancelOpenApprovalRecord("inventory.return", id, userId);
+  await cancelOpenApprovalRecord("inventory.return", id, userId, comment);
   await sql`
     UPDATE "StockReturn"
     SET status = 'CANCELLED', "updatedAt" = NOW()
     WHERE id = ${id}
   `;
-  await writeHistory(sql, "inventory.return", id, "CANCEL", userId);
+  await writeHistory(sql, "inventory.return", id, "CANCEL", userId, comment);
   return { id };
 }
 
@@ -1622,6 +1747,7 @@ export async function listRequisitions(): Promise<RequisitionSummary[]> {
     return await sql<Array<RequisitionSummary>>`
       SELECT
         sr.id,
+        sr."publicId",
         sr."requisitionNo",
         sr."requisitionDate"::text,
         sr."requestedById",
@@ -1632,12 +1758,14 @@ export async function listRequisitions(): Promise<RequisitionSummary[]> {
         tl."locationName" AS "toLocationName",
         sr."toDepartmentId",
         d.name AS "toDepartmentName",
+        sr."shiftCode",
+        sr."neededByDate"::text AS "neededByDate",
         sr.purpose,
         sr.status,
         COALESCE(sr.remarks, '') AS remarks,
         COALESCE(COUNT(sri.id), 0)::int AS "itemCount"
       FROM "StoreRequisition" sr
-      INNER JOIN "User" u ON u.id = sr."requestedById"
+      LEFT JOIN "User" u ON u.id = sr."requestedById"
       LEFT JOIN "Location" fl ON fl.id = sr."fromLocationId"
       LEFT JOIN "Location" tl ON tl.id = sr."toLocationId"
       LEFT JOIN "Department" d ON d.id = sr."toDepartmentId"
@@ -1650,25 +1778,56 @@ export async function listRequisitions(): Promise<RequisitionSummary[]> {
   }
 }
 
-export async function getRequisitionById(id: string): Promise<RequisitionDetail | null> {
+export async function getRequisitionById(key: string): Promise<RequisitionDetail | null> {
   try {
-    const rows = await listRequisitions();
-    const header = rows.find((row) => row.id === id);
+    const rows = await sql<Array<RequisitionSummary>>`
+      SELECT
+        sr.id,
+        sr."publicId",
+        sr."requisitionNo",
+        sr."requisitionDate"::text,
+        sr."requestedById",
+        u.name AS "requestedByName",
+        sr."fromLocationId",
+        fl."locationName" AS "fromLocationName",
+        sr."toLocationId",
+        tl."locationName" AS "toLocationName",
+        sr."toDepartmentId",
+        d.name AS "toDepartmentName",
+        sr."shiftCode",
+        sr."neededByDate"::text AS "neededByDate",
+        sr.purpose,
+        sr.status,
+        COALESCE(sr.remarks, '') AS remarks,
+        COALESCE(COUNT(sri.id), 0)::int AS "itemCount"
+      FROM "StoreRequisition" sr
+      LEFT JOIN "User" u ON u.id = sr."requestedById"
+      LEFT JOIN "Location" fl ON fl.id = sr."fromLocationId"
+      LEFT JOIN "Location" tl ON tl.id = sr."toLocationId"
+      LEFT JOIN "Department" d ON d.id = sr."toDepartmentId"
+      LEFT JOIN "StoreRequisitionItem" sri ON sri."requisitionId" = sr.id
+      WHERE ${isPublicIdParam(key) ? sql`sr."publicId" = ${Number(key)}` : sql`sr.id = ${key}`}
+      GROUP BY sr.id, u.name, fl."locationName", tl."locationName", d.name
+      LIMIT 1
+    `;
+    const header = rows[0];
     if (!header) return null;
-    const approval = await getAssignedApprover("inventory.requisition", id);
+    const approval = await getAssignedApprover("inventory.requisition", header.id);
     const items = await sql<RequisitionDetail["items"]>`
       SELECT
         sri.id,
         sri."itemId",
         i."itemCode",
         i."itemName",
+        u.name AS "uomName",
         sri."requestedQty",
         sri."approvedQty",
         sri."issuedQty",
         COALESCE(sri.remarks, '') AS remarks
       FROM "StoreRequisitionItem" sri
       INNER JOIN "Item" i ON i.id = sri."itemId"
-      WHERE sri."requisitionId" = ${id}
+      LEFT JOIN "Unit" u ON u.id = i."uomId"
+      WHERE sri."requisitionId" = ${header.id}
       ORDER BY i."itemCode" ASC
     `;
     return { ...header, ...approval, items };
@@ -1685,23 +1844,25 @@ export async function createRequisition(payload: RequisitionPayload) {
     status: payload.status,
     approverId: payload.approverId,
     fromLocationId: payload.fromLocationId ?? undefined,
-    createdById: payload.requestedById,
+    createdById: payload.actorId,
     totalQuantity: totals.totalQuantity,
     totalValue: totals.totalValue,
   });
   return sql.begin(async (tx) => {
     const id = randomUUID();
-    const requisitionNo = await nextDocumentNumber(tx, "SRV", "Store Requisition");
-    await tx`
+    const requisitionNo = await resolveStoreRequisitionNumber(tx, payload.requisitionNo);
+    const inserted = await tx<Array<{ publicId: number }>>`
       INSERT INTO "StoreRequisition" (
         id, "requisitionNo", "requisitionDate", "requestedById", "fromLocationId", "toLocationId",
-        "toDepartmentId", purpose, status, remarks, "createdAt", "updatedAt"
+        "toDepartmentId", "shiftCode", "neededByDate", purpose, status, remarks, "createdAt", "updatedAt"
       )
       VALUES (
         ${id}, ${requisitionNo}, ${new Date(payload.requisitionDate)}, ${payload.requestedById}, ${payload.fromLocationId ?? null}, ${payload.toLocationId ?? null},
-        ${payload.toDepartmentId ?? null}, ${payload.purpose}, ${normalizeStatus(payload.status)}, ${payload.remarks ?? null}, NOW(), NOW()
+        ${payload.toDepartmentId ?? null}, ${payload.shiftCode ?? null}, ${payload.neededByDate ? new Date(payload.neededByDate) : null}, ${payload.purpose}, ${normalizeStatus(payload.status)}, ${payload.remarks ?? null}, NOW(), NOW()
       )
+      RETURNING "publicId"
     `;
+    const publicId = inserted[0]?.publicId ?? 0;
     for (const item of items) {
       await tx`
         INSERT INTO "StoreRequisitionItem" (
@@ -1712,10 +1873,10 @@ export async function createRequisition(payload: RequisitionPayload) {
         )
       `;
     }
-    await syncApprovalState(tx, "inventory.requisition", id, normalizeStatus(payload.status), payload.requestedById, payload.approverId, payload.remarks);
-    await writeDocumentAudit(tx, payload.requestedById, "CREATE", "inventory.requisition", id, payload);
-    await writeHistory(tx, "inventory.requisition", id, "CREATE", payload.requestedById, payload.remarks);
-    return { id, requisitionNo };
+    await syncApprovalState(tx, "inventory.requisition", id, normalizeStatus(payload.status), payload.actorId, payload.approverId, payload.remarks);
+    await writeDocumentAudit(tx, payload.actorId, "CREATE", "inventory.requisition", id, payload);
+    await writeHistory(tx, "inventory.requisition", id, "CREATE", payload.actorId, payload.remarks);
+    return { id, publicId, requisitionNo };
   });
 }
 
@@ -1727,7 +1888,7 @@ export async function updateRequisition(id: string, payload: RequisitionPayload)
     status: payload.status,
     approverId: payload.approverId,
     fromLocationId: payload.fromLocationId ?? undefined,
-    createdById: payload.requestedById,
+    createdById: payload.actorId,
     totalQuantity: totals.totalQuantity,
     totalValue: totals.totalValue,
   });
@@ -1737,14 +1898,18 @@ export async function updateRequisition(id: string, payload: RequisitionPayload)
     if (!existing) throw new Error("Store requisition not found");
     if (existing.status === "CANCELLED" || existing.status === "ISSUED") throw new Error("Cancelled or issued requisition cannot be edited");
 
+    const requisitionNo = await resolveStoreRequisitionNumber(tx, payload.requisitionNo, id);
     await tx`
       UPDATE "StoreRequisition"
       SET
+        "requisitionNo" = ${requisitionNo},
         "requisitionDate" = ${new Date(payload.requisitionDate)},
         "requestedById" = ${payload.requestedById},
         "fromLocationId" = ${payload.fromLocationId ?? null},
         "toLocationId" = ${payload.toLocationId ?? null},
         "toDepartmentId" = ${payload.toDepartmentId ?? null},
+        "shiftCode" = ${payload.shiftCode ?? null},
+        "neededByDate" = ${payload.neededByDate ? new Date(payload.neededByDate) : null},
         purpose = ${payload.purpose},
         status = ${normalizeStatus(payload.status)},
         remarks = ${payload.remarks ?? null},
@@ -1762,9 +1927,9 @@ export async function updateRequisition(id: string, payload: RequisitionPayload)
         )
       `;
     }
-    await syncApprovalState(tx, "inventory.requisition", id, normalizeStatus(payload.status), payload.requestedById, payload.approverId, payload.remarks);
-    await writeDocumentAudit(tx, payload.requestedById, "UPDATE", "inventory.requisition", id, payload);
-    await writeHistory(tx, "inventory.requisition", id, "UPDATE", payload.requestedById, payload.remarks);
+    await syncApprovalState(tx, "inventory.requisition", id, normalizeStatus(payload.status), payload.actorId, payload.approverId, payload.remarks);
+    await writeDocumentAudit(tx, payload.actorId, "UPDATE", "inventory.requisition", id, payload);
+    await writeHistory(tx, "inventory.requisition", id, "UPDATE", payload.actorId, payload.remarks);
     return { id };
   });
 }
@@ -1778,22 +1943,22 @@ export async function approveRequisition(id: string, userId: string) {
   return { id };
 }
 
-export async function rejectRequisition(id: string, userId: string) {
+export async function rejectRequisition(id: string, userId: string, comment?: string) {
   const requisition = await getRequisitionById(id);
   if (!requisition) throw new Error("Store requisition not found");
-  await rejectApprovalRecord("inventory.requisition", id, userId);
+  await rejectApprovalRecord("inventory.requisition", id, userId, comment);
   await sql`UPDATE "StoreRequisition" SET status = 'REJECTED', "updatedAt" = NOW() WHERE id = ${id}`;
-  await writeHistory(sql, "inventory.requisition", id, "REJECT", userId);
+  await writeHistory(sql, "inventory.requisition", id, "REJECT", userId, comment);
   return { id };
 }
 
-export async function cancelRequisition(id: string, userId: string) {
+export async function cancelRequisition(id: string, userId: string, comment?: string) {
   const requisition = await getRequisitionById(id);
   if (!requisition) throw new Error("Store requisition not found");
   if (requisition.status === "ISSUED") throw new Error("Issued requisition cannot be cancelled");
-  await cancelOpenApprovalRecord("inventory.requisition", id, userId);
+  await cancelOpenApprovalRecord("inventory.requisition", id, userId, comment);
   await sql`UPDATE "StoreRequisition" SET status = 'CANCELLED', "updatedAt" = NOW() WHERE id = ${id}`;
-  await writeHistory(sql, "inventory.requisition", id, "CANCEL", userId);
+  await writeHistory(sql, "inventory.requisition", id, "CANCEL", userId, comment);
   return { id };
 }
 

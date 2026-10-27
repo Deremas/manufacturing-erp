@@ -53,7 +53,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "7px 10px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: "6px",
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -333,7 +333,7 @@ export default function ItemForm({
             value={String(fieldValue ?? "")}
             onChange={handleChange}
           >
-            <option value="">{placeholder ?? `Select ${label}`}</option>
+            <option value="">{placeholder ?? "Select ..."}</option>
             {options.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -439,7 +439,7 @@ export default function ItemForm({
         <div style={sectionStyle}>
           <h4 style={sectionTitleStyle}>Pricing & Stock Level</h4>
           <div style={gridStyle}>
-            {renderField("reorderPoint", "Low Stock Alert Level", "number")}
+            {renderField("reorderPoint", "Low Stock Alert", "number")}
             {showStandardCost &&
               renderField("standardCost", "Standard Cost", "number")}
             {showSellingPrice &&
@@ -514,7 +514,7 @@ export default function ItemForm({
                 value={taxCodeId}
                 onChange={(e) => setTaxCodeId(e.target.value)}
               >
-                <option value="">Select tax code...</option>
+                <option value="">Select ...</option>
                 {taxCodes
                   .filter((t) => t.isActive)
                   .map((t) => (

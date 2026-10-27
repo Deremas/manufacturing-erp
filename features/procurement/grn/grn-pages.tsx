@@ -8,19 +8,32 @@ import {
   DataTable,
   EmptyState,
   FormCard,
+  FormattedNumberInput,
   PageHeader,
   SearchInput,
+  SelectPlaceholderOption,
+  useFormSubmit,
 } from "@/components/shared";
 import type { Action, Breadcrumb, Column, TableAction } from "@/components/shared";
+import { Eye, FileText, Pencil, Undo2 } from "lucide-react";
 import { colors } from "@/components/ui/colors";
 import { radius } from "@/components/ui/radius";
 import { spacing } from "@/components/ui/spacing";
 import { typography } from "@/components/ui/typography";
+import { useProcurementApprovalDialog } from "../approval-controls";
+import { formatMoney } from "@/lib/utils/format-number";
+import {
+  procurementCreateUrl,
+  procurementEditUrl,
+  procurementListUrl,
+  procurementViewUrl,
+} from "@/lib/procurement/routes";
 
 type Option = { value: string; label: string };
 
 type GoodsReceiptListRow = {
   id: string;
+  publicId: number;
   number: string;
   date: string;
   status: string;
@@ -46,10 +59,12 @@ type GoodsReceiptEditorLine = {
   unitCost: number;
   taxAmount: number;
   remarks: string;
+  receiptType: "INVENTORY" | "ASSET" | "SERVICE";
 };
 
 type GoodsReceiptEditorProps = {
   documentId?: string;
+  documentPublicId?: number;
   title: string;
   subtitle: string;
   breadcrumbs: Breadcrumb[];
@@ -72,7 +87,6 @@ type GoodsReceiptEditorProps = {
     deliveredBy: string;
     receivedById: string;
     remarks: string;
-    approverId?: string;
     items: GoodsReceiptEditorLine[];
   };
 };
@@ -105,13 +119,36 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: radius.components.input,
   backgroundColor: colors.surface,
   fontSize: typography.sizes.body.fontSize,
   color: colors.text.primary,
   boxSizing: "border-box",
 };
+
+const itemGridHeaderStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "8px",
+  alignItems: "center",
+  marginBottom: "10px",
+  padding: "0 4px",
+  color: colors.text.secondary,
+  fontSize: typography.sizes.caption.fontSize,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const itemGridScrollStyle: React.CSSProperties = {
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
+  paddingBottom: "8px",
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+};
+
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(new Date(value));
@@ -139,8 +176,16 @@ function statusBadge(status: string) {
   );
 }
 
-export function GoodsReceiptListPage({ rows }: { rows: GoodsReceiptListRow[] }) {
+export function GoodsReceiptListPage({
+  rows,
+}: {
+  rows: GoodsReceiptListRow[];
+}) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
+  const approval = useProcurementApprovalDialog({
+    apiBasePath: "/api/procurement/grn",
+  });
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -153,23 +198,50 @@ export function GoodsReceiptListPage({ rows }: { rows: GoodsReceiptListRow[] }) 
   }, [rows, search]);
 
   const columns: Column<GoodsReceiptListRow>[] = [
-    { key: "number", label: "GRN No", sortable: true },
+    {
+      key: "number",
+      label: "GRN No",
+      sortable: true,
+      render: (_value, record) => (
+        <a href={procurementViewUrl("grn", record.publicId)} style={{ color: colors.primary[600], fontWeight: 600, textDecoration: "none" }}>
+          {record.number}
+        </a>
+      ),
+    },
     { key: "date", label: "Date", render: (value) => formatDate(String(value)) },
     { key: "poNo", label: "PO No" },
     { key: "supplierName", label: "Supplier" },
     { key: "locationName", label: "Receiving Location" },
     { key: "itemCount", label: "Items" },
-    { key: "totalAmount", label: "Total Amount", render: (value) => Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+    { key: "totalAmount", label: "Total Amount", render: (value) => formatMoney(Number(value ?? 0)) },
     { key: "status", label: "Status", render: (value) => statusBadge(String(value)) },
   ];
 
   const actions: TableAction[] = [
-    { label: "View", onClick: (record) => { window.location.href = `/procurement/grn/${(record as GoodsReceiptListRow).id}`; } },
-    { label: "Edit", onClick: (record) => { window.location.href = `/procurement/grn/${(record as GoodsReceiptListRow).id}/edit`; } },
+    { label: "View", icon: <Eye size={16} />, onClick: (record) => { router.push(procurementViewUrl("grn", (record as GoodsReceiptListRow).publicId)); } },
+    {
+      label: "Edit",
+      icon: <Pencil size={16} />,
+      show: (record) => !["POSTED", "CANCELLED"].includes(String((record as GoodsReceiptListRow).status).toUpperCase()),
+      onClick: (record) => { router.push(procurementEditUrl("grn", (record as GoodsReceiptListRow).publicId)); },
+    },
+    {
+      label: "Create Invoice",
+      icon: <FileText size={16} />,
+      show: (record) => String((record as GoodsReceiptListRow).status).toUpperCase() === "POSTED",
+      onClick: (record) => { router.push(procurementCreateUrl("invoice", { grnPublicId: (record as GoodsReceiptListRow).publicId })); },
+    },
+    {
+      label: "Create Return",
+      icon: <Undo2 size={16} />,
+      show: (record) => String((record as GoodsReceiptListRow).status).toUpperCase() === "POSTED",
+      onClick: (record) => { router.push(procurementCreateUrl("return", { grnPublicId: (record as GoodsReceiptListRow).publicId })); },
+    },
+    ...approval.actions,
   ];
 
   const headerActions: Action[] = [
-    { label: "Create GRN", variant: "primary", onClick: () => { window.location.href = "/procurement/grn/create"; } },
+    { label: "Create GRN", variant: "primary", onClick: () => { router.push(`${procurementListUrl("grn")}/create`); } },
   ];
 
   return (
@@ -184,12 +256,14 @@ export function GoodsReceiptListPage({ rows }: { rows: GoodsReceiptListRow[] }) 
         <SearchInput value={search} onChange={setSearch} placeholder="Search GRN number, PO number, supplier, or location..." />
       </div>
       <DataTable columns={columns} data={filtered} actions={actions} pageSize={15} emptyState={<EmptyState title="No Goods Receipts" message="Create the first GRN to receive approved purchase orders into inventory." />} />
+      {approval.dialog}
     </div>
   );
 }
 
 export function GoodsReceiptEditor({
   documentId,
+  documentPublicId,
   title,
   subtitle,
   breadcrumbs,
@@ -205,6 +279,7 @@ export function GoodsReceiptEditor({
 }: GoodsReceiptEditorProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { savingKey, isBusy, submitJson } = useFormSubmit();
   const [message, setMessage] = useState("");
   const [header, setHeader] = useState({
     grnDate: initialValue.grnDate,
@@ -217,7 +292,6 @@ export function GoodsReceiptEditor({
     deliveredBy: initialValue.deliveredBy,
     receivedById: initialValue.receivedById,
     remarks: initialValue.remarks,
-    approverId: initialValue.approverId ?? "",
   });
   const [lineItems, setLineItems] = useState<GoodsReceiptEditorLine[]>(initialValue.items);
 
@@ -253,6 +327,7 @@ export function GoodsReceiptEditor({
         unitCost: Number(item.unitCost ?? 0),
         taxAmount: Number(item.taxAmount ?? 0),
         remarks: "",
+        receiptType: String(item.receiptType ?? "INVENTORY") as GoodsReceiptEditorLine["receiptType"],
       })));
     });
   }
@@ -279,42 +354,41 @@ export function GoodsReceiptEditor({
 
   function save(status: string) {
     setMessage("");
-    startTransition(async () => {
-      const response = await fetch(documentId ? `${apiBasePath}/${documentId}` : apiBasePath, {
-        method: documentId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...header,
-          status,
-          lineItems: lineItems.map((line) => ({
-            poItemId: line.poItemId,
-            itemId: line.itemId,
-            uomId: line.uomId,
-            orderedQty: line.orderedQty,
-            previouslyReceivedQty: line.previouslyReceivedQty,
-            receivedQty: line.receivedQty,
-            acceptedQty: line.acceptedQty,
-            rejectedQty: line.rejectedQty,
-            unitCost: line.unitCost,
-            taxAmount: line.taxAmount,
-            remarks: line.remarks,
-          })),
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        setMessage(result.error ?? "Unable to save goods receipt");
-        return;
-      }
-      router.push(documentId ? `${successHref}/${documentId}` : `${successHref}/${result.id}`);
-      router.refresh();
+    void submitJson(status, {
+      url: documentId ? `${apiBasePath}/${documentId}` : apiBasePath,
+      method: documentId ? "PUT" : "POST",
+      body: {
+        ...header,
+        status,
+        lineItems: lineItems.map((line) => ({
+          poItemId: line.poItemId,
+          itemId: line.itemId,
+          uomId: line.uomId,
+          orderedQty: line.orderedQty,
+          previouslyReceivedQty: line.previouslyReceivedQty,
+          receivedQty: line.receivedQty,
+          acceptedQty: line.acceptedQty,
+          rejectedQty: line.rejectedQty,
+          unitCost: line.unitCost,
+          taxAmount: line.taxAmount,
+          remarks: line.remarks,
+          receiptType: line.receiptType,
+        })),
+      },
+      errorFallback: "Unable to save goods receipt",
+      successHref: (result) =>
+        procurementViewUrl(
+          "grn",
+          Number(result.publicId ?? documentPublicId ?? 0),
+        ),
+      onError: setMessage,
     });
   }
 
   const actions: Action[] = [
-    { label: "Cancel", variant: "secondary", onClick: () => router.push(cancelHref), disabled: isPending },
-    { label: "Save Draft", variant: "secondary", onClick: () => save("DRAFT"), loading: isPending, disabled: !canEdit },
-    { label: "Submit", variant: "primary", onClick: () => save("SUBMITTED"), loading: isPending, disabled: !canEdit },
+    { label: "Cancel", variant: "secondary", onClick: () => router.push(cancelHref), disabled: isBusy || isPending },
+    { label: "Save Draft", variant: "secondary", onClick: () => save("DRAFT"), loading: savingKey === "DRAFT", loadingLabel: "Saving...", disabled: !canEdit || isPending },
+    { label: "Submit for Approval", variant: "primary", onClick: () => save("SUBMITTED"), loading: savingKey === "SUBMITTED", loadingLabel: "Submitting...", disabled: !canEdit || isPending },
   ];
 
   return (
@@ -331,21 +405,21 @@ export function GoodsReceiptEditor({
           <div style={fieldStyle}>
             <label style={labelStyle}>PO Reference</label>
             <select style={inputStyle} value={header.poId} disabled={!canEdit || Boolean(documentId)} onChange={(event) => void loadPrefill(event.target.value)}>
-              <option value="">Select purchase order</option>
+              <SelectPlaceholderOption label="Select PO" />
               {purchaseOrders.map((po) => <option key={po.value} value={po.value}>{po.label}</option>)}
             </select>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>Supplier</label>
             <select style={inputStyle} value={header.supplierId} disabled>
-              <option value="">Select supplier</option>
+              <SelectPlaceholderOption label="Select supplier" />
               {suppliers.map((supplier) => <option key={supplier.value} value={supplier.value}>{supplier.label}</option>)}
             </select>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>Receiving Location</label>
             <select style={inputStyle} value={header.receivingLocationId} disabled={!canEdit} onChange={(event) => setHeader((current) => ({ ...current, receivingLocationId: event.target.value }))}>
-              <option value="">Select location</option>
+              <SelectPlaceholderOption label="Select receiving location" />
               {locations.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}
             </select>
           </div>
@@ -368,14 +442,7 @@ export function GoodsReceiptEditor({
           <div style={fieldStyle}>
             <label style={labelStyle}>Received By</label>
             <select style={inputStyle} value={header.receivedById} disabled={!canEdit} onChange={(event) => setHeader((current) => ({ ...current, receivedById: event.target.value }))}>
-              <option value="">Select user</option>
-              {users.map((user) => <option key={user.value} value={user.value}>{user.label}</option>)}
-            </select>
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Assigned Approver</label>
-            <select style={inputStyle} value={header.approverId} disabled={!canEdit} onChange={(event) => setHeader((current) => ({ ...current, approverId: event.target.value }))}>
-              <option value="">No explicit approver</option>
+              <SelectPlaceholderOption label="Select receiver" />
               {users.map((user) => <option key={user.value} value={user.value}>{user.label}</option>)}
             </select>
           </div>
@@ -387,29 +454,34 @@ export function GoodsReceiptEditor({
       </FormCard>
 
       <FormCard title="Received Items" variant="teal-header">
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div className="erp-table-scroll" style={itemGridScrollStyle}>
+        <div style={{ ...itemGridHeaderStyle, gridTemplateColumns: "2fr 1fr repeat(9, 1fr)", minWidth: "1400px" }}>
+          {["Item", "Receipt Type", "UOM", "Ordered", "Prev. Received", "Remaining", "Received", "Accepted", "Rejected", "Unit Cost", "Tax Amount"].map((label) => (
+            <div key={label}>{label}</div>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "1280px" }}>
           {lineItems.length === 0 ? (
             <p style={{ margin: 0, color: colors.text.secondary }}>Select an approved purchase order to load receivable lines.</p>
           ) : null}
           {lineItems.map((line, index) => (
-            <div key={`${line.poItemId ?? line.itemId}-${index}`} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr repeat(7, 1fr) 2fr", gap: "8px", alignItems: "center" }}>
+            <div key={`${line.poItemId ?? line.itemId}-${index}`}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr repeat(9, 1fr)", gap: "8px", alignItems: "center" }}>
                 <input style={inputStyle} value={line.itemLabel} disabled />
+                <input style={inputStyle} value={line.receiptType === "ASSET" ? "Asset" : line.receiptType === "SERVICE" ? "Service" : "Inventory"} disabled />
                 <input style={inputStyle} value={line.uomName} disabled />
-                <input style={inputStyle} type="number" value={line.orderedQty} disabled />
-                <input style={inputStyle} type="number" value={line.previouslyReceivedQty} disabled />
-                <input style={inputStyle} type="number" value={line.remainingQty} disabled />
-                <input style={inputStyle} type="number" value={line.receivedQty} disabled={!canEdit} onChange={(event) => updateLine(index, "receivedQty", Number(event.target.value))} />
-                <input style={inputStyle} type="number" value={line.acceptedQty} disabled={!canEdit} onChange={(event) => updateLine(index, "acceptedQty", Number(event.target.value))} />
-                <input style={inputStyle} type="number" value={line.rejectedQty} disabled={!canEdit} onChange={(event) => updateLine(index, "rejectedQty", Number(event.target.value))} />
-                <input style={inputStyle} type="number" value={line.unitCost} disabled={!canEdit} onChange={(event) => updateLine(index, "unitCost", Number(event.target.value))} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "8px" }}>
-                <input style={inputStyle} type="number" value={line.taxAmount} disabled={!canEdit} onChange={(event) => updateLine(index, "taxAmount", Number(event.target.value))} placeholder="Tax Amount" />
-                <input style={inputStyle} value={line.remarks} disabled={!canEdit} onChange={(event) => updateLine(index, "remarks", event.target.value)} placeholder="Remarks" />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={line.orderedQty} disabled />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={line.previouslyReceivedQty} disabled />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={line.remainingQty} disabled />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={line.receivedQty} disabled={!canEdit} onChange={(nextValue) => updateLine(index, "receivedQty", nextValue)} />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={line.acceptedQty} disabled={!canEdit} onChange={(nextValue) => updateLine(index, "acceptedQty", nextValue)} />
+                <FormattedNumberInput style={inputStyle} decimals={0} value={line.rejectedQty} disabled={!canEdit} onChange={(nextValue) => updateLine(index, "rejectedQty", nextValue)} />
+                <FormattedNumberInput style={inputStyle} decimals={2} value={line.unitCost} disabled={!canEdit} onChange={(nextValue) => updateLine(index, "unitCost", nextValue)} />
+                <FormattedNumberInput style={inputStyle} decimals={2} value={line.taxAmount} disabled={!canEdit} onChange={(nextValue) => updateLine(index, "taxAmount", nextValue)} />
               </div>
             </div>
           ))}
+        </div>
         </div>
       </FormCard>
 

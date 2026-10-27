@@ -4,6 +4,7 @@
 
 export interface StockBalanceView {
   itemId?: string;
+  itemPublicId?: number;
   itemCode: string;
   itemName: string;
   categoryId?: string;
@@ -13,6 +14,7 @@ export interface StockBalanceView {
   uomId?: string;
   uom?: string;
   locationId?: string;
+  locationPublicId?: number;
   location: string;
   quantity: number;
   reserved: number;
@@ -69,7 +71,7 @@ export interface AdjustmentLineItem {
   itemId: string;
   itemCode: string;
   itemName: string;
-  adjustmentType: "increase" | "decrease";
+  adjustmentType: string;
   quantity: number;
   unitCost: number;
   reason?: string;

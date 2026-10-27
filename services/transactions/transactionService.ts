@@ -1,50 +1,27 @@
-// services/transactions/transactionService.ts
-// Generic transaction layer — status management, history, comments, attachments.
-// Every document type (PO, GRN, invoice, etc.) inherits from this service.
-//
-// TODO: Replace in-memory stores with real Prisma queries when the DB is ready.
-
+import { sql } from "@/lib/db";
 import type {
-  DocumentStatus,
-  DocumentHistoryEntry,
-  DocumentCommentEntry,
   DocumentAttachmentEntry,
+  DocumentCommentEntry,
+  DocumentHistoryEntry,
+  DocumentStatus,
 } from "./types";
 import type {
-  AddHistoryInput,
-  AddCommentInput,
   AddAttachmentInput,
+  AddCommentInput,
+  AddHistoryInput,
 } from "@/validators/transactions";
 
-// ─── Status machine ──────────────────────────────────────────────────────────
-
-/** Ordered lifecycle — used to validate transitions. */
-const STATUS_ORDER: Record<DocumentStatus, number> = {
-  DRAFT: 0,
-  PENDING: 1,
-  APPROVED: 2,
-  REJECTED: -1, // terminal (negative = dead-end)
-  POSTED: 3,
-  VOIDED: -2, // terminal
-  CANCELLED: -3, // terminal
-  ARCHIVED: 10, // terminal
-};
-
-/** Allowed transitions keyed by [from → to]. */
 const TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
   DRAFT: ["PENDING"],
   PENDING: ["APPROVED", "REJECTED"],
   APPROVED: ["POSTED", "REJECTED"],
-  REJECTED: ["DRAFT"], // allowed to re-submit
+  REJECTED: ["DRAFT"],
   POSTED: ["VOIDED"],
   VOIDED: [],
   CANCELLED: [],
   ARCHIVED: [],
 };
 
-/**
- * Returns `true` if the transition from → to is valid.
- */
 export function canTransition(
   from: DocumentStatus,
   to: DocumentStatus,
@@ -52,9 +29,6 @@ export function canTransition(
   return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-/**
- * Given the current status and an action name, returns the next status or null.
- */
 export function getNextStatus(
   current: DocumentStatus,
   action: string,
@@ -74,9 +48,6 @@ export function getNextStatus(
   return null;
 }
 
-/**
- * Returns the list of available action labels for a given status.
- */
 export function getAvailableActions(status: DocumentStatus): string[] {
   const actions: Record<DocumentStatus, string[]> = {
     DRAFT: ["Submit", "Print", "Export"],
@@ -91,9 +62,6 @@ export function getAvailableActions(status: DocumentStatus): string[] {
   return actions[status] ?? ["Print", "Export"];
 }
 
-/**
- * Maps a document status to a Tailwind badge variant string.
- */
 export function getStatusBadgeVariant(status: DocumentStatus): string {
   const variants: Record<DocumentStatus, string> = {
     DRAFT: "draft",
@@ -108,168 +76,245 @@ export function getStatusBadgeVariant(status: DocumentStatus): string {
   return variants[status] ?? "draft";
 }
 
-// ─── In-memory stores (placeholder) ──────────────────────────────────────────
-// TODO: Replace with Prisma queries against DocumentHistory, DocumentComment,
-//       DocumentAttachment tables.
+type HistoryRow = {
+  id: string;
+  action: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  comment: string | null;
+  performedBy: string;
+  performedByName: string;
+  createdAt: Date;
+};
 
-/** Internal store entries that also carry the lookup key. */
-interface HistoryStoreEntry extends DocumentHistoryEntry {
-  referenceType: string;
-  referenceId: string;
-}
-interface CommentStoreEntry extends DocumentCommentEntry {
-  referenceType: string;
-  referenceId: string;
-}
-interface AttachmentStoreEntry extends DocumentAttachmentEntry {
-  referenceType: string;
-  referenceId: string;
+type CommentRow = {
+  id: string;
+  content: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: Date;
+};
+
+type AttachmentRow = {
+  id: string;
+  fileName: string;
+  fileSize: number | null;
+  mimeType: string | null;
+  fileUrl: string;
+  uploadedBy: string;
+  uploadedByName: string;
+  createdAt: Date;
+};
+
+function mapHistoryRow(row: HistoryRow): DocumentHistoryEntry {
+  return {
+    id: row.id,
+    action: row.action,
+    fieldName: row.fieldName ?? undefined,
+    oldValue: row.oldValue ?? undefined,
+    newValue: row.newValue ?? undefined,
+    comment: row.comment ?? undefined,
+    performedBy: row.performedBy,
+    performedByName: row.performedByName,
+    createdAt: row.createdAt,
+  };
 }
 
-const historyStore: HistoryStoreEntry[] = [];
-const commentStore: CommentStoreEntry[] = [];
-const attachmentStore: AttachmentStoreEntry[] = [];
-
-let historyIdCounter = 0;
-let commentIdCounter = 0;
-let attachmentIdCounter = 0;
-
-function nextHistoryId(): string {
-  historyIdCounter += 1;
-  return `hist-${Date.now()}-${historyIdCounter}`;
-}
-function nextCommentId(): string {
-  commentIdCounter += 1;
-  return `cmt-${Date.now()}-${commentIdCounter}`;
-}
-function nextAttachmentId(): string {
-  attachmentIdCounter += 1;
-  return `att-${Date.now()}-${attachmentIdCounter}`;
+function mapCommentRow(row: CommentRow): DocumentCommentEntry {
+  return {
+    id: row.id,
+    content: row.content,
+    createdBy: row.createdBy,
+    createdByName: row.createdByName,
+    createdAt: row.createdAt,
+  };
 }
 
-// ─── History ─────────────────────────────────────────────────────────────────
+function mapAttachmentRow(row: AttachmentRow): DocumentAttachmentEntry {
+  return {
+    id: row.id,
+    fileName: row.fileName,
+    fileSize: row.fileSize ?? undefined,
+    mimeType: row.mimeType ?? undefined,
+    fileUrl: row.fileUrl,
+    uploadedBy: row.uploadedBy,
+    uploadedByName: row.uploadedByName,
+    createdAt: row.createdAt,
+  };
+}
 
 export async function getDocumentHistory(
   referenceType: string,
   referenceId: string,
 ): Promise<DocumentHistoryEntry[]> {
-  // TODO: Prisma query — findMany where referenceType & referenceId
-  return historyStore
-    .filter(
-      (h) => h.referenceType === referenceType && h.referenceId === referenceId,
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+  const rows = await sql<HistoryRow[]>`
+    SELECT
+      h.id,
+      h.action,
+      h."fieldName",
+      h."oldValue",
+      h."newValue",
+      h.comment,
+      h."performedById" AS "performedBy",
+      COALESCE(u.name, u.email, '') AS "performedByName",
+      h."createdAt"
+    FROM "DocumentHistory" h
+    LEFT JOIN "User" u ON u.id = h."performedById"
+    WHERE h."referenceType" = ${referenceType}
+      AND h."referenceId" = ${referenceId}
+      AND h."isArchived" = false
+    ORDER BY h."createdAt" DESC
+  `;
+
+  return rows.map(mapHistoryRow);
 }
 
 export async function addHistoryEntry(data: AddHistoryInput): Promise<void> {
-  // TODO: Prisma create
-  const entry: HistoryStoreEntry = {
-    id: nextHistoryId(),
-    action: data.action,
-    fieldName: data.fieldName,
-    oldValue: data.oldValue,
-    newValue: data.newValue,
-    comment: data.comment,
-    performedBy: data.performedById,
-    performedByName: "", // TODO: resolve from user store
-    createdAt: new Date(),
-    referenceType: data.referenceType,
-    referenceId: data.referenceId,
-  };
-  historyStore.push(entry);
+  await sql`
+    INSERT INTO "DocumentHistory" (
+      "referenceType",
+      "referenceId",
+      action,
+      "fieldName",
+      "oldValue",
+      "newValue",
+      comment,
+      "performedById",
+      "isArchived",
+      "createdAt"
+    )
+    VALUES (
+      ${data.referenceType},
+      ${data.referenceId},
+      ${data.action},
+      ${data.fieldName ?? null},
+      ${data.oldValue ?? null},
+      ${data.newValue ?? null},
+      ${data.comment ?? null},
+      ${data.performedById},
+      false,
+      NOW()
+    )
+  `;
 }
-
-// ─── Comments ────────────────────────────────────────────────────────────────
 
 export async function getComments(
   referenceType: string,
   referenceId: string,
 ): Promise<DocumentCommentEntry[]> {
-  // TODO: Prisma query
-  return commentStore
-    .filter(
-      (c) => c.referenceType === referenceType && c.referenceId === referenceId,
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+  const rows = await sql<CommentRow[]>`
+    SELECT
+      c.id,
+      c.content,
+      c."createdById" AS "createdBy",
+      COALESCE(u.name, u.email, '') AS "createdByName",
+      c."createdAt"
+    FROM "DocumentComment" c
+    LEFT JOIN "User" u ON u.id = c."createdById"
+    WHERE c."referenceType" = ${referenceType}
+      AND c."referenceId" = ${referenceId}
+      AND c."isArchived" = false
+    ORDER BY c."createdAt" DESC
+  `;
+
+  return rows.map(mapCommentRow);
 }
 
 export async function addComment(data: AddCommentInput): Promise<void> {
-  // TODO: Prisma create
-  const entry: CommentStoreEntry = {
-    id: nextCommentId(),
-    content: data.content,
-    createdBy: data.createdById,
-    createdByName: "", // TODO: resolve from user store
-    createdAt: new Date(),
-    referenceType: data.referenceType,
-    referenceId: data.referenceId,
-  };
-  commentStore.push(entry);
+  await sql`
+    INSERT INTO "DocumentComment" (
+      "referenceType",
+      "referenceId",
+      content,
+      "createdById",
+      "isArchived",
+      "createdAt",
+      "updatedAt"
+    )
+    VALUES (
+      ${data.referenceType},
+      ${data.referenceId},
+      ${data.content},
+      ${data.createdById},
+      false,
+      NOW(),
+      NOW()
+    )
+  `;
 }
 
 export async function deleteComment(id: string): Promise<void> {
-  // TODO: Prisma delete
-  const idx = commentStore.findIndex((c) => c.id === id);
-  if (idx !== -1) commentStore.splice(idx, 1);
+  await sql`
+    UPDATE "DocumentComment"
+    SET "isArchived" = true,
+        "updatedAt" = NOW()
+    WHERE id = ${id}
+  `;
 }
-
-// ─── Attachments ─────────────────────────────────────────────────────────────
 
 export async function getAttachments(
   referenceType: string,
   referenceId: string,
 ): Promise<DocumentAttachmentEntry[]> {
-  // TODO: Prisma query
-  return attachmentStore
-    .filter(
-      (a) => a.referenceType === referenceType && a.referenceId === referenceId,
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+  const rows = await sql<AttachmentRow[]>`
+    SELECT
+      a.id,
+      a."fileName",
+      a."fileSize",
+      a."mimeType",
+      a."fileUrl",
+      a."uploadedById" AS "uploadedBy",
+      COALESCE(u.name, u.email, '') AS "uploadedByName",
+      a."createdAt"
+    FROM "DocumentAttachment" a
+    LEFT JOIN "User" u ON u.id = a."uploadedById"
+    WHERE a."referenceType" = ${referenceType}
+      AND a."referenceId" = ${referenceId}
+      AND a."isArchived" = false
+    ORDER BY a."createdAt" DESC
+  `;
+
+  return rows.map(mapAttachmentRow);
 }
 
 export async function uploadAttachment(
   data: AddAttachmentInput,
 ): Promise<void> {
-  // TODO: Prisma create + file storage upload
-  attachmentStore.push({
-    id: nextAttachmentId(),
-    fileName: data.fileName,
-    fileSize: data.fileSize,
-    mimeType: data.mimeType,
-    fileUrl: data.fileUrl,
-    uploadedBy: data.uploadedById,
-    uploadedByName: "", // TODO: resolve from user store
-    createdAt: new Date(),
-    referenceType: data.referenceType,
-    referenceId: data.referenceId,
-  } as DocumentAttachmentEntry & {
-    referenceType: string;
-    referenceId: string;
-  });
+  await sql`
+    INSERT INTO "DocumentAttachment" (
+      "referenceType",
+      "referenceId",
+      "fileName",
+      "fileSize",
+      "mimeType",
+      "fileUrl",
+      "uploadedById",
+      "isArchived",
+      "createdAt"
+    )
+    VALUES (
+      ${data.referenceType},
+      ${data.referenceId},
+      ${data.fileName},
+      ${data.fileSize ?? null},
+      ${data.mimeType ?? null},
+      ${data.fileUrl},
+      ${data.uploadedById},
+      false,
+      NOW()
+    )
+  `;
 }
 
 export async function deleteAttachment(id: string): Promise<void> {
-  // TODO: Prisma delete + file storage removal
-  const idx = attachmentStore.findIndex((a) => a.id === id);
-  if (idx !== -1) attachmentStore.splice(idx, 1);
+  await sql`
+    UPDATE "DocumentAttachment"
+    SET "isArchived" = true
+    WHERE id = ${id}
+  `;
 }
 
-// ─── Status actions ──────────────────────────────────────────────────────────
-
-/**
- * Generic helper that records a history entry for a status transition.
- * Components call this after they have persisted the document's new status
- * to the database.
- */
 async function recordStatusAction(
   referenceType: string,
   referenceId: string,
@@ -292,13 +337,7 @@ export async function submitDocument(
   userId: string,
   notes?: string,
 ): Promise<void> {
-  await recordStatusAction(
-    referenceType,
-    referenceId,
-    userId,
-    "SUBMITTED",
-    notes,
-  );
+  await recordStatusAction(referenceType, referenceId, userId, "SUBMITTED", notes);
 }
 
 export async function approveDocument(
@@ -307,13 +346,7 @@ export async function approveDocument(
   userId: string,
   notes?: string,
 ): Promise<void> {
-  await recordStatusAction(
-    referenceType,
-    referenceId,
-    userId,
-    "APPROVED",
-    notes,
-  );
+  await recordStatusAction(referenceType, referenceId, userId, "APPROVED", notes);
 }
 
 export async function rejectDocument(
@@ -322,13 +355,7 @@ export async function rejectDocument(
   userId: string,
   notes?: string,
 ): Promise<void> {
-  await recordStatusAction(
-    referenceType,
-    referenceId,
-    userId,
-    "REJECTED",
-    notes,
-  );
+  await recordStatusAction(referenceType, referenceId, userId, "REJECTED", notes);
 }
 
 export async function postDocument(
@@ -345,13 +372,7 @@ export async function voidDocument(
   userId: string,
   reason?: string,
 ): Promise<void> {
-  await recordStatusAction(
-    referenceType,
-    referenceId,
-    userId,
-    "VOIDED",
-    reason,
-  );
+  await recordStatusAction(referenceType, referenceId, userId, "VOIDED", reason);
 }
 
 export async function cancelDocument(
@@ -360,13 +381,7 @@ export async function cancelDocument(
   userId: string,
   reason?: string,
 ): Promise<void> {
-  await recordStatusAction(
-    referenceType,
-    referenceId,
-    userId,
-    "CANCELLED",
-    reason,
-  );
+  await recordStatusAction(referenceType, referenceId, userId, "CANCELLED", reason);
 }
 
 export async function archiveDocument(

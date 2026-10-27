@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 
 export interface StockBalanceRow {
   itemId: string;
+  itemPublicId: number;
   itemCode: string;
   itemName: string;
   categoryId: string | null;
@@ -13,6 +14,7 @@ export interface StockBalanceRow {
   uomCode: string | null;
   uomName: string | null;
   locationId: string;
+  locationPublicId: number;
   locationCode: string;
   locationName: string;
   quantity: number;
@@ -60,6 +62,7 @@ export async function listStockBalances(): Promise<StockBalanceRow[]> {
   const rows = await sql<
     Array<{
       itemId: string;
+      itemPublicId: number;
       itemCode: string;
       itemName: string;
       categoryId: string | null;
@@ -71,6 +74,7 @@ export async function listStockBalances(): Promise<StockBalanceRow[]> {
       uomCode: string | null;
       uomName: string | null;
       locationId: string;
+      locationPublicId: number;
       locationCode: string;
       locationName: string;
       quantity: number;
@@ -83,6 +87,7 @@ export async function listStockBalances(): Promise<StockBalanceRow[]> {
   >`
     SELECT
       sb."itemId",
+      i."publicId" AS "itemPublicId",
       i."itemCode",
       i."itemName",
       i."categoryId",
@@ -94,6 +99,7 @@ export async function listStockBalances(): Promise<StockBalanceRow[]> {
       u.code AS "uomCode",
       u.name AS "uomName",
       sb."locationId",
+      l."publicId" AS "locationPublicId",
       l."locationCode",
       l."locationName",
       sb.quantity,
@@ -109,6 +115,7 @@ export async function listStockBalances(): Promise<StockBalanceRow[]> {
     LEFT JOIN "Unit" u ON u.id = i."uomId"
     INNER JOIN "Location" l ON l.id = sb."locationId"
     WHERE sb."isArchived" = false
+      AND i."isArchived" = false
     ORDER BY i."itemCode" ASC, l."locationName" ASC
   `;
 
@@ -124,6 +131,7 @@ export async function listStockBalances(): Promise<StockBalanceRow[]> {
 
     return {
       itemId: row.itemId,
+      itemPublicId: Number(row.itemPublicId ?? 0),
       itemCode: row.itemCode,
       itemName: row.itemName,
       categoryId: row.categoryId,
@@ -135,6 +143,7 @@ export async function listStockBalances(): Promise<StockBalanceRow[]> {
       uomCode: row.uomCode,
       uomName: row.uomName,
       locationId: row.locationId,
+      locationPublicId: Number(row.locationPublicId ?? 0),
       locationCode: row.locationCode,
       locationName: row.locationName,
       quantity: row.quantity,

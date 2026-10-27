@@ -39,6 +39,7 @@ export interface CreateUserInput {
   avatar?: string;
   permissions?: string[];
   locations?: string[];
+  isActive?: boolean;
 }
 
 export interface UpdateUserInput extends Partial<CreateUserInput> {}
@@ -49,12 +50,14 @@ export interface Role extends BaseEntity {
   name: string;
   description?: string;
   permissions: string[];
+  isSystem?: boolean;
 }
 
 export interface CreateRoleInput {
   name: string;
   description?: string;
   permissions?: string[];
+  isActive?: boolean;
 }
 
 export interface UpdateRoleInput extends Partial<CreateRoleInput> {}

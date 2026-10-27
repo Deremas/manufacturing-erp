@@ -14,6 +14,7 @@ export default async function StockBalancePage() {
     <StockOverview
       initialData={balances.map((row) => ({
         itemId: row.itemId,
+        itemPublicId: row.itemPublicId,
         itemCode: row.itemCode,
         itemName: row.itemName,
         categoryId: row.categoryId ?? undefined,
@@ -23,6 +24,7 @@ export default async function StockBalancePage() {
         uomId: row.uomId ?? undefined,
         uom: row.uomName ?? row.uomCode ?? "",
         locationId: row.locationId,
+        locationPublicId: row.locationPublicId,
         location: row.locationName,
         quantity: row.quantity,
         reserved: row.reservedQuantity,

@@ -54,7 +54,7 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   height: "48px",
   padding: "10px 12px",
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.inputBorder}`,
   borderRadius: "10px",
   backgroundColor: colors.surface,
   fontFamily: typography.fontFamily,
@@ -224,7 +224,7 @@ export default function TaxCodeFormPage({
                 onChange={(e) => setTaxType(e.target.value)}
                 style={selectStyle}
               >
-                <option value="">Select type...</option>
+                <option value="">Select ...</option>
                 {taxTypeOptions.map((type) => (
                   <option key={type} value={type}>
                     {type}
